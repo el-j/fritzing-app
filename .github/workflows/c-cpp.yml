@@ -41,12 +41,13 @@ jobs:
              ls -alrt
              ./tools/deploy_fritzing_mac.sh
              echo "done DEPLOY SCRIPT"
-             cd ..
+             cd ../deploy-app
              ls -alrt
       - name: copy file to server
         run: |
           pwd
-          cd deploy-app
+          cd ../deploy-app
+          ls -alrt
           pwd
           echo "get cloudsend script"
           curl -O 'https://gist.githubusercontent.com/tavinus/93bdbc051728748787dc22a58dfe58d8/raw/cloudsend.sh' && chmod +x cloudsend.sh
