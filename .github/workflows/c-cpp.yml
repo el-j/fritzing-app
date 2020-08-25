@@ -8,11 +8,20 @@ on:
 
 jobs:
   build:
-
     runs-on: macos-latest
-
     steps:
       - uses: actions/checkout@v2
+      - name: update file and push to remote
+        run: |
+          echo "Test push for a new Release Build to the macosRelease Branch" >> release.txt
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          git commit -m "Update release.txt"
+          git push origin macosReleases
+
       - name: Install HomeBrew
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
@@ -28,7 +37,7 @@ jobs:
           wget -q -O - https://github.com/libgit2/libgit2/archive/v0.28.1.tar.gz | tar xz && mv libgit2-0.28.1/* ../libgit2/
           (cd ../libgit2/build && cmake -D BUILD_SHARED_LIBS=OFF .. && cmake --build .)
           (cd .. && wget -q -O - https://dl.bintray.com/boostorg/release/1.70.0/source/boost_1_70_0.tar.bz2 | tar xj)
-          echo "boost installed, libgit2 is build"
+          echo "libgit2 is build"
           
       - name: Get and Install Boost
         run: |
@@ -43,3 +52,14 @@ jobs:
              ./tools/deploy_fritzing_mac.sh
              echo "done DEPLOY SCRIPT"
              ls *.dmg
+             
+      - name: update file and push to remote
+        run: |
+          echo "Test push commit to the remote in the workflow" >> test.txt
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          git commit -m "Update test.txt"
+          git push origin macosReleases
