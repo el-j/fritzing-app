@@ -14,11 +14,12 @@ jobs:
       - name: update file and push to remote
         run: |
           echo "Test push for a new Release Build to the macosRelease Branch" >> release.txt
-
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch
           git checkout macosReleases
           git status
+          touch release.txt
           git add .
           git status
           git commit -m "Update release.txt"
