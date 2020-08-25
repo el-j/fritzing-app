@@ -41,15 +41,14 @@ jobs:
              ls -alrt
              ./tools/deploy_fritzing_mac.sh
              echo "done DEPLOY SCRIPT"
-             
-      - name: update file and push to remote
+             cd ..
+             ls -alrt
+      - name: copy file to server
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch
-          git remote add releaseorigin https://github.com/el-j/freetzing-macosRelease.git
-          git status
-          git add .
-          git status
-          git commit -m "push release now"
-          git push -u releaseorigin master
+          pwd
+          cd deploy-app
+          pwd
+          echo "get cloudsend script"
+          curl -O 'https://gist.githubusercontent.com/tavinus/93bdbc051728748787dc22a58dfe58d8/raw/cloudsend.sh' && chmod +x cloudsend.sh
+           ./cloudsend.sh './fritzing.dmg' 'https://base.joev.de/nextcloud/index.php/s/8cDkTc8Z2ajqdxY'
+    
