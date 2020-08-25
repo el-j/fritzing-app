@@ -22,7 +22,12 @@ jobs:
           wget -q -O - https://github.com/libgit2/libgit2/archive/v0.28.1.tar.gz | tar xz && mv libgit2-0.28.1/* ../libgit2/
           (cd ../libgit2/build && cmake -D BUILD_SHARED_LIBS=OFF .. && cmake --build .)
           (cd .. && wget -q -O - https://dl.bintray.com/boostorg/release/1.70.0/source/boost_1_70_0.tar.bz2 | tar xj)
+          echo "boost installed, libgit2 is build"
       - name: Deploy and Build Fritzing
         run: |
              ls /usr/local/opt
              pwd
+             ls -alrt
+             ./tools/deploy_fritzing_mac.sh
+             echo "done DEPLOY SCRIPT"
+             ls *.dmg
