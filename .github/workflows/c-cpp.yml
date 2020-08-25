@@ -9,15 +9,20 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: configure
-      run: ./configure
-    - name: make
-      run: make
-    - name: make check
-      run: make check
-    - name: make distcheck
-      run: make distcheck
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v2
+        with:
+          host: 'macos'
+      - name: Install dependencies LibGit&Boost
+        run: |
+         mkdir -p ../libgit2/build
+          wget -q -O - https://github.com/libgit2/libgit2/archive/v0.28.1.tar.gz | tar xz && mv libgit2-0.28.1/* ../libgit2/
+          (cd ../libgit2/build && cmake -D BUILD_SHARED_LIBS=OFF .. && cmake --build .)
+          (cd .. && wget -q -O - https://dl.bintray.com/boostorg/release/1.70.0/source/boost_1_70_0.tar.bz2 | tar xj)
+      - name: Deploy and Build Fritzing
+        run: |
+             ls /usr/local/opt
+             tools/deploy_fritzing_mac.sh
