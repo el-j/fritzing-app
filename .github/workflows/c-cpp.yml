@@ -47,9 +47,9 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch
-          git checkout macosReleases
+          git remote add releaseorigin https://github.com/el-j/freetzing-macosRelease.git
           git status
           git add .
           git status
-          git commit -m "Update release.txt"
-          git push origin macosReleases
+          git commit -m "push release now"
+          git push -u releaseorigin master
