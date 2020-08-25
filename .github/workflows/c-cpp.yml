@@ -25,4 +25,4 @@ jobs:
       - name: Deploy and Build Fritzing
         run: |
              ls /usr/local/opt
-             tools/deploy_fritzing_mac.sh
+             pwd
