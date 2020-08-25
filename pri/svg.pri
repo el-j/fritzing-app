@@ -1,6 +1,6 @@
 # /*******************************************************************
 # Part of the Fritzing project - http://fritzing.org
-# Copyright (c) 2007-08 Fachhochschule Potsdam - http://fh-potsdam.de
+# Copyright (c) 2007-08 Fritzing
 # Fritzing is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -11,10 +11,6 @@
 # GNU General Public License for more details.
 # You should have received a copy of the GNU General Public License
 # along with Fritzing. If not, see <http://www.gnu.org/licenses/>.
-# ********************************************************************
-# $Revision: 5721 $:
-# $Author: cohen@irascible.com $:
-# $Date: 2012-01-03 16:53:58 +0100 (Di, 03. Jan 2012) $
 # ********************************************************************/
 HEADERS += src/svg/svgfilesplitter.h \
     src/svg/svgpathparser.h \
@@ -33,7 +29,7 @@ HEADERS += src/svg/svgfilesplitter.h \
     src/svg/gedaelementparser.h \
     src/svg/gedaelementgrammar_p.h \
     src/svg/gedaelementlexer.h
-    
+
 SOURCES += src/svg/svgfilesplitter.cpp \
     src/svg/svgpathparser.cpp \
     src/svg/svgpathgrammar.cpp \

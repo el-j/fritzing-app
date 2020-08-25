@@ -1,7 +1,7 @@
 /*******************************************************************
 
 Part of the Fritzing project - http://fritzing.org
-Copyright (c) 2007-2014 Fachhochschule Potsdam - http://fh-potsdam.de
+Copyright (c) 2007-2019 Fritzing
 
 Fritzing is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,12 +16,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 
-********************************************************************
-
-$Revision: 6181 $:
-$Author: cohen@irascible.com $:
-$Date: 2012-07-18 15:52:11 +0200 (Mi, 18. Jul 2012) $
-
 ********************************************************************/
 
 // misc Fritzing utility functions
@@ -33,18 +27,32 @@ $Date: 2012-07-18 15:52:11 +0200 (Mi, 18. Jul 2012) $
 #include <QTextStream>
 #include <QSet>
 
-static QStringList ___fritzingExtensions___;
+static QStringList p_fritzingExtensions;
+static QStringList p_fritzingBundleExtensions;
+
+static inline void initializeExtensionList() {
+	if (p_fritzingExtensions.count() == 0) {
+		p_fritzingExtensions
+		        << FritzingSketchExtension << FritzingBinExtension
+		        << FritzingPartExtension
+		        << FritzingBundleExtension << FritzingBundledPartExtension
+		        << FritzingBundledBinExtension;
+		p_fritzingBundleExtensions
+		        << FritzingBundleExtension
+		        << FritzingBundledPartExtension
+		        << FritzingBundledBinExtension;
+	}
+	return;
+}
 
 const QStringList & fritzingExtensions() {
-	if (___fritzingExtensions___.count() == 0) {
-		___fritzingExtensions___
-			<< FritzingSketchExtension << FritzingBinExtension
-			<< FritzingPartExtension
-			<< FritzingBundleExtension << FritzingBundledPartExtension
-			<< FritzingBundledBinExtension;
-	}
+	initializeExtensionList();
+	return p_fritzingExtensions;
+}
 
-	return ___fritzingExtensions___;
+const QStringList & fritzingBundleExtensions() {
+	initializeExtensionList();
+	return p_fritzingBundleExtensions;
 }
 
 bool isParent(QObject * candidateParent, QObject * candidateChild) {

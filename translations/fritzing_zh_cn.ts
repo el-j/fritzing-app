@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
-<TS version="2.0" language="zh_CN">
+<TS version="2.1" language="zh_CN">
 <context>
     <name>AboutBox</name>
     <message>
@@ -10,10 +10,6 @@
     <message>
         <source>&lt;b&gt;GNU GPL v3 on the code and CreativeCommons:BY-SA on the rest</source>
         <translation>&lt;b&gt;代码遵守GNU GPL v3 其他内容遵守 CreativeCommons:BY-SA</translation>
-    </message>
-    <message>
-        <source>&lt;b&gt;2007-%1 Fachhochschule Potsdam&lt;/b&gt;</source>
-        <translation>&lt;b&gt;2007-%1 Fachhochschule Potsdam&lt;/b&gt;</translation>
     </message>
     <message>
         <source>Fritzing is made by: </source>
@@ -37,10 +33,6 @@
     </message>
     <message>
         <source>Mariano Crowe, Johannes Landstorfer, </source>
-        <translation></translation>
-    </message>
-    <message>
-        <source>Jenny Chowdhury, Lionel Michel, Jannis Leidel, </source>
         <translation></translation>
     </message>
     <message>
@@ -76,34 +68,6 @@
         <translation></translation>
     </message>
     <message>
-        <source>Thanks to Kurt Badelt and Miguel Solis for the Spanish translation, </source>
-        <translation>感谢 Kurt Badelt和Miguel Solis 对西班牙语的翻译,</translation>
-    </message>
-    <message>
-        <source>to Gianluca Urgese for the Italian translation, </source>
-        <translation>Gianluca Urgese 对意大利版的翻译,</translation>
-    </message>
-    <message>
-        <source>to Nuno Pessanha Santos for the Portuguese (European) translation, </source>
-        <translation>Nuno Pessanha Santos 对葡萄牙(欧洲)版的翻译,</translation>
-    </message>
-    <message>
-        <source>to Yuelin and Ninjia  for the Chinese (Simplified) translation, </source>
-        <translation>Yuelin和Ninjia 对简体中文版的翻译,</translation>
-    </message>
-    <message>
-        <source>to Hiroshi Suzuki for the Japanese translation, </source>
-        <translation>Hiroshi Suzuki 对日文版的翻译,</translation>
-    </message>
-    <message>
-        <source>to Robert Lee for the Chinese (Traditional) translation, </source>
-        <translation>Robert Lee 对繁体中文版的翻译,</translation>
-    </message>
-    <message>
-        <source>to Vladimir Savinov for the Russian translation, </source>
-        <translation>Vladimir Savinov 对俄罗斯版的翻译,</translation>
-    </message>
-    <message>
         <source>Fritzing is made possible with funding from the </source>
         <translation></translation>
     </message>
@@ -132,51 +96,103 @@
         <translation></translation>
     </message>
     <message>
-        <source>&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;</source>
-        <translation></translation>
-    </message>
-    <message>
-        <source>to Josef Dustira for the Czech translation, </source>
-        <translation>Josef Dustira对捷克语的翻译, </translation>
-    </message>
-    <message>
-        <source>to Jinbuhm Kim for the Korean translation, </source>
-        <translation>Jinbuhm Kim对韩语的翻译, </translation>
-    </message>
-    <message>
-        <source>to Alexander Kaltsas for the Greek translation, </source>
-        <translation>Alexander Kaltsas对希腊语的翻译, </translation>
-    </message>
-    <message>
-        <source>to &amp;#313;ubom&amp;iacute;r Ducho&amp;#328; for the Slovak translation, </source>
-        <translation> &amp;#313;ubom&amp;iacute;r Ducho&amp;#328; 对斯洛伐克语的翻译, </translation>
-    </message>
-    <message>
-        <source>to Steven Noppe and Davy Uittenbogerd for the Dutch translation, </source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>to Cihan Mete Bahad&amp;#x0131;r for the Turkish translation, </source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>and to Arthur Zanona, Nuno Pessanha Santos, Leandro Nunes, and Gabriel Ferreira for the Portuguese (Brazilian) translation. </source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>to Nikolay Stankov for the Bulgarian translation, </source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>and from each purchase of a Fritzing Starter Kit or a PCB from Fritzing Fab.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>to Lionel Michel, Yvan Kloster, Alexandre Dussart, and Roald Baudoux for the French translation, </source>
+        <source>Version %1.%2.%3 &lt;small&gt;(%4%5 %6) %7 [Qt %8]&lt;/small&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Version %1.%2.%3 &lt;small&gt;(%4%5 %6) %7 [Qt %8]&lt;/small&gt;</source>
+        <source>Jenny Chowdhury, Lionel Michel, Fabian Althaus, Jannis Leidel, </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;2007-%1 Fritzing&lt;/b&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Thanks for the translations go out to: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Spanish: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Italian: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Portuguese (European): </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Portuguese (Brazilian): </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Chinese (Simplified): </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Japanese: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Russian: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dutch: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Czech: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Korean: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Slovak: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Greek: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>French: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Turkish: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bulgarian: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Yuelin and Ninjia</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Chinese (Traditional): </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Robert Lee</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Hiroshi Suzuki</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Jinbuhm Kim</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -946,18 +962,6 @@ A custom board svg typically has one or two silkscreen layers and one board laye
 <context>
     <name>FApplication</name>
     <message>
-        <source>Import files from previous version?</source>
-        <translation>从早期版本导入?</translation>
-    </message>
-    <message>
-        <source>Import</source>
-        <translation>导入</translation>
-    </message>
-    <message>
-        <source>Do not import now</source>
-        <translation>现在导入么</translation>
-    </message>
-    <message>
         <source>Fritzing failure</source>
         <translation>Fritzing 出错了</translation>
     </message>
@@ -970,18 +974,6 @@ A custom board svg typically has one or two silkscreen layers and one board laye
         <translation>Fritzing 在event %3 中获得了一个 %2的%1意外</translation>
     </message>
     <message>
-        <source>Do you want to import parts and bins that you have created with earlier versions of Fritzing?
-</source>
-        <translation>你想要导入使用早期版本的Fritzing创建的元件和元件库么?
-</translation>
-    </message>
-    <message>
-        <source>
-Note: You can import them later using the &quot;Help&quot; &gt; &quot;Import parts and bins from old version...&quot; menu action.</source>
-        <translation>
-提示：你可以在稍后使用&quot;帮助&quot;&gt;&quot;从早期版本中导入元件和元件库&quot;菜单导入他们.</translation>
-    </message>
-    <message>
         <source>Please specify an .fzz file name to save to (cancel will delete the backup)</source>
         <translation>请指定一个.fzz文件名来以便保存(取消将删除备份)</translation>
     </message>
@@ -991,6 +983,33 @@ Note: You can import them later using the &quot;Help&quot; &gt; &quot;Import par
     </message>
     <message>
         <source>Fritzing caught an exception from %1 in event %2: %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Regenerate parts database?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Regenerating the parts database will take some minutes and you will have to restart Fritzing
+
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Would you like to regenerate the parts database?
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Regenerate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="unfinished">取消</translation>
+    </message>
+    <message>
+        <source>Regenerating parts database...</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1009,7 +1028,18 @@ Note: You can import them later using the &quot;Help&quot; &gt; &quot;Import par
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>The &lt;b&gt;PCB View&lt;/b&gt; is where you layout the components will  on a physical PCB (Printed Circuit Board).&lt;br/&gt;&lt;br/&gt;PCBs can be made at home or in a small lab using DIY etching processes. They also can be sent to professional PCB manufacturing services for more precise fabrication. &lt;br/&gt;&lt;table&gt;&lt;tr&gt;&lt;td&gt;The first thing you will need is a board to place your parts on. There should already be one in your sketch, but if not, drag in the board icon from the Parts Bin. The icon matches thie image to the right: &lt;/td&gt;&lt;td&gt;&lt;img src=&quot;:resources/parts/svg/core/icon/rectangle_pcb.svg&quot; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;br/&gt;&lt;br/&gt;To lay out your PCB, arrange all the components so they fit nicely on the board. Then try to shift them around to minimize the length and confusion of connections. You can also resize rectangular boards. &lt;br/&gt;&lt;table&gt;&lt;tr&gt;&lt;td&gt;Once the parts are sorted out, you connect them with copper traces. You can drag out a trace from individual connections or use the autorouter to generate them. The Autoroute button is at the bottom of the window. The button matches the image to the right:&lt;/td&gt;&lt;td&gt;&lt;img src=&quot;:resources/images/icons/toolbarAutorouteEnabled_icon.png&quot; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</source>
+        <source>The &lt;b&gt;PCB View&lt;/b&gt; is where you layout the components will  on a physical PCB (Printed Circuit Board).&lt;br/&gt;&lt;br/&gt;PCBs can be made at home or in a small lab using DIY etching processes. They also can be sent to professional PCB manufacturing services for more precise fabrication. &lt;br/&gt;&lt;table&gt;&lt;tr&gt;&lt;td&gt;The first thing you will need is a board to place your parts on. There should already be one in your sketch, but if not, drag in the board icon from the Parts Bin. The icon matches the image to the right: &lt;/td&gt;&lt;td&gt;&lt;img src=&quot;:resources/parts/svg/core/icon/rectangle_pcb.svg&quot; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;br/&gt;&lt;br/&gt;To lay out your PCB, arrange all the components so they fit nicely on the board. Then try to shift them around to minimize the length and confusion of connections. You can also resize rectangular boards. &lt;br/&gt;&lt;table&gt;&lt;tr&gt;&lt;td&gt;Once the parts are sorted out, you connect them with copper traces. You can drag out a trace from individual connections or use the autorouter to generate them. The Autoroute button is at the bottom of the window. The button matches the image to the right:&lt;/td&gt;&lt;td&gt;&lt;img src=&quot;:resources/images/icons/toolbarAutorouteEnabled_icon.png&quot; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>FolderUtils</name>
+    <message>
+        <source>Moving your custom parts</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Your custom-made parts and bins are moved from the hidden app data folder to your fritzing documents folder at &lt;br/&gt;&lt;br/&gt;&lt;em&gt;%1&lt;/em&gt;&lt;br/&gt;&lt;br/&gt;This way we hope to make it easier for you to find and edit them manually.&lt;/p&gt;</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1450,14 +1480,6 @@ It is also possible to choose a connector as a ground fill seed by right-clickin
 <context>
     <name>LogoItem</name>
     <message>
-        <source>Unable to display</source>
-        <translation>不能显示</translation>
-    </message>
-    <message>
-        <source>Unable to display image from %1</source>
-        <translation>不能从%1显示图像</translation>
-    </message>
-    <message>
         <source>shape</source>
         <translation>形状</translation>
     </message>
@@ -1491,6 +1513,14 @@ It is also possible to choose a connector as a ground fill seed by right-clickin
     </message>
     <message>
         <source>text</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to display</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to display image from %1</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1825,10 +1855,6 @@ We&apos;re working to avoid this message, and only let you choose between proper
         <translation>剪切(&amp;C)</translation>
     </message>
     <message>
-        <source>Ctrl+X</source>
-        <translation type="obsolete">Ctrl+X</translation>
-    </message>
-    <message>
         <source>Cut selection</source>
         <translation>剪切选择</translation>
     </message>
@@ -1837,20 +1863,12 @@ We&apos;re working to avoid this message, and only let you choose between proper
         <translation>复制(&amp;C)</translation>
     </message>
     <message>
-        <source>Ctrl+C</source>
-        <translation type="obsolete">Ctrl+C</translation>
-    </message>
-    <message>
         <source>Copy selection</source>
         <translation>复制选择</translation>
     </message>
     <message>
         <source>&amp;Paste</source>
         <translation>粘贴(&amp;P)</translation>
-    </message>
-    <message>
-        <source>Ctrl+V</source>
-        <translation type="obsolete">Ctrl+V</translation>
     </message>
     <message>
         <source>Paste clipboard contents</source>
@@ -1879,10 +1897,6 @@ We&apos;re working to avoid this message, and only let you choose between proper
     <message>
         <source>&amp;Select All</source>
         <translation>全选(&amp;S)</translation>
-    </message>
-    <message>
-        <source>Ctrl+A</source>
-        <translation type="obsolete">Ctrl+A</translation>
     </message>
     <message>
         <source>Select all elements</source>
@@ -2205,14 +2219,6 @@ We&apos;re working to avoid this message, and only let you choose between proper
         <translation>报告在Fritzing中发现的bug</translation>
     </message>
     <message>
-        <source>&amp;Import parts and bins from old version...</source>
-        <translation>从旧版本中导入元件和元件库(&amp;I)...</translation>
-    </message>
-    <message>
-        <source>Import parts and bins from previous installation</source>
-        <translation>从之前安装的版本中中导入元件和元件库</translation>
-    </message>
-    <message>
         <source>&amp;File</source>
         <translation>文件(&amp;F)</translation>
     </message>
@@ -2311,14 +2317,6 @@ We&apos;re working to avoid this message, and only let you choose between proper
     <message>
         <source>Remove Bendpoint</source>
         <translation>移除拐点</translation>
-    </message>
-    <message>
-        <source>Please choose the previous Fritzing folder...</source>
-        <translation>请选择上层Fritzing文件夹...</translation>
-    </message>
-    <message>
-        <source>You will have to restart Fritzing in order to use the imported parts</source>
-        <translation>使用导入的元件必须重新启动Fritzing</translation>
     </message>
     <message>
         <source>Remove copper fill</source>
@@ -2687,10 +2685,6 @@ Please check all views for potential side-effects.</source>
         <translation>选择所有via元件</translation>
     </message>
     <message>
-        <source>%1 %2 %3</source>
-        <translation>%1 %2 %3</translation>
-    </message>
-    <message>
         <source>Shift+Ctrl+D</source>
         <translation>Shift+Ctrl+D</translation>
     </message>
@@ -2811,34 +2805,12 @@ Please check all views for potential side-effects.</source>
         <translation>未找到草稿&apos;%1&apos;</translation>
     </message>
     <message>
-        <source>the .fz file format is obsolete</source>
-        <translation>.fz文件格式已经被停止使用了</translation>
-    </message>
-    <message>
-        <source>The .fz file format has been deprecated.
-
-Would you like to convert &apos;%1&apos; to the .fzz format now or open it read-only?
-</source>
-        <translation>.fz文件格式已经不在建议使用了。
-
-你现在想转换&apos;%1&apos;为.fzz格式或者以只读格式打开它么?
-</translation>
-    </message>
-    <message>
-        <source>The conversion process will not modify &apos;%1&apos;.</source>
-        <translation>转换处理过程不会改变&apos;%1&apos;。</translation>
-    </message>
-    <message>
         <source>Convert</source>
         <translation>转换</translation>
     </message>
     <message>
         <source>Read-only</source>
         <translation>只读</translation>
-    </message>
-    <message>
-        <source>Please specify an .fzz file name to save &apos;%1&apos; to</source>
-        <translation>请为&apos;%1&apos;指定一个.fzz的文件名</translation>
     </message>
     <message>
         <source>&amp;Routing</source>
@@ -2871,10 +2843,6 @@ Would you like to convert &apos;%1&apos; to the .fzz format now or open it read-
     <message>
         <source>Fill empty regions of the copper layer--fill will include all traces connected to the seeds</source>
         <translation>填充覆铜层的空区域--填充将包含所有连接至种子的导线</translation>
-    </message>
-    <message>
-        <source>Ctrl+B</source>
-        <translation type="obsolete">Ctrl+B</translation>
     </message>
     <message>
         <source>Choose Ground Fill Seed(s)...</source>
@@ -3171,10 +3139,6 @@ Go ahead and revert?</source>
     <message>
         <source>Display Parts Editor help in a browser</source>
         <translation>在浏览器中显示元件编辑器帮助</translation>
-    </message>
-    <message>
-        <source>The folder &quot;%1&quot; isn&apos;t a Fritzing installation folder</source>
-        <translation>文件夹&quot;%1&quot;不是Fritzing安装文件夹</translation>
     </message>
     <message>
         <source>Design Rules Check (DRC)</source>
@@ -3548,24 +3512,16 @@ Note: if you want to update later, there are options under the &apos;Part&apos; 
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Rotate 45� Clockwise</source>
-        <translation type="obsolete">顺时针旋转135° {45�?}</translation>
+        <source>Ctrl+Shift+V</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Rotate 90� Clockwise</source>
-        <translation type="obsolete">顺时针旋转135° {90�?}</translation>
+        <source>(x,y)=(%1, %2) %3</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Rotate 180�</source>
-        <translation type="obsolete">旋转 180° {180�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 90� Counter Clockwise</source>
-        <translation type="obsolete">逆时针旋转45° {90�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 45� Counter Clockwise</source>
-        <translation type="obsolete">逆时针旋转45° {45�?}</translation>
+        <source>(x, y)=(%1, %2)	(width, height)=(%3, %4) %5</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Rotate 45° Clockwise</source>
@@ -3588,7 +3544,23 @@ Note: if you want to update later, there are options under the &apos;Part&apos; 
         <translation type="unfinished">逆时针旋转45° {45�?} {45°?}</translation>
     </message>
     <message>
-        <source>Ctrl+Shift+V</source>
+        <source>Regenerate parts database ...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Regenerate the parts database (should only be used if your parts database is broken)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fritzing uncompressed (*%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Color Breadboard Wires By Length</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Display breadboard wires using standard color coding by length</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -3642,6 +3614,29 @@ Note: if you want to update later, there are options under the &apos;Part&apos; 
     </message>
     <message>
         <source>Optimizing traces...</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ModFileDialog</name>
+    <message>
+        <source>Modified files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>decision</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fritzing can proceed with the update, but the set of files listed below must first be cleaned (removed or reset). It may take a few minutes. &lt;p&gt;Do you want to proceed with cleaning these files?&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clean files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Now cleaning files. Please don&apos;t interrupt the process.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -4201,7 +4196,7 @@ Go ahead and save?</source>
         <translation>Fritzing当前只支持OCRA和Droid字体--这些已经被替换为字体&apos;%1&apos;</translation>
     </message>
     <message>
-        <source>Unable to load image file &apos;%1&apos;: 
+        <source>Unable to load image file &apos;%1&apos;:
 
 %2</source>
         <translation>不能载入图像文件&apos;%1&apos;:
@@ -4397,15 +4392,15 @@ Go ahead and save?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Please enter a prefix to help you identify the part files. The names will have the form &apos;PREFIX_%1&apos;. (It is not necessary to change the prefix, since a unique suffix is always added.)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Convert schematic to 0.1 inch standard</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Convert pre-0.8.6 schematic image to new 0.1 inch standard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Please enter a prefix to help you identify the part files.&lt;br/&gt;The file names will have the form &apos;PREFIX_%1&apos;.&lt;br/&gt;(It is not necessary to change the proposed prefix, since a unique suffix is always added.)&lt;/p&gt;</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -4807,34 +4802,6 @@ Go ahead and save?</source>
         <translation>设置字体大小为tiny</translation>
     </message>
     <message>
-        <source>Rotate 45� Clockwise</source>
-        <translation type="obsolete">顺时针旋转135° {45�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 90� Clockwise</source>
-        <translation type="obsolete">顺时针旋转135° {90�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 135� Clockwise</source>
-        <translation type="obsolete">顺时针旋转135° {135�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 180�</source>
-        <translation type="obsolete">旋转 180° {180�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 135� Counter Clockwise</source>
-        <translation type="obsolete">逆时针旋转45° {135�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 90� Counter Clockwise</source>
-        <translation type="obsolete">逆时针旋转45° {90�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 45� Counter Clockwise</source>
-        <translation type="obsolete">逆时针旋转45° {45�?}</translation>
-    </message>
-    <message>
         <source>Rotate 45° Clockwise</source>
         <translation type="unfinished">顺时针旋转135° {135�?} {45°?}</translation>
     </message>
@@ -5164,24 +5131,12 @@ shift键转换滚动轴
 <context>
     <name>ProgramTab</name>
     <message>
-        <source>Open...</source>
-        <translation type="obsolete">打开...</translation>
-    </message>
-    <message>
-        <source>Program</source>
-        <translation type="obsolete">程序</translation>
-    </message>
-    <message>
         <source>Select a program file to load</source>
         <translation>选择载入一个程序文件</translation>
     </message>
     <message>
         <source>Fritzing is unable to find &apos;%1&apos;, please locate it</source>
         <translation>Fritzing找不到&apos;%1&apos;,请定位它</translation>
-    </message>
-    <message>
-        <source>Language:</source>
-        <translation type="obsolete">语言:</translation>
     </message>
     <message>
         <source>New</source>
@@ -5192,28 +5147,12 @@ shift键转换滚动轴
         <translation>保存</translation>
     </message>
     <message>
-        <source>Port:</source>
-        <translation type="obsolete">端口:</translation>
-    </message>
-    <message>
-        <source>Programmer:</source>
-        <translation type="obsolete">程序:</translation>
-    </message>
-    <message>
         <source>Remove &quot;%1&quot;?</source>
         <translation>移除&quot;%1&quot;?</translation>
     </message>
     <message>
         <source>Are you sure you want to remove &quot;%1&quot; from the sketch?</source>
         <translation>确定从程序中移除&quot;%1&quot;?</translation>
-    </message>
-    <message>
-        <source>The file &apos;%1&apos; must be saved before it can be sent to the programmer.</source>
-        <translation type="obsolete">&apos;%1&apos;文件在发送给其他程序前必须保存.</translation>
-    </message>
-    <message>
-        <source>Select a programmer (executable) for %1</source>
-        <translation type="obsolete">为%1选择一个程序(可执行)</translation>
     </message>
     <message>
         <source>Code (*.%1)</source>
@@ -5267,90 +5206,6 @@ shift键转换滚动轴
 <context>
     <name>ProgramWindow</name>
     <message>
-        <source>%1 %2</source>
-        <translation type="obsolete">%1 %2</translation>
-    </message>
-    <message>
-        <source>No ports found</source>
-        <translation type="obsolete">未找到端口</translation>
-    </message>
-    <message>
-        <source>&amp;File</source>
-        <translation type="obsolete">文件(&amp;F)</translation>
-    </message>
-    <message>
-        <source>Ctrl+N</source>
-        <translation type="obsolete">Ctrl+N</translation>
-    </message>
-    <message>
-        <source>Create a new program</source>
-        <translation type="obsolete">创建一个新程序</translation>
-    </message>
-    <message>
-        <source>Ctrl+O</source>
-        <translation type="obsolete">Ctrl+O</translation>
-    </message>
-    <message>
-        <source>Open a program</source>
-        <translation type="obsolete">打开一个程序</translation>
-    </message>
-    <message>
-        <source>Ctrl+S</source>
-        <translation type="obsolete">Ctrl+S</translation>
-    </message>
-    <message>
-        <source>Save the current program</source>
-        <translation type="obsolete">保存当前程序</translation>
-    </message>
-    <message>
-        <source>Rename the current program</source>
-        <translation type="obsolete">重命名当前程序</translation>
-    </message>
-    <message>
-        <source>Duplicate tab</source>
-        <translation type="obsolete">复制标签</translation>
-    </message>
-    <message>
-        <source>Copies the current program into a new tab</source>
-        <translation type="obsolete">复制当前的程序到新标签中</translation>
-    </message>
-    <message>
-        <source>Remove tab</source>
-        <translation type="obsolete">移除标签</translation>
-    </message>
-    <message>
-        <source>Ctrl+W</source>
-        <translation type="obsolete">Ctrl+W</translation>
-    </message>
-    <message>
-        <source>Remove the current program from the sketch</source>
-        <translation type="obsolete">从程序中移除当前程序段</translation>
-    </message>
-    <message>
-        <source>&amp;Print...</source>
-        <translation type="obsolete">打印(&amp;P)...</translation>
-    </message>
-    <message>
-        <source>Ctrl+P</source>
-        <translation type="obsolete">Ctrl+P</translation>
-    </message>
-    <message>
-        <source>Print the current program</source>
-        <translation type="obsolete">打印当前程序</translation>
-    </message>
-    <message>
-        <source>&amp;Quit</source>
-        <translation type="obsolete">退出(&amp;Q)</translation>
-    </message>
-    <message>
-        <source>Ctrl+Q</source>
-        <translation type="obsolete">Ctrl+Q</translation>
-    </message>
-    <message>
-        <source>Quit the application</source>
-        <translation type="obsolete">退出程序</translation>
-    </message>
-    <message>
         <source>&amp;Edit</source>
         <translation>编辑(&amp;E)</translation>
     </message>
@@ -5367,20 +5222,12 @@ shift键转换滚动轴
         <translation>剪切(&amp;C)</translation>
     </message>
     <message>
-        <source>Ctrl+X</source>
-        <translation type="obsolete">Ctrl+X</translation>
-    </message>
-    <message>
         <source>Cut selection</source>
         <translation>剪切选择</translation>
     </message>
     <message>
         <source>&amp;Copy</source>
         <translation>复制(&amp;C)</translation>
-    </message>
-    <message>
-        <source>Ctrl+C</source>
-        <translation type="obsolete">Ctrl+C</translation>
     </message>
     <message>
         <source>Copy selection</source>
@@ -5391,10 +5238,6 @@ shift键转换滚动轴
         <translation>粘贴(&amp;P)</translation>
     </message>
     <message>
-        <source>Ctrl+V</source>
-        <translation type="obsolete">Ctrl+V</translation>
-    </message>
-    <message>
         <source>Paste clipboard contents</source>
         <translation>粘贴剪切板内容</translation>
     </message>
@@ -5403,32 +5246,8 @@ shift键转换滚动轴
         <translation>全选(&amp;S)</translation>
     </message>
     <message>
-        <source>Ctrl+A</source>
-        <translation type="obsolete">Ctrl+A</translation>
-    </message>
-    <message>
         <source>Select all text</source>
         <translation>选择所有文本</translation>
-    </message>
-    <message>
-        <source>Select language</source>
-        <translation type="obsolete">选择语言</translation>
-    </message>
-    <message>
-        <source>Select port</source>
-        <translation type="obsolete">选择端口</translation>
-    </message>
-    <message>
-        <source>Select programmer</source>
-        <translation type="obsolete">选择程序</translation>
-    </message>
-    <message>
-        <source>Program</source>
-        <translation type="obsolete">程序</translation>
-    </message>
-    <message>
-        <source>Load the current program onto a microcontroller</source>
-        <translation type="obsolete">载入当前程序到微控制器</translation>
     </message>
     <message>
         <source>File &apos;%1&apos; was restored from the .fzz file; the local copy was not found.</source>
@@ -5584,10 +5403,6 @@ shift键转换滚动轴
     <message>
         <source>Fritzing</source>
         <translation>Fritzing</translation>
-    </message>
-    <message>
-        <source>&lt;font face=&apos;Lucida Grande, Tahoma, Sans Serif&apos; size=&apos;2&apos; color=&apos;#eaf4ed&apos;&gt;&amp;#169; 2007-%1 Fachhochschule Potsdam&lt;/font&gt;</source>
-        <translation>&lt;font face=&apos;Lucida Grande, Tahoma, Sans Serif&apos; size=&apos;2&apos; color=&apos;#eaf4ed&apos;&gt;&amp;#169; 2007-%1 Fachhochschule Potsdam&lt;/font&gt;</translation>
     </message>
     <message>
         <source>The file &apos;%1&apos; is read-only; please use a different filename.</source>
@@ -5965,10 +5780,6 @@ Fritzing仍然在工作，但不能改变元件的属性.</translation>
         <translation>不能解析铜层：%1 %2 %3</translation>
     </message>
     <message>
-        <source>Parts folder not found.</source>
-        <translation>未找到元件文件夹.</translation>
-    </message>
-    <message>
         <source>Select %1</source>
         <translation>选择 %1</translation>
     </message>
@@ -6057,38 +5868,6 @@ Fritzing仍然在工作，但不能改变元件的属性.</translation>
         <translation>轮廓线是空的</translation>
     </message>
     <message>
-        <source>the board outline layer, </source>
-        <translation>板轮廓线层，</translation>
-    </message>
-    <message>
-        <source>silkscreen layer(s), </source>
-        <translation>丝印层，</translation>
-    </message>
-    <message>
-        <source>copper layer(s), </source>
-        <translation>覆铜层，</translation>
-    </message>
-    <message>
-        <source>mask layer(s), </source>
-        <translation>阻焊层，</translation>
-    </message>
-    <message>
-        <source>Unable to translate svg curves in %1</source>
-        <translation>不能改变%1中的svg曲线</translation>
-    </message>
-    <message>
-        <source>silk export failure</source>
-        <translation>丝印导出失败</translation>
-    </message>
-    <message>
-        <source>drill export failure</source>
-        <translation>钻孔导出失败</translation>
-    </message>
-    <message>
-        <source>mask export failure</source>
-        <translation>mask导出失败</translation>
-    </message>
-    <message>
         <source>Copper Fill Bottom</source>
         <translation>底部覆铜</translation>
     </message>
@@ -6151,10 +5930,6 @@ Fritzing仍然在工作，但不能改变元件的属性.</translation>
         <translation>接地填充种子编辑器</translation>
     </message>
     <message>
-        <source>%1 mask export failure (2)</source>
-        <translation>%1阻焊层导出失败（2）</translation>
-    </message>
-    <message>
         <source>Select all &apos;Don&apos;t autoroute&apos; traces</source>
         <translation>选择所有&apos;不自动布线&apos;的线</translation>
     </message>
@@ -6211,10 +5986,6 @@ Fritzing仍然在工作，但不能改变元件的属性.</translation>
         <translation>%1的线从它%2中保存的位置移动。</translation>
     </message>
     <message>
-        <source>paste mask layer(s), </source>
-        <translation>粘贴遮盖层，</translation>
-    </message>
-    <message>
         <source>ii</source>
         <translation>ii</translation>
     </message>
@@ -6267,18 +6038,6 @@ Fritzing仍然在工作，但不能改变元件的属性.</translation>
         <translation>元件%1&apos;%2&apos;</translation>
     </message>
     <message>
-        <source>Fritzing is unable to process the cutouts in this custom PCB shape. </source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>You may need to reload the shape SVG. </source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Fritzing requires that you make cutouts using a shape &apos;subtraction&apos; or &apos;difference&apos; operation in your vector graphics editor.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>unable to copy file &apos;%1&apos; to &apos;%2&apos;.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6287,39 +6046,11 @@ Fritzing仍然在工作，但不能改变元件的属性.</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>%1 layer export is empty.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>exported drill file is empty</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>exported mask layer %1 is empty</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>exported paste mask layer is empty</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>%1 layer: unable to save to &apos;%2&apos;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Unable to save pick and place file: %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Text</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>%1 layer export is empty (case 2).</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>silk layer %1 export is empty</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6332,6 +6063,155 @@ Fritzing仍然在工作，但不能改变元件的属性.</translation>
     </message>
     <message>
         <source>N/A</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;font face=&apos;Lucida Grande, Tahoma, Sans Serif&apos; size=&apos;2&apos; color=&apos;#eaf4ed&apos;&gt;&amp;#169; 2007-%1 Fritzing&lt;/font&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Regenerate database failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Regenerating parts database</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to find parts git repository</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to find parts git repository HEAD</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The parts folder &apos;%1&apos; has been changed--it is not in the master branch (%2). %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The parts folder &apos;%1&apos; may have been damaged (%2). %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The parts folder &apos;%1&apos; has been changed (%2). %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>There are new or modified files in the parts folder &apos;%1&apos;. These changes will be discarded by the update.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>There are unreadable files in the parts folder &apos;%1&apos;. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to open parts folder &apos;%1&apos; for update. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Parts folder repo &apos;%1&apos; is empty. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to determine network site for &apos;%1&apos;. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to access network site for &apos;%1&apos;. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to retrieve network references for &apos;%1&apos;. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to retrieve master network reference for &apos;%1&apos;. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Error %1
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>the board outline layer, </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>silkscreen layer(s), </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>copper layer(s), </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>mask layer(s), </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>paste mask layer(s), </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to translate svg curves in %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 layer export is empty.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 layer export is empty (case 2).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>silk layer %1 export is empty</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>silk export failure</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>exported drill file is empty</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>drill export failure</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>exported mask layer %1 is empty</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 mask export failure (2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>mask export failure</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>exported paste mask layer is empty</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 layer: unable to save to &apos;%2&apos;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fritzing is unable to process the cutouts in this custom PCB shape. </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>You may need to reload the shape SVG. </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fritzing requires that you make cutouts using a shape &apos;subtraction&apos; or &apos;difference&apos; operation in your vector graphics editor.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -6447,6 +6327,25 @@ Fritzing仍然在工作，但不能改变元件的属性.</translation>
     </message>
 </context>
 <context>
+    <name>RegenerateDatabaseThread</name>
+    <message>
+        <source>Unable to open temporary file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Database failure</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to remove original db file %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to copy database file %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>Resistor</name>
     <message>
         <source>resistance</source>
@@ -6550,6 +6449,14 @@ Fritzing仍然在工作，但不能改变元件的属性.</translation>
         <source>width</source>
         <translation>宽度</translation>
     </message>
+    <message>
+        <source>&amp;cm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;in</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>S2S</name>
@@ -6571,10 +6478,6 @@ Fritzing仍然在工作，但不能改变元件的属性.</translation>
     </message>
     <message>
         <source>Missing connector %1 in &apos;%2&apos; schematic of &apos;%3&apos;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Uunable to load schematic &apos;%1&apos; for &apos;%2&apos;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6635,22 +6538,6 @@ Fritzing仍然在工作，但不能改变元件的属性.</translation>
 <context>
     <name>SetColorDialog</name>
     <message>
-        <source>Set %1 Color...</source>
-        <translation type="obsolete">设置 %1的颜色...</translation>
-    </message>
-    <message>
-        <source>Choose a new %1 color.</source>
-        <translation type="obsolete">选择新的%1 颜色.</translation>
-    </message>
-    <message>
-        <source>current %1 color (%2)</source>
-        <translation type="obsolete">当前%1颜色(%2)</translation>
-    </message>
-    <message>
-        <source>standard %1 color (%2)</source>
-        <translation type="obsolete">标准%1颜色(%2)</translation>
-    </message>
-    <message>
         <source>Make this the default %1 color</source>
         <translation>设置为默认的%1颜色</translation>
     </message>
@@ -6661,18 +6548,6 @@ Fritzing仍然在工作，但不能改变元件的属性.</translation>
     <message>
         <source>OK</source>
         <translation>确定</translation>
-    </message>
-    <message>
-        <source>Select custom %1 color</source>
-        <translation type="obsolete">选择自定义%1颜色</translation>
-    </message>
-    <message>
-        <source>custom color (%1)</source>
-        <translation type="obsolete">自定义颜色(%1)</translation>
-    </message>
-    <message>
-        <source>selected color (%1)</source>
-        <translation type="obsolete">已选择颜色(%1)</translation>
     </message>
     <message>
         <source>%1 Color...</source>
@@ -7470,10 +7345,6 @@ Note: you can also trigger this display by mousing down on the routing status te
         <translation>关闭</translation>
     </message>
     <message>
-        <source>No new versions found.</source>
-        <translation>未找到新版本.</translation>
-    </message>
-    <message>
         <source>A new main release is available for downloading:</source>
         <translation>新的主release 已经可以下载了:</translation>
     </message>
@@ -7482,12 +7353,72 @@ Note: you can also trigger this display by mousing down on the routing status te
         <translation>新的过度发布版已经可以下载了:</translation>
     </message>
     <message>
-        <source>Checking...</source>
-        <translation>检查中...</translation>
+        <source>Update parts</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Sorry, unable to retrieve update info</source>
-        <translation>对不起,不能获得更新信息</translation>
+        <source>&lt;p&gt;No new versions found.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Checking for new releases...&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Fritzing is unable to check for--and update--new parts.&lt;br/&gt;If you want this functionality, please enable write permission on this folder:&lt;br/&gt; &apos;%1&apos;.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Checking for new parts...&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;No new releases or new parts found&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Sorry, unable to retrieve update info&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Sorry, unable to retrieve parts update info&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Downloading new parts...&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Sorry, unable to download new parts&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;New parts successfully installed!&lt;/p&gt;&lt;p&gt;Fritzing must be restarted, so the &apos;Close&apos; button will close Fritzing.&lt;br/&gt;The new parts will be available when you run Fritzing again.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Sorry, unable to install new parts: %1&lt;br/&gt;Fritzing must nevertheless be restarted, so the &apos;Close&apos; button will close Fritzing.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;&lt;b&gt;There is a parts library update available!&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Would you like Fritzing to download and install the update now?&lt;br/&gt;See the &lt;a href=&apos;https://github.com/fritzing/fritzing-parts/compare/%1...master&apos;&gt;list of changes here.&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Note: the update may take some minutes and you will have to restart Fritzing.&lt;br/&gt;You can also update later via the &lt;i&gt;Help &amp;rarr; Check for Updates&lt;/i&gt; menu.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>New files:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Modified Files:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fritzing was unable to clean the files, so the update cannot proceed.&lt;br/&gt;You may have to reinstall Fritzing.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Installing new parts. This may take a few minutes.&lt;br/&gt;Please do not interrupt the process, as your parts folder could be damaged.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -7514,18 +7445,6 @@ Note: you can also trigger this display by mousing down on the routing status te
     </message>
     <message>
         <source>Fritzing CreatorKit</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>The Fritzing Creator Kit provides a fast, easy and entertaining introduction to the world of interactive electronics.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>order now &gt;&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Get your Creator Kit now.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -7590,6 +7509,10 @@ Note: you can also trigger this display by mousing down on the routing status te
     </message>
     <message>
         <source>Fritzing Fab</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The Fritzing Creator Kit is out of Stock. For Updates please visit the fritzing.blog</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

@@ -1,128 +1,126 @@
 #!/bin/bash
-arch_aux=`uname -m`
+set -euE -o functrace
+failure() {
+  local err=$?
+  local lineno=$1
+  local msg=$2
+  echo "Failed at $lineno: $msg"
+  exit $err
+}
+trap 'failure ${LINENO} "$BASH_COMMAND"' ERR
+
+if [ -z "${1:-}" ] ; then
+  echo "Usage: $0 <need a version string such as '0.6.4b' (without the quotes)>"
+  exit 64
+else
+  relname=$1  #`date +%Y.%m.%d`
+fi
+
+echo "Building release: ${relname}..."
+
+if [[ ${relname} == *"develop"* ]]; then
+  echo "Building a development version"
+  export QT_HASH_SEED=123
+  export QT_DEBUG_PLUGINS=0  # usually to verbose
+  export QML_IMPORT_TRACE=0
+  target="debug"
+else
+  if [[ -n $(git status -s) ]]; then
+    echo "Build directory is not clean. Check git status."
+    git status -s
+    exit 1
+  fi
+
+  if [[ -n $(git clean -xdn) ]]; then
+    echo "Build directory is not clean. Check git clean -xdn."
+    git clean -xfn
+    exit 1
+  fi
+  target="release"
+fi
+
+arch_aux=$(uname -m)
+
+echo
+script_path="$(readlink -f "$0")"
+script_folder=$(dirname "${script_path}")
+echo "{script_folder} ${script_folder}"
 
 current_dir=$(pwd)
 
-echo ""
-echo "NOTE: Don't forget to set this script's QT_HOME variable"
-echo "NOTE: Execute this script from outside the fritzing-app folder"
-echo ""
-
-QT_HOME="/home/ubuntu/Qt5.2.1/5.2.1/gcc"
-#QT_HOME="/home/vuser/Qt5.2.1/5.2.1/gcc_64" # 64bit version
-#QT_HOME="~/Qt5.2.1/5.2.1/gcc" # doesn't work for some reason
-
-if [ "$1" = "" ]
-then
-  echo "Usage: $0 <need a version string such as '0.6.4b' (without the quotes)>"
-  exit
-fi
-
-
-PKG_OK=$(dpkg-query -W --showformat='${Status}\n' libboost-dev)
-if [ "`expr index "$PKG_OK" installed`" -gt 0 ]
-then
-  echo "using installed boost library"
-else
-  echo "please install libboost-dev"
-  exit
-fi
-
-PKG_OK=$(dpkg-query -W --showformat='${Status}\n' libquazip-dev)
-quazip='QUAZIP_LIB'
-if [ "`expr index "$PKG_OK" installed`" -gt 0 ]
-then
-  quazip='QUAZIP_INSTALLED'
-  echo "using installed quazip"
-else
-  echo "using src/lib/quazip"
-fi
-
-compile_folder="build-$arch_aux"
-#svn export http://fritzing.googlecode.com/svn/trunk/fritzing $compile_folder
-git clone --recursive https://github.com/fritzing/fritzing-app $compile_folder
-
-cd $compile_folder/src/lib
-rm -rf boost*				# depend on linux boost installation 
-if [ "$quazip" == 'QUAZIP_INSTALLED' ]
-then
-  rm -rf quazip*
-fi
-
-cd $current_dir
-
-#let's define some variables that we'll need to in the future
-relname=$1  #`date +%Y.%m.%d`
-
 if [ "$arch_aux" == 'x86_64' ] ; then
-	arch='AMD64'
-	# only creates the source tarball, when running on the 64 platform
-	tarball_folder="fritzing-$relname.source"
-	echo "making source tarball: $tarball_folder"
-	cp -rf $compile_folder $tarball_folder
-	rm -rf $tarball_folder/FritzingInfo.plist
-	rm -rf $tarball_folder/tools/fixfz
-	tar -cjf ./$tarball_folder.tar.bz2 $tarball_folder
-	rm -rf $tarball_folder
-	echo "done with source tarball: $tarball_folder"
-
-	else arch='i386'
+  arch='AMD64'
+else
+  arch='i386'
 fi
 
-cd $compile_folder
-echo "compliling... if this is not taking a long time, something is probably wrong"
-$QT_HOME/bin/qmake CONFIG+=release DEFINES+=$quazip
-make
+quazip='QUAZIP_LIB'
+echo "using src/lib/quazip"
 
-release_folder="fritzing-$relname.linux.$arch"
 
-echo "making release folder: $release_folder"
-mkdir ../$release_folder
+app_folder=$(dirname "${script_folder}")
+app_folder=$(dirname "${app_folder}")
+cd "$app_folder"
+echo "appfolder ${app_folder}"
+
+echo "Build lingustics."
+lrelease phoenix.pro
+
+echo "Compiling."
+qmake CONFIG+=${target} DEFINES+=$quazip
+make -j16
+
+release_name=fritzing-${relname}.linux.${arch}
+release_folder="${current_dir}/${release_name}"
+
+if [[ ${relname} != *"develop"* ]] ; then
+  # Archive this for evaluation of crash reports
+  cp Fritzing "Fritzing_${release_name}"
+  strip Fritzing
+fi
+
+echo "making release folder: ${release_folder}"
+mkdir -p "${release_folder}"
 
 echo "copying release files"
-cp -rf bins/ parts/ sketches/ help/ pdb/ Fritzing Fritzing.sh Fritzing.1 fritzing.desktop fritzing.rc fritzing.appdata.xml readme.md LICENSE.CC-BY-SA LICENSE.GPL2 LICENSE.GPL3 ../$release_folder/
-cd ../$release_folder
+cp -rf sketches/ help/ translations/ Fritzing.sh Fritzing.1 org.fritzing.Fritzing.desktop fritzing.rc org.fritzing.Fritzing.appdata.xml install_fritzing.sh README.md LICENSE.CC-BY-SA LICENSE.GPL2 LICENSE.GPL3 "$release_folder/"
+mkdir -p "${release_folder}/icons"
+cp resources/system_icons/linux/* "$release_folder/icons/"
+mv Fritzing "${release_folder}/"
+chmod +x "${release_folder}/install_fritzing.sh"
 
-echo "move parts into pdb folder - TEMPORARY WORKAROUND"
-mv parts/contrib/* pdb/contrib/
-mv parts/core/* pdb/core/
-mv parts/obsolete/* pdb/obsolete/
-mv parts/user/* pdb/user/
+cd "${release_folder}"
+
+echo "cleaning translations"
+rm ./translations/*.ts  			# remove translation xml files, since we only need the binaries in the release
+find ./translations -name "*.qm" -size -128c -delete   # delete empty translation binaries
+
+if [[ ${relname} == *"develop"* ]] ; then
+  git clone --branch develop --single-branch https://github.com/fritzing/fritzing-parts.git || echo -e "\\n   ####   \\033[1;31m Ignoring git error for development build!  \\033[0m ####\\n"
+else
+  git clone --branch master --single-branch https://github.com/fritzing/fritzing-parts.git
+fi
 
 echo "making library folders"
-mkdir lib
-mkdir lib/imageformats
-mkdir lib/sqldrivers
-mkdir translations
-mkdir lib/platforms
 
-cd lib
-echo "copying libraries"
+mkdir -p lib/imageformats
+mkdir -p lib/sqldrivers
+mkdir -p lib/platforms
 
-cp $QT_HOME/lib/libicudata.so.51 $QT_HOME/lib/libicui18n.so.51 $QT_HOME/lib/libicuuc.so.51 $QT_HOME/lib/libicudata.so.5 $QT_HOME/lib/libQt5Concurrent.so.5 $QT_HOME/lib/libQt5Core.so.5 $QT_HOME/lib/libQt5DBus.so.5 $QT_HOME/lib/libQt5Gui.so.5 $QT_HOME/lib/libQt5Network.so.5 $QT_HOME/lib/libQt5SerialPort.so.5 $QT_HOME/lib/libQt5PrintSupport.so.5 $QT_HOME/lib/libQt5Sql.so.5 $QT_HOME/lib/libQt5Svg.so.5  $QT_HOME/lib/libQt5Xml.so.5 $QT_HOME/lib/libQt5Widgets.so.5 $QT_HOME/lib/libQt5XmlPatterns.so.5 .
+mv Fritzing lib  				# hide the executable in the lib folder
+mv Fritzing.sh Fritzing   		# rename Fritzing.sh to Fritzing
+chmod +x Fritzing
 
-mv ../Fritzing .  				     # hide the executable in the lib folder
-mv ../Fritzing.sh ../Fritzing   		# rename Fritzing.sh to Fritzing
-chmod +x ../Fritzing
+./Fritzing -db "${release_folder}/fritzing-parts/parts.db" -pp "${release_folder}/fritzing-parts" -f "${release_folder}"
 
-echo "copying plugins"
-cp $QT_HOME/plugins/imageformats/libqjpeg.so imageformats
-cp $QT_HOME/plugins/sqldrivers/libqsqlite.so sqldrivers
-cp $QT_HOME/plugins/platforms/libqxcb.so platforms
+cd "${current_dir}"
 
-echo "copying translations"
-cp ../../$compile_folder/translations/ -r ../
-rm ../translations/*.ts  			# remove translation xml files, since we only need the binaries in the release
-find ../translations -name "*.qm" -size -128c -delete   # delete empty translation binaries
+if [[ "${TRAVIS:-}" == "true" ]]; then
+  echo "compressing...."
+  tar -cjf  ./"${release_name}".tar.bz2 "${release_name}"
 
-cd ../../
-
-echo "compressing...."
-tar -cjf ./$release_folder.tar.bz2 $release_folder
-
-echo "cleaning up"
-rm -rf $release_folder
-rm -rf $compile_folder
+  echo "cleaning up ${release_folder}"
+  rm -rf "${release_folder}"
+fi
 
 echo "done!"
-

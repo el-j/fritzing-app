@@ -3,7 +3,7 @@
 /*******************************************************************
 
 Part of the Fritzing project - http://fritzing.org
-Copyright (c) 2007-08 Fachhochschule Potsdam - http://fh-potsdam.de
+Copyright (c) 2007-08 Fritzing
 
 Fritzing is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -17,12 +17,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
-
-********************************************************************
-
-$Revision: 3442 $:
-$Author: cohen@irascible.com $:
-$Date: 2009-09-10 04:49:21 +0200 (Do, 10. Sep 2009) $
 
 ********************************************************************/
 
@@ -38,21 +32,21 @@ class SVGPathLexer;
 class SVGPathParser: public SVGPathGrammar
 {
 public:
-    SVGPathParser();
-    ~SVGPathParser();
+	SVGPathParser();
+	~SVGPathParser();
 
-    bool parse(SVGPathLexer *lexer);
-    QVector<QVariant> & symStack();
-    QString errorMessage() const;
-    QVariant result() const;
+	bool parse(SVGPathLexer *lexer);
+	QVector<QVariant> & symStack();
+	QString errorMessage() const;
+	QVariant result() const;
 
 private:
-    void reallocateStack();
-    int m_tos;
-    QVector<int> m_stateStack;
-    QVector<QVariant> m_symStack;
-    QString m_errorMessage;
-    QVariant m_result;
+	void reallocateStack();
+	int m_tos;
+	QVector<int> m_stateStack;
+	QVector<QVariant> m_symStack;
+	QString m_errorMessage;
+	QVariant m_result;
 };
 
 #endif // SVGPATHPARSER_H

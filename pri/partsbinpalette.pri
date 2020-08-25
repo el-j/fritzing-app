@@ -1,6 +1,6 @@
 # /*******************************************************************
 # Part of the Fritzing project - http://fritzing.org
-# Copyright (c) 2007-08 Fachhochschule Potsdam - http://fh-potsdam.de
+# Copyright (c) 2007-08 Fritzing
 # Fritzing is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -11,10 +11,6 @@
 # GNU General Public License for more details.
 # You should have received a copy of the GNU General Public License
 # along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
-# ********************************************************************
-# $Revision: 6486 $:
-# $Author: irascibl@gmail.com $:
-# $Date: 2012-09-27 10:12:47 +0200 (Do, 27. Sep 2012) $
 # ********************************************************************/
 HEADERS += \
     src/partsbinpalette/partsbinpalettewidget.h \

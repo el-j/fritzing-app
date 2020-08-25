@@ -1,7 +1,7 @@
 # /*******************************************************************
 #
 # Part of the Fritzing project - http://fritzing.org
-# Copyright (c) 2007-08 Fachhochschule Potsdam - http://fh-potsdam.de
+# Copyright (c) 2007-19 Fritzing
 #
 # Fritzing is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,144 +17,159 @@
 # along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #
 # ********************************************************************
-#
-# $Revision: 6960 $:
-# $Author: irascibl@gmail.com $:
-# $Date: 2013-04-10 12:15:14 +0200 (Mi, 10. Apr 2013) $
-#
-#********************************************************************/
 
-# Fritzing requires two Qt-provided plugins in order to run correctly,
-# however the QTPLUGIN syntax only seems to work if Qt is built statically,
-# so QTPLUGIN is included here only for information purposes:
-#
-# QTPLUGIN  += qjpeg qsqlite
-
+lessThan(QT_MAJOR_VERSION, 5) {
+    error(Fritzing does not build with Qt 4 or earlier)
+}
 
 CONFIG += debug_and_release
+
+unix:!macx {
+    CONFIG += link_pkgconfig
+}
+
+load(configure)
+
 win32 {
 # release build using msvc 2010 needs to use Multi-threaded (/MT) for the code generation/runtime library option
 # release build using msvc 2010 needs to add msvcrt.lib;%(IgnoreSpecificDefaultLibraries) to the linker/no default libraries option
-        CONFIG -= embed_manifest_exe
-        INCLUDEPATH += $$[QT_INSTALL_HEADERS]/QtZlib
-        DEFINES += _CRT_SECURE_NO_DEPRECATE
-        DEFINES += _WINDOWS
-	RELEASE_SCRIPT = $$(RELEASE_SCRIPT)			# environment variable set from release script	
+    CONFIG -= embed_manifest_exe
+    INCLUDEPATH += $$[QT_INSTALL_HEADERS]/QtZlib
+    DEFINES += _CRT_SECURE_NO_DEPRECATE
+    DEFINES += _WINDOWS
+    RELEASE_SCRIPT = $$(RELEASE_SCRIPT)    # environment variable set from release script
 
-        message("target arch: $${QMAKE_TARGET.arch}")
-        contains(QMAKE_TARGET.arch, x86_64) {
-                RELDIR = ../release64
-                DEBDIR = ../debug64
-                DEFINES += WIN64
-       }
-       !contains(QMAKE_TARGET.arch, x86_64) {
-                RELDIR = ../release32
-                DEBDIR = ../debug32
-        }
-	
-	Release:DESTDIR = $${RELDIR}
-	Release:OBJECTS_DIR = $${RELDIR}
-	Release:MOC_DIR = $${RELDIR}
-	Release:RCC_DIR = $${RELDIR}
-	Release:UI_DIR = $${RELDIR}
-
-	Debug:DESTDIR = $${DEBDIR}
-	Debug:OBJECTS_DIR = $${DEBDIR}
-	Debug:MOC_DIR = $${DEBDIR}
-	Debug:RCC_DIR = $${DEBDIR}
-	Debug:UI_DIR = $${DEBDIR}
-}
-macx {
+    message("target arch: $${QMAKE_TARGET.arch}")
+    contains(QMAKE_TARGET.arch, x86_64) {
         RELDIR = ../release64
         DEBDIR = ../debug64
-        Release:DESTDIR = $${RELDIR}
-        Release:OBJECTS_DIR = $${RELDIR}
-        Release:MOC_DIR = $${RELDIR}
-        Release:RCC_DIR = $${RELDIR}
-        Release:UI_DIR = $${RELDIR}
+        DEFINES += WIN64
+    } else {
+        RELDIR = ../release32
+        DEBDIR = ../debug32
+    }
 
-        Debug:DESTDIR = $${DEBDIR}
-        Debug:OBJECTS_DIR = $${DEBDIR}
-        Debug:MOC_DIR = $${DEBDIR}
-        Debug:RCC_DIR = $${DEBDIR}
-        Debug:UI_DIR = $${DEBDIR}
+    Release:DESTDIR = $${RELDIR}
+    Release:OBJECTS_DIR = $${RELDIR}
+    Release:MOC_DIR = $${RELDIR}
+    Release:RCC_DIR = $${RELDIR}
+    Release:UI_DIR = $${RELDIR}
 
+    Debug:DESTDIR = $${DEBDIR}
+    Debug:OBJECTS_DIR = $${DEBDIR}
+    Debug:MOC_DIR = $${DEBDIR}
+    Debug:RCC_DIR = $${DEBDIR}
+    Debug:UI_DIR = $${DEBDIR}
+}
+macx {
+    RELDIR = ../release64
+    DEBDIR = ../debug64
+    Release:DESTDIR = $${RELDIR}
+    Release:OBJECTS_DIR = $${RELDIR}
+    Release:MOC_DIR = $${RELDIR}
+    Release:RCC_DIR = $${RELDIR}
+    Release:UI_DIR = $${RELDIR}
 
-        CONFIG += x86_64 # x86 ppc
-        QMAKE_INFO_PLIST = FritzingInfo.plist
-        #DEFINES += QT_NO_DEBUG   		# uncomment this for xcode
-        LIBS += -lz
-        LIBS += /usr/lib/libz.dylib
-        LIBS += /System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation
-        LIBS += /System/Library/Frameworks/Carbon.framework/Carbon
-        LIBS += /System/Library/Frameworks/IOKit.framework/Versions/A/IOKit
+    Debug:DESTDIR = $${DEBDIR}
+    Debug:OBJECTS_DIR = $${DEBDIR}
+    Debug:MOC_DIR = $${DEBDIR}
+    Debug:RCC_DIR = $${DEBDIR}
+    Debug:UI_DIR = $${DEBDIR}
+
+    #QMAKE_MAC_SDK = macosx10.11            # uncomment/adapt for your version of OSX
+    CONFIG += x86_64 # x86 ppc
+    QMAKE_INFO_PLIST = FritzingInfo.plist
+    #DEFINES += QT_NO_DEBUG                # uncomment this for xcode
+    LIBS += -lz
+    LIBS += /usr/lib/libz.dylib
+    LIBS += /System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation
+    LIBS += /System/Library/Frameworks/Carbon.framework/Carbon
+    LIBS += /System/Library/Frameworks/IOKit.framework/Versions/A/IOKit
+    LIBS += -liconv
 }
 unix {
     !macx { # unix is defined on mac
         HARDWARE_PLATFORM = $$system(uname -m)
-        contains( HARDWARE_PLATFORM, x86_64 ) {
+        contains(HARDWARE_PLATFORM, x86_64) {
             DEFINES += LINUX_64
         } else {
             DEFINES += LINUX_32
         }
-        LIBS += -lz
+        !contains(DEFINES, QUAZIP_INSTALLED) {
+            LIBS += -lz
+        }
     }
 
-        isEmpty(PREFIX) {
-                PREFIX = /usr
-        }
-        BINDIR = $$PREFIX/bin
-        DATADIR = $$PREFIX/share
-        PKGDATADIR = $$DATADIR/fritzing
+    isEmpty(PREFIX) {
+        PREFIX = /usr
+    }
+    BINDIR = $$PREFIX/bin
+    DATADIR = $$PREFIX/share
+    PKGDATADIR = $$DATADIR/fritzing
 
-        DEFINES += DATADIR=\\\"$$DATADIR\\\" PKGDATADIR=\\\"$$PKGDATADIR\\\"
+    DEFINES += DATADIR=\\\"$$DATADIR\\\" PKGDATADIR=\\\"$$PKGDATADIR\\\"
 
-        target.path =$$BINDIR
+    target.path = $$BINDIR
 
-        desktop.path = $$DATADIR/applications
-        desktop.files += fritzing.desktop
+    desktop.path = $$DATADIR/applications
+    desktop.files += org.fritzing.Fritzing.desktop
 
-        manpage.path = $$DATADIR/man/man1
-        manpage.files += Fritzing.1
+    appdata.path = $$DATADIR/metainfo
+    appdata.files += org.fritzing.Fritzing.appdata.xml
 
-        icon.path = $$DATADIR/icons
-        icon.extra = install -D -m 0644 $$PWD/resources/images/fritzing_icon.png $(INSTALL_ROOT)$$DATADIR/icons/fritzing.png
+    mimedb.path = $$DATADIR/mime/packages
+    mimedb.files += resources/system_icons/linux/fritzing.xml
 
-        parts.path = $$PKGDATADIR
-        parts.files += parts
+    manpage.path = $$DATADIR/man/man1
+    manpage.files += Fritzing.1
 
-        pdb.path = $$PKGDATADIR
-        pdb.files += pdb
+    icon.path = $$DATADIR/pixmaps
+    icon.extra = install -D -m 0644 $$PWD/resources/images/fritzing_icon.png $(INSTALL_ROOT)$$DATADIR/pixmaps/fritzing.png
 
-        help.path = $$PKGDATADIR
-        help.files += help
+    parts.path = $$PKGDATADIR
+    parts.files += parts
 
-        sketches.path = $$PKGDATADIR
-        sketches.files += sketches
+    help.path = $$PKGDATADIR
+    help.files += help
 
-        bins.path = $$PKGDATADIR
-        bins.files += bins
+    sketches.path = $$PKGDATADIR
+    sketches.files += sketches
 
-        translations.path = $$PKGDATADIR/translations
-        translations.extra = find $$PWD/translations -name "*.qm" -size +128c -exec cp -pr {} $(INSTALL_ROOT)$$PKGDATADIR/translations \\;
+    bins.path = $$PKGDATADIR
+    bins.files += bins
 
-        syntax.path = $$PKGDATADIR/translations/syntax
-        syntax.files += translations/syntax/*.xml
+    translations.path = $$PKGDATADIR/translations
+    isEmpty(LINGUAS) {
+        translations.files += $$system(find $$PWD/translations -name "*.qm" -size +128c)
+    } else {
+        for(lang, LINGUAS):translations.files += $$system(find $$PWD/translations -name "fritzing_$${lang}.qm" -size +128c)
+        isEmpty(translations.files):error("No translations found for $$LINGUAS")
+    }
 
-        INSTALLS += target desktop manpage icon parts sketches bins translations syntax pdb help
+    syntax.path = $$PKGDATADIR/translations/syntax
+    syntax.files += translations/syntax/*.xml
+
+    INSTALLS += target desktop appdata mimedb manpage icon parts sketches bins translations syntax help
 }
 
-ICON = resources/images/fritzing_icon.icns
+ICON = resources/system_icons/macosx/fritzing_icon.icns
 
-QT += core gui svg xml network sql # opengl
-greaterThan(QT_MAJOR_VERSION, 4) {
-    QT += widgets printsupport concurrent serialport
-} else {
-    include($$QTSERIALPORT_PROJECT_ROOT/src/serialport/qt4support/serialport.prf)
+macx {
+    FILE_ICONS.files = resources/system_icons/macosx/mac_fz_icon.icns resources/system_icons/macosx/mac_fzz_icon.icns resources/system_icons/macosx/mac_fzb_icon.icns resources/system_icons/macosx/mac_fzp_icon.icns resources/system_icons/macosx/mac_fzm_icon.icns resources/system_icons/macosx/mac_fzpz_icon.icns
+    FILE_ICONS.path = Contents/Resources
+    QMAKE_BUNDLE_DATA += FILE_ICONS
 }
+
+QT += concurrent core gui network printsupport serialport sql svg widgets xml
 
 RC_FILE = fritzing.rc
 RESOURCES += phoenixresources.qrc
+
+# Disable this if you have (and want) libgit2 dynamically
+LIBGIT_STATIC = true
+include(pri/libgit2detect.pri)
+
+include(pri/boostdetect.pri)
 
 include(pri/kitchensink.pri)
 include(pri/mainwindow.pri)
@@ -178,15 +193,14 @@ include(pri/translations.pri)
 include(pri/program.pri)
 include(pri/qtsysteminfo.pri)
 
-!contains(DEFINES, QUAZIP_INSTALLED) {
-        include(pri/quazip.pri)
-}
 contains(DEFINES, QUAZIP_INSTALLED) {
-        INCLUDEPATH += /usr/include/quazip /usr/include/minizip
-        LIBS += -lquazip -lminizip
+    INCLUDEPATH += /usr/include/quazip
+    LIBS += -lquazip
+} else {
+    include(pri/quazip.pri)
 }
 
 TARGET = Fritzing
 TEMPLATE = app
 
-
+message("libs $$LIBS")

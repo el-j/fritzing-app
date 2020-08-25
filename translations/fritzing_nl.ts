@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
-<TS version="2.0" language="nl_NL" sourcelanguage="en_US">
+<TS version="2.1" language="nl_NL" sourcelanguage="en_US">
 <context>
     <name>AboutBox</name>
     <message>
@@ -10,10 +10,6 @@
     <message>
         <source>&lt;b&gt;GNU GPL v3 on the code and CreativeCommons:BY-SA on the rest</source>
         <translation>&lt;b&gt;GNU GPL v3 -on the code and CreativeCommons:BY-SA on the rest</translation>
-    </message>
-    <message>
-        <source>&lt;b&gt;2007-%1 Fachhochschule Potsdam&lt;/b&gt;</source>
-        <translation>&lt;b&gt;2007-%1 Fachhochschule Potsdam&lt;/b&gt;</translation>
     </message>
     <message>
         <source>Fritzing is made by: </source>
@@ -38,10 +34,6 @@
     <message>
         <source>Mariano Crowe, Johannes Landstorfer, </source>
         <translation>Mariano Crowe, Johannes Landstorfer, </translation>
-    </message>
-    <message>
-        <source>Jenny Chowdhury, Lionel Michel, Jannis Leidel, </source>
-        <translation>Jenny Chowdhury, Lionel Michel, Jannis Leidel, </translation>
     </message>
     <message>
         <source>Bryant Mairs, Uleshka Asher, and Daniel Tzschentke. </source>
@@ -76,34 +68,6 @@
         <translation>Michaela Vieser and Julia Werner.</translation>
     </message>
     <message>
-        <source>Thanks to Kurt Badelt and Miguel Solis for the Spanish translation, </source>
-        <translation>Dank aan Kurt Badelt en Miguel Solis voor de Spaanse vertaling, </translation>
-    </message>
-    <message>
-        <source>to Gianluca Urgese for the Italian translation, </source>
-        <translation>aan, Gianluca Urgese voor de Italiaanse vertaling, </translation>
-    </message>
-    <message>
-        <source>to Nuno Pessanha Santos for the Portuguese (European) translation, </source>
-        <translation>aan Nuno Pessanha Santos voor de Portugeese (Europese) vertaling, </translation>
-    </message>
-    <message>
-        <source>to Yuelin and Ninjia  for the Chinese (Simplified) translation, </source>
-        <translation>aan Yuelin and Ninjia voor de Chinese (versimpelde) vertaling, </translation>
-    </message>
-    <message>
-        <source>to Hiroshi Suzuki for the Japanese translation, </source>
-        <translation>aan Hiroshi Suzuki voor de Japanse vertaling, </translation>
-    </message>
-    <message>
-        <source>to Robert Lee for the Chinese (Traditional) translation, </source>
-        <translation>aan Robert Lee voor de Chinese (traditionele) vertaling, </translation>
-    </message>
-    <message>
-        <source>to Vladimir Savinov for the Russian translation, </source>
-        <translation>aan Vladimir Savinov voor de Russische vertaling, </translation>
-    </message>
-    <message>
         <source>Fritzing is made possible with funding from the </source>
         <translation>Fritzing is mogelijk gemaakt door financiering van de </translation>
     </message>
@@ -133,50 +97,106 @@
     </message>
     <message>
         <source>&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;</source>
-        <translation>&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;</translation>
-    </message>
-    <message>
-        <source>to Josef Dustira for the Czech translation, </source>
-        <translation>aan Josef Dustira voor de Tsjechische vertaling, </translation>
-    </message>
-    <message>
-        <source>to Jinbuhm Kim for the Korean translation, </source>
-        <translation>aan, Jinbuhm Kim voor de Koreaanse vertaling, </translation>
-    </message>
-    <message>
-        <source>to Alexander Kaltsas for the Greek translation, </source>
-        <translation>aan Alexander Kaltsas voor de Griekse vertaling, </translation>
-    </message>
-    <message>
-        <source>to &amp;#313;ubom&amp;iacute;r Ducho&amp;#328; for the Slovak translation, </source>
-        <translation>aan Ĺubomír Duchoň voor de Slowaakse vertaling</translation>
-    </message>
-    <message>
-        <source>to Steven Noppe and Davy Uittenbogerd for the Dutch translation, </source>
-        <translation>aan Steven Noppe en Davy Uittenbogerd voor de Nederlandse vertaling, </translation>
-    </message>
-    <message>
-        <source>to Cihan Mete Bahad&amp;#x0131;r for the Turkish translation, </source>
-        <translation>aan Cihan Mete Bahadır voor de Turkse vertaling, </translation>
-    </message>
-    <message>
-        <source>and to Arthur Zanona, Nuno Pessanha Santos, Leandro Nunes, and Gabriel Ferreira for the Portuguese (Brazilian) translation. </source>
-        <translation>en aan Arthur Zanona, Nuno Pessanha Santos, Leandro Nunes, and Gabriel Ferreira voor de Portugeese (Braziliaanse) vertaling. </translation>
-    </message>
-    <message>
-        <source>to Nikolay Stankov for the Bulgarian translation, </source>
-        <translation>aan Nikolay Stankov voor de Bulgaarse vertaling, </translation>
+        <translation type="vanished">&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;</translation>
     </message>
     <message>
         <source>and from each purchase of a Fritzing Starter Kit or a PCB from Fritzing Fab.</source>
         <translation>en van elke aankoop van een Fritzing Starter Kit of een PCB van Fritzing Fab.</translation>
     </message>
     <message>
-        <source>to Lionel Michel, Yvan Kloster, Alexandre Dussart, and Roald Baudoux for the French translation, </source>
+        <source>Version %1.%2.%3 &lt;small&gt;(%4%5 %6) %7 [Qt %8]&lt;/small&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Version %1.%2.%3 &lt;small&gt;(%4%5 %6) %7 [Qt %8]&lt;/small&gt;</source>
+        <source>Jenny Chowdhury, Lionel Michel, Fabian Althaus, Jannis Leidel, </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;2007-%1 Fritzing&lt;/b&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Thanks for the translations go out to: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Spanish: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Italian: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Portuguese (European): </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Portuguese (Brazilian): </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Chinese (Simplified): </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Japanese: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Russian: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dutch: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Czech: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Korean: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Slovak: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Greek: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>French: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Turkish: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bulgarian: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Yuelin and Ninjia</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Chinese (Traditional): </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Robert Lee</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Hiroshi Suzuki</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Jinbuhm Kim</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -537,7 +557,7 @@
     <message>
         <source>The image from %1 can be loaded, but %2
 Use the file?</source>
-        <translation>De afbeelding van %1 kan geladen worden, maar %2 
+        <translation>De afbeelding van %1 kan geladen worden, maar %2
 Wil je het bestand gebruiken?</translation>
     </message>
     <message>
@@ -950,18 +970,6 @@ Er zijn geen banen of connectoren die elkaar overlappen of te dicht bij elkaar l
 <context>
     <name>FApplication</name>
     <message>
-        <source>Import files from previous version?</source>
-        <translation>Bestanden importeren van vorige versie?</translation>
-    </message>
-    <message>
-        <source>Import</source>
-        <translation>Importeer</translation>
-    </message>
-    <message>
-        <source>Do not import now</source>
-        <translation>Nu niet importeren</translation>
-    </message>
-    <message>
         <source>Fritzing failure</source>
         <translation>Fritzing fout</translation>
     </message>
@@ -974,18 +982,6 @@ Er zijn geen banen of connectoren die elkaar overlappen of te dicht bij elkaar l
         <translation>Fritzing heeft een uitzondering van %1 gevonden %2 in event %3</translation>
     </message>
     <message>
-        <source>Do you want to import parts and bins that you have created with earlier versions of Fritzing?
-</source>
-        <translation>Wil je onderdelen en koffers importeren die je hebt gemaakt in eerdere versies van Fritzing?
-</translation>
-    </message>
-    <message>
-        <source>
-Note: You can import them later using the &quot;Help&quot; &gt; &quot;Import parts and bins from old version...&quot; menu action.</source>
-        <translation>
-Noot: Je kunt ze ook later importeren via &quot;Help&quot; &gt;&quot;Importeer onderdelen en koffers van oudere versie&quot;.</translation>
-    </message>
-    <message>
         <source>Please specify an .fzz file name to save to (cancel will delete the backup)</source>
         <translation>Specificeer een .fzz bestandsnaam om naar op te slaan. (Annuleren zal de backup verwijderen)</translation>
     </message>
@@ -995,6 +991,33 @@ Noot: Je kunt ze ook later importeren via &quot;Help&quot; &gt;&quot;Importeer o
     </message>
     <message>
         <source>Fritzing caught an exception from %1 in event %2: %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Regenerate parts database?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Regenerating the parts database will take some minutes and you will have to restart Fritzing
+
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Would you like to regenerate the parts database?
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Regenerate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="unfinished">Annuleren</translation>
+    </message>
+    <message>
+        <source>Regenerating parts database...</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1013,7 +1036,18 @@ Noot: Je kunt ze ook later importeren via &quot;Help&quot; &gt;&quot;Importeer o
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>The &lt;b&gt;PCB View&lt;/b&gt; is where you layout the components will  on a physical PCB (Printed Circuit Board).&lt;br/&gt;&lt;br/&gt;PCBs can be made at home or in a small lab using DIY etching processes. They also can be sent to professional PCB manufacturing services for more precise fabrication. &lt;br/&gt;&lt;table&gt;&lt;tr&gt;&lt;td&gt;The first thing you will need is a board to place your parts on. There should already be one in your sketch, but if not, drag in the board icon from the Parts Bin. The icon matches thie image to the right: &lt;/td&gt;&lt;td&gt;&lt;img src=&quot;:resources/parts/svg/core/icon/rectangle_pcb.svg&quot; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;br/&gt;&lt;br/&gt;To lay out your PCB, arrange all the components so they fit nicely on the board. Then try to shift them around to minimize the length and confusion of connections. You can also resize rectangular boards. &lt;br/&gt;&lt;table&gt;&lt;tr&gt;&lt;td&gt;Once the parts are sorted out, you connect them with copper traces. You can drag out a trace from individual connections or use the autorouter to generate them. The Autoroute button is at the bottom of the window. The button matches the image to the right:&lt;/td&gt;&lt;td&gt;&lt;img src=&quot;:resources/images/icons/toolbarAutorouteEnabled_icon.png&quot; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</source>
+        <source>The &lt;b&gt;PCB View&lt;/b&gt; is where you layout the components will  on a physical PCB (Printed Circuit Board).&lt;br/&gt;&lt;br/&gt;PCBs can be made at home or in a small lab using DIY etching processes. They also can be sent to professional PCB manufacturing services for more precise fabrication. &lt;br/&gt;&lt;table&gt;&lt;tr&gt;&lt;td&gt;The first thing you will need is a board to place your parts on. There should already be one in your sketch, but if not, drag in the board icon from the Parts Bin. The icon matches the image to the right: &lt;/td&gt;&lt;td&gt;&lt;img src=&quot;:resources/parts/svg/core/icon/rectangle_pcb.svg&quot; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;br/&gt;&lt;br/&gt;To lay out your PCB, arrange all the components so they fit nicely on the board. Then try to shift them around to minimize the length and confusion of connections. You can also resize rectangular boards. &lt;br/&gt;&lt;table&gt;&lt;tr&gt;&lt;td&gt;Once the parts are sorted out, you connect them with copper traces. You can drag out a trace from individual connections or use the autorouter to generate them. The Autoroute button is at the bottom of the window. The button matches the image to the right:&lt;/td&gt;&lt;td&gt;&lt;img src=&quot;:resources/images/icons/toolbarAutorouteEnabled_icon.png&quot; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>FolderUtils</name>
+    <message>
+        <source>Moving your custom parts</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Your custom-made parts and bins are moved from the hidden app data folder to your fritzing documents folder at &lt;br/&gt;&lt;br/&gt;&lt;em&gt;%1&lt;/em&gt;&lt;br/&gt;&lt;br/&gt;This way we hope to make it easier for you to find and edit them manually.&lt;/p&gt;</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1455,14 +1489,6 @@ Het is ook mogelijk om op een connector rechts te klikken en kies &apos;Maak gro
 <context>
     <name>LogoItem</name>
     <message>
-        <source>Unable to display</source>
-        <translation>Niet mogelijk om te tonen</translation>
-    </message>
-    <message>
-        <source>Unable to display image from %1</source>
-        <translation>Niet mogelijk om de afbeeldeing te tonen van %1</translation>
-    </message>
-    <message>
         <source>shape</source>
         <translation>vorm</translation>
     </message>
@@ -1496,6 +1522,14 @@ Het is ook mogelijk om op een connector rechts te klikken en kies &apos;Maak gro
     </message>
     <message>
         <source>text</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to display</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to display image from %1</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1847,10 +1881,6 @@ Wij werken er momenteel aan om dit bericht te vermijden en je te laten kiezen tu
         <translation>&amp;Knippen</translation>
     </message>
     <message>
-        <source>Ctrl+X</source>
-        <translation type="obsolete">Ctrl+X</translation>
-    </message>
-    <message>
         <source>Cut selection</source>
         <translation>Knip selectie</translation>
     </message>
@@ -1859,20 +1889,12 @@ Wij werken er momenteel aan om dit bericht te vermijden en je te laten kiezen tu
         <translation>&amp;Kopiëren</translation>
     </message>
     <message>
-        <source>Ctrl+C</source>
-        <translation type="obsolete">Ctrl+C</translation>
-    </message>
-    <message>
         <source>Copy selection</source>
         <translation>Kopieer selectie</translation>
     </message>
     <message>
         <source>&amp;Paste</source>
         <translation>&amp;Plakken</translation>
-    </message>
-    <message>
-        <source>Ctrl+V</source>
-        <translation type="obsolete">Ctrl+V</translation>
     </message>
     <message>
         <source>Paste clipboard contents</source>
@@ -1901,10 +1923,6 @@ Wij werken er momenteel aan om dit bericht te vermijden en je te laten kiezen tu
     <message>
         <source>&amp;Select All</source>
         <translation>&amp;Alles selecteren</translation>
-    </message>
-    <message>
-        <source>Ctrl+A</source>
-        <translation type="obsolete">Ctrl+A</translation>
     </message>
     <message>
         <source>Select all elements</source>
@@ -2251,14 +2269,6 @@ Wij werken er momenteel aan om dit bericht te vermijden en je te laten kiezen tu
         <translation></translation>
     </message>
     <message>
-        <source>&amp;Import parts and bins from old version...</source>
-        <translation>&amp;Importeer onderdelen en koffers van een oudere versie...</translation>
-    </message>
-    <message>
-        <source>Import parts and bins from previous installation</source>
-        <translation>Importeer onderdelen en koffers van een oudere installatie</translation>
-    </message>
-    <message>
         <source>&amp;File</source>
         <translation>&amp;Bestand</translation>
     </message>
@@ -2357,14 +2367,6 @@ Wij werken er momenteel aan om dit bericht te vermijden en je te laten kiezen tu
     <message>
         <source>Remove Bendpoint</source>
         <translation>Verwijder buigpunt</translation>
-    </message>
-    <message>
-        <source>Please choose the previous Fritzing folder...</source>
-        <translation>Kies a.u.b. de vorige Fritzing map...</translation>
-    </message>
-    <message>
-        <source>You will have to restart Fritzing in order to use the imported parts</source>
-        <translation>U moet Fritzing herstarten om de geïmporteerde onderdelen te kunnen gebruiken</translation>
     </message>
     <message>
         <source>Remove copper fill</source>
@@ -2694,10 +2696,6 @@ Controleer a.u.b. alle weergaves voor potentiële fouten.</translation>
         <translation>Selecteer alle via onderdelen</translation>
     </message>
     <message>
-        <source>%1 %2 %3</source>
-        <translation>%1 %2 %3</translation>
-    </message>
-    <message>
         <source>Shift+Ctrl+D</source>
         <translation>Shift+Ctrl+D</translation>
     </message>
@@ -2811,34 +2809,12 @@ Controleer a.u.b. alle weergaves voor potentiële fouten.</translation>
         <translation>Geen sketch gevonden in &apos;%1&apos;</translation>
     </message>
     <message>
-        <source>the .fz file format is obsolete</source>
-        <translation>het .fz bestandsformaat is verouderd</translation>
-    </message>
-    <message>
-        <source>The .fz file format has been deprecated.
-
-Would you like to convert &apos;%1&apos; to the .fzz format now or open it read-only?
-</source>
-        <translation>Het .fz bestandsformaat wordt niet langer gebruikt.
-
-Wilt u &apos;%1&apos; converteren naar het .fzz bestandsfomaat of wilt u het als &apos;Alleen-Lezen&apos; openen?
-</translation>
-    </message>
-    <message>
-        <source>The conversion process will not modify &apos;%1&apos;.</source>
-        <translation>Het conversie proces zal &apos;%1&apos; niet aanpassen.</translation>
-    </message>
-    <message>
         <source>Convert</source>
         <translation>Converteren</translation>
     </message>
     <message>
         <source>Read-only</source>
         <translation>Alleen-Lezen</translation>
-    </message>
-    <message>
-        <source>Please specify an .fzz file name to save &apos;%1&apos; to</source>
-        <translation>Kies a.u.b. een .fzz bestandsnaam om &apos;%1&apos; op te slaan</translation>
     </message>
     <message>
         <source>&amp;Routing</source>
@@ -2871,10 +2847,6 @@ Wilt u &apos;%1&apos; converteren naar het .fzz bestandsfomaat of wilt u het als
     <message>
         <source>Fill empty regions of the copper layer--fill will include all traces connected to the seeds</source>
         <translation>Vul lege gebieden van de koperlaag--Vulling zal alle banen verbonden met seeds omvatten</translation>
-    </message>
-    <message>
-        <source>Ctrl+B</source>
-        <translation type="obsolete">Ctrl+B</translation>
     </message>
     <message>
         <source>Choose Ground Fill Seed(s)...</source>
@@ -3171,10 +3143,6 @@ Doorgaan en terug naar vorige versie?</translation>
     <message>
         <source>Display Parts Editor help in a browser</source>
         <translation>Toon Onderdelen Bewerker help in een browser</translation>
-    </message>
-    <message>
-        <source>The folder &quot;%1&quot; isn&apos;t a Fritzing installation folder</source>
-        <translation>De folder &quot;%1&quot; is geen Fritzing installatiefolder</translation>
     </message>
     <message>
         <source>Design Rules Check (DRC)</source>
@@ -3552,24 +3520,16 @@ Note: if you want to update later, there are options under the &apos;Part&apos; 
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Rotate 45� Clockwise</source>
-        <translation type="obsolete">Roteer 135° Rechtsom {45�?}</translation>
+        <source>Ctrl+Shift+V</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Rotate 90� Clockwise</source>
-        <translation type="obsolete">Roteer 135° Rechtsom {90�?}</translation>
+        <source>(x,y)=(%1, %2) %3</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Rotate 180�</source>
-        <translation type="obsolete">Roteer 180° {180�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 90� Counter Clockwise</source>
-        <translation type="obsolete">Roteer 45° Linksom {90�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 45� Counter Clockwise</source>
-        <translation type="obsolete">Roteer 45° Linksom {45�?}</translation>
+        <source>(x, y)=(%1, %2)	(width, height)=(%3, %4) %5</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Rotate 45° Clockwise</source>
@@ -3592,7 +3552,23 @@ Note: if you want to update later, there are options under the &apos;Part&apos; 
         <translation type="unfinished">Roteer 45° Linksom {45�?} {45°?}</translation>
     </message>
     <message>
-        <source>Ctrl+Shift+V</source>
+        <source>Regenerate parts database ...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Regenerate the parts database (should only be used if your parts database is broken)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fritzing uncompressed (*%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Color Breadboard Wires By Length</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Display breadboard wires using standard color coding by length</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -3648,6 +3624,29 @@ Note: if you want to update later, there are options under the &apos;Part&apos; 
     <message>
         <source>Optimizing traces...</source>
         <translation>Banen optimaliseren...</translation>
+    </message>
+</context>
+<context>
+    <name>ModFileDialog</name>
+    <message>
+        <source>Modified files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>decision</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fritzing can proceed with the update, but the set of files listed below must first be cleaned (removed or reset). It may take a few minutes. &lt;p&gt;Do you want to proceed with cleaning these files?&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clean files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Now cleaning files. Please don&apos;t interrupt the process.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -4213,10 +4212,10 @@ Doorgaan en opslaan?</translation>
         <translation>Fritzing ondersteunt momenteel alleen OCRA en Droid lettertypen--de lettertypen in &apos;%1&apos; zijn hierdoor vervangen</translation>
     </message>
     <message>
-        <source>Unable to load image file &apos;%1&apos;: 
+        <source>Unable to load image file &apos;%1&apos;:
 
 %2</source>
-        <translation>Niet mogelijk om afbeeldingsbestand &apos;%1&apos; te laden: 
+        <translation>Niet mogelijk om afbeeldingsbestand &apos;%1&apos; te laden:
 
 %2</translation>
     </message>
@@ -4411,15 +4410,15 @@ Doorgaan en opslaan?</translation>
         <translation>Bestandsnaam voorvoegsel</translation>
     </message>
     <message>
-        <source>Please enter a prefix to help you identify the part files. The names will have the form &apos;PREFIX_%1&apos;. (It is not necessary to change the prefix, since a unique suffix is always added.)</source>
-        <translation>Voer een voorvoegsel in om je onderdeelbestanden te herkennen. De namen zullen er als volgt uitzien &apos;VOORVOEGSEL_%1&apos; (Het is niet noodzakelijk om het voorvoegsel te veranderen, omdat altijd een uniek achtervoegsel gemaakt wordt.)</translation>
-    </message>
-    <message>
         <source>Convert schematic to 0.1 inch standard</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Convert pre-0.8.6 schematic image to new 0.1 inch standard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Please enter a prefix to help you identify the part files.&lt;br/&gt;The file names will have the form &apos;PREFIX_%1&apos;.&lt;br/&gt;(It is not necessary to change the proposed prefix, since a unique suffix is always added.)&lt;/p&gt;</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -4821,34 +4820,6 @@ Doorgaan en opslaan?</translation>
         <translation>Stel een klein lettertype in</translation>
     </message>
     <message>
-        <source>Rotate 45� Clockwise</source>
-        <translation type="obsolete">Roteer 135° Rechtsom {45�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 90� Clockwise</source>
-        <translation type="obsolete">Roteer 135° Rechtsom {90�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 135� Clockwise</source>
-        <translation type="obsolete">Roteer 135° Rechtsom {135�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 180�</source>
-        <translation type="obsolete">Roteer 180° {180�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 135� Counter Clockwise</source>
-        <translation type="obsolete">Roteer 45° Linksom {135�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 90� Counter Clockwise</source>
-        <translation type="obsolete">Roteer 45° Linksom {90�?}</translation>
-    </message>
-    <message>
-        <source>Rotate 45� Counter Clockwise</source>
-        <translation type="obsolete">Roteer 45° Linksom {45�?}</translation>
-    </message>
-    <message>
         <source>Rotate 45° Clockwise</source>
         <translation type="unfinished">Roteer 135° Rechtsom {135�?} {45°?}</translation>
     </message>
@@ -5175,24 +5146,12 @@ De shift toets wisselt de as</translation>
 <context>
     <name>ProgramTab</name>
     <message>
-        <source>Open...</source>
-        <translation type="obsolete">Open...</translation>
-    </message>
-    <message>
-        <source>Program</source>
-        <translation type="obsolete">Programmeer</translation>
-    </message>
-    <message>
         <source>Select a program file to load</source>
         <translation>Selecteer een bestand om te laden</translation>
     </message>
     <message>
         <source>Fritzing is unable to find &apos;%1&apos;, please locate it</source>
         <translation>Fritzing is niet in staat &apos;%1&apos; te vinden</translation>
-    </message>
-    <message>
-        <source>Language:</source>
-        <translation type="obsolete">Taal:</translation>
     </message>
     <message>
         <source>New</source>
@@ -5203,28 +5162,12 @@ De shift toets wisselt de as</translation>
         <translation>Opslaan</translation>
     </message>
     <message>
-        <source>Port:</source>
-        <translation type="obsolete">Poort:</translation>
-    </message>
-    <message>
-        <source>Programmer:</source>
-        <translation type="obsolete">Programmer:</translation>
-    </message>
-    <message>
         <source>Remove &quot;%1&quot;?</source>
         <translation>&quot;%1&quot; verwijderen?</translation>
     </message>
     <message>
         <source>Are you sure you want to remove &quot;%1&quot; from the sketch?</source>
         <translation>Weet je zeker dat je &quot;%1&quot; uit de sketch wilt verwijderen?</translation>
-    </message>
-    <message>
-        <source>The file &apos;%1&apos; must be saved before it can be sent to the programmer.</source>
-        <translation type="obsolete">Het bestand &apos;%1&apos; moet opgeslagen worden voordat het naar de programmer verzonden kan worden.</translation>
-    </message>
-    <message>
-        <source>Select a programmer (executable) for %1</source>
-        <translation type="obsolete">Selecteer een programmer (uitvoerbaar) voor %1</translation>
     </message>
     <message>
         <source>Code (*.%1)</source>
@@ -5278,90 +5221,6 @@ De shift toets wisselt de as</translation>
 <context>
     <name>ProgramWindow</name>
     <message>
-        <source>%1 %2</source>
-        <translation type="obsolete">%1 %2</translation>
-    </message>
-    <message>
-        <source>No ports found</source>
-        <translation type="obsolete">Geen poorten gevonden</translation>
-    </message>
-    <message>
-        <source>&amp;File</source>
-        <translation type="obsolete">&amp;Bestand</translation>
-    </message>
-    <message>
-        <source>Ctrl+N</source>
-        <translation type="obsolete">Ctrl+N</translation>
-    </message>
-    <message>
-        <source>Create a new program</source>
-        <translation type="obsolete">Maak een nieuw programma</translation>
-    </message>
-    <message>
-        <source>Ctrl+O</source>
-        <translation type="obsolete">Ctrl+O</translation>
-    </message>
-    <message>
-        <source>Open a program</source>
-        <translation type="obsolete">Open een programma</translation>
-    </message>
-    <message>
-        <source>Ctrl+S</source>
-        <translation type="obsolete">Ctrl+S</translation>
-    </message>
-    <message>
-        <source>Save the current program</source>
-        <translation type="obsolete">Sla het huidige programma op</translation>
-    </message>
-    <message>
-        <source>Rename the current program</source>
-        <translation type="obsolete">Hernoem het huidige programma</translation>
-    </message>
-    <message>
-        <source>Duplicate tab</source>
-        <translation type="obsolete">Dupliceer tabblad</translation>
-    </message>
-    <message>
-        <source>Copies the current program into a new tab</source>
-        <translation type="obsolete">Kopieert het huidige programma in een nieuw tabblad</translation>
-    </message>
-    <message>
-        <source>Remove tab</source>
-        <translation type="obsolete">Verwijder tabblad</translation>
-    </message>
-    <message>
-        <source>Ctrl+W</source>
-        <translation type="obsolete">Ctrl+W</translation>
-    </message>
-    <message>
-        <source>Remove the current program from the sketch</source>
-        <translation type="obsolete">Verwijder het huidige programma uit de sketch</translation>
-    </message>
-    <message>
-        <source>&amp;Print...</source>
-        <translation type="obsolete">&amp;Afdrukken...</translation>
-    </message>
-    <message>
-        <source>Ctrl+P</source>
-        <translation type="obsolete">Ctrl+P</translation>
-    </message>
-    <message>
-        <source>Print the current program</source>
-        <translation type="obsolete">Druk het huidige programma af</translation>
-    </message>
-    <message>
-        <source>&amp;Quit</source>
-        <translation type="obsolete">&amp;Afsluiten</translation>
-    </message>
-    <message>
-        <source>Ctrl+Q</source>
-        <translation type="obsolete">Ctrl+Q</translation>
-    </message>
-    <message>
-        <source>Quit the application</source>
-        <translation type="obsolete">Applicatie afsluiten</translation>
-    </message>
-    <message>
         <source>&amp;Edit</source>
         <translation>&amp;Wijzig</translation>
     </message>
@@ -5378,20 +5237,12 @@ De shift toets wisselt de as</translation>
         <translation>&amp;Knippen</translation>
     </message>
     <message>
-        <source>Ctrl+X</source>
-        <translation type="obsolete">Ctrl+X</translation>
-    </message>
-    <message>
         <source>Cut selection</source>
         <translation>Knip selectie</translation>
     </message>
     <message>
         <source>&amp;Copy</source>
         <translation>&amp;Kopiëren</translation>
-    </message>
-    <message>
-        <source>Ctrl+C</source>
-        <translation type="obsolete">Ctrl+C</translation>
     </message>
     <message>
         <source>Copy selection</source>
@@ -5402,10 +5253,6 @@ De shift toets wisselt de as</translation>
         <translation>&amp;Plakken</translation>
     </message>
     <message>
-        <source>Ctrl+V</source>
-        <translation type="obsolete">Ctrl+V</translation>
-    </message>
-    <message>
         <source>Paste clipboard contents</source>
         <translation>Plak klembord inhoud</translation>
     </message>
@@ -5414,32 +5261,8 @@ De shift toets wisselt de as</translation>
         <translation>&amp;Alles selecteren</translation>
     </message>
     <message>
-        <source>Ctrl+A</source>
-        <translation type="obsolete">Ctrl+A</translation>
-    </message>
-    <message>
         <source>Select all text</source>
         <translation>Selecteer alle tekst</translation>
-    </message>
-    <message>
-        <source>Select language</source>
-        <translation type="obsolete">Selecteer taal</translation>
-    </message>
-    <message>
-        <source>Select port</source>
-        <translation type="obsolete">Selecteer poort</translation>
-    </message>
-    <message>
-        <source>Select programmer</source>
-        <translation type="obsolete">Selecteer programmer</translation>
-    </message>
-    <message>
-        <source>Program</source>
-        <translation type="obsolete">Programmeer</translation>
-    </message>
-    <message>
-        <source>Load the current program onto a microcontroller</source>
-        <translation type="obsolete">Laad het huidige prgramma naar een microcontroller</translation>
     </message>
     <message>
         <source>File &apos;%1&apos; was restored from the .fzz file; the local copy was not found.</source>
@@ -5448,22 +5271,6 @@ De shift toets wisselt de as</translation>
     <message>
         <source>File &apos;%1&apos; was restored from the .fzz file; save a local copy to work with an external editor.</source>
         <translation>Bestand &apos;%1&apos; is hersteld vanuit het .fzz bestand; sla een lokale kopie op om met een externe bewerker te werken.</translation>
-    </message>
-    <message>
-        <source>New Code File</source>
-        <translation type="obsolete">Nieuw Code Bestand</translation>
-    </message>
-    <message>
-        <source>&amp;Open Code File...</source>
-        <translation type="obsolete">&amp;Open Code Bestand...</translation>
-    </message>
-    <message>
-        <source>&amp;Save Code File</source>
-        <translation type="obsolete">&amp;Opslaan Code Bestand</translation>
-    </message>
-    <message>
-        <source>Rename Code File</source>
-        <translation type="obsolete">Hernoem Code Bestand</translation>
     </message>
     <message>
         <source>&amp;Code</source>
@@ -5480,10 +5287,6 @@ De shift toets wisselt de as</translation>
     <message>
         <source>Code Window - %1</source>
         <translation>Code Venster - %1</translation>
-    </message>
-    <message>
-        <source>Find file...</source>
-        <translation type="obsolete">Zoek bestand...</translation>
     </message>
     <message>
         <source>No boards available</source>
@@ -5607,10 +5410,6 @@ De shift toets wisselt de as</translation>
     <message>
         <source>Fritzing</source>
         <translation>Fritzing</translation>
-    </message>
-    <message>
-        <source>&lt;font face=&apos;Lucida Grande, Tahoma, Sans Serif&apos; size=&apos;2&apos; color=&apos;#eaf4ed&apos;&gt;&amp;#169; 2007-%1 Fachhochschule Potsdam&lt;/font&gt;</source>
-        <translation>&lt;font face=&apos;Lucida Grande, Tahoma, Sans Serif size=&apos;2&apos; color=&apos;#eaf4ed&apos;&gt;&amp;#169; 2007-%1 Fachhochschule Potsdam&lt;/font&gt;</translation>
     </message>
     <message>
         <source>The file &apos;%1&apos; is read-only; please use a different filename.</source>
@@ -5995,10 +5794,6 @@ Fritzing werkt nog steeds, maar je kunt geen eigenschappen van de onderdelen wij
         <translation>Niet mogelijk om koper %1 %2 %3 te analyseren</translation>
     </message>
     <message>
-        <source>Parts folder not found.</source>
-        <translation>Onderdelen folder niet gevonden.</translation>
-    </message>
-    <message>
         <source>Select %1</source>
         <translation>Selecteer %1</translation>
     </message>
@@ -6087,38 +5882,6 @@ Fritzing werkt nog steeds, maar je kunt geen eigenschappen van de onderdelen wij
         <translation>outline is leeg</translation>
     </message>
     <message>
-        <source>the board outline layer, </source>
-        <translation>de bord outline laag</translation>
-    </message>
-    <message>
-        <source>silkscreen layer(s), </source>
-        <translation>silkscreen laag/lagen, </translation>
-    </message>
-    <message>
-        <source>copper layer(s), </source>
-        <translation>Koper laag/lagen, </translation>
-    </message>
-    <message>
-        <source>mask layer(s), </source>
-        <translation>masker laag/lagen, </translation>
-    </message>
-    <message>
-        <source>Unable to translate svg curves in %1</source>
-        <translation>Niet mogelijk om SVG curves te vertalen in %1</translation>
-    </message>
-    <message>
-        <source>silk export failure</source>
-        <translation>silk export fout</translation>
-    </message>
-    <message>
-        <source>drill export failure</source>
-        <translation>boor export fout</translation>
-    </message>
-    <message>
-        <source>mask export failure</source>
-        <translation>masker export fout</translation>
-    </message>
-    <message>
         <source>Copper Fill Bottom</source>
         <translation>Kopervulling Onderkant</translation>
     </message>
@@ -6181,10 +5944,6 @@ Fritzing werkt nog steeds, maar je kunt geen eigenschappen van de onderdelen wij
         <translation>Ground Vulling Seed Bewerker</translation>
     </message>
     <message>
-        <source>%1 mask export failure (2)</source>
-        <translation>%1 masker export fout (2)</translation>
-    </message>
-    <message>
         <source>Select all &apos;Don&apos;t autoroute&apos; traces</source>
         <translation>Selecteer aan &apos;Geen autoroute&apos; banen</translation>
     </message>
@@ -6241,10 +6000,6 @@ Fritzing werkt nog steeds, maar je kunt geen eigenschappen van de onderdelen wij
         <translation>%1 draden zijn verschoven vanaf hun opgeslagen positie in %2.</translation>
     </message>
     <message>
-        <source>paste mask layer(s), </source>
-        <translation>plak masker laag/lagen,</translation>
-    </message>
-    <message>
         <source>ii</source>
         <translation>ii</translation>
     </message>
@@ -6297,18 +6052,6 @@ Fritzing werkt nog steeds, maar je kunt geen eigenschappen van de onderdelen wij
         <translation>Onderdeel %1 &apos;%2&apos;</translation>
     </message>
     <message>
-        <source>Fritzing is unable to process the cutouts in this custom PCB shape. </source>
-        <translation>Fritzing is niet in staat om de uitsnedes in de aangepast PCB vorm te verwerken. </translation>
-    </message>
-    <message>
-        <source>You may need to reload the shape SVG. </source>
-        <translation>Mogelijk moet je de SVG vorm opnieuw inladen. </translation>
-    </message>
-    <message>
-        <source>Fritzing requires that you make cutouts using a shape &apos;subtraction&apos; or &apos;difference&apos; operation in your vector graphics editor.</source>
-        <translation>Fritzing verlangt dat je de uitsnedes maakt door middel van een vorm via de &apos;substractie&apos; of &apos;verschil&apos; uitvoer binnen je vector programma.</translation>
-    </message>
-    <message>
         <source>unable to copy file &apos;%1&apos; to &apos;%2&apos;.</source>
         <translation>Niet mogelijk bestand &apos;%1&apos; naar &apos;%2&apos; te kopieren.</translation>
     </message>
@@ -6317,40 +6060,12 @@ Fritzing werkt nog steeds, maar je kunt geen eigenschappen van de onderdelen wij
         <translation>Autorouter Instellingen</translation>
     </message>
     <message>
-        <source>%1 layer export is empty.</source>
-        <translation>%1 laag export is leeg.</translation>
-    </message>
-    <message>
-        <source>exported drill file is empty</source>
-        <translation>het geëxporteerde boorbestand is leeg</translation>
-    </message>
-    <message>
-        <source>exported mask layer %1 is empty</source>
-        <translation>de geëxporteerde masker laag %1 is leeg</translation>
-    </message>
-    <message>
-        <source>exported paste mask layer is empty</source>
-        <translation>de geëxporteerde soldeerpasta masker laag is leeg</translation>
-    </message>
-    <message>
-        <source>%1 layer: unable to save to &apos;%2&apos;</source>
-        <translation>%1 laag: niet mogelijk om naar &apos;%2&apos; op te slaan</translation>
-    </message>
-    <message>
         <source>Unable to save pick and place file: %2</source>
         <translation>Niet mogelijk om pick and place bestand op te slaan:%2</translation>
     </message>
     <message>
         <source>Text</source>
         <translation>Tekst</translation>
-    </message>
-    <message>
-        <source>%1 layer export is empty (case 2).</source>
-        <translation>%1 laag export is leeg (case 2).</translation>
-    </message>
-    <message>
-        <source>silk layer %1 export is empty</source>
-        <translation>silkscreen laag %1 export is leeg</translation>
     </message>
     <message>
         <source>%2 ... %1 wires moved from their saved position</source>
@@ -6362,6 +6077,155 @@ Fritzing werkt nog steeds, maar je kunt geen eigenschappen van de onderdelen wij
     </message>
     <message>
         <source>N/A</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;font face=&apos;Lucida Grande, Tahoma, Sans Serif&apos; size=&apos;2&apos; color=&apos;#eaf4ed&apos;&gt;&amp;#169; 2007-%1 Fritzing&lt;/font&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Regenerate database failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Regenerating parts database</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to find parts git repository</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to find parts git repository HEAD</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The parts folder &apos;%1&apos; has been changed--it is not in the master branch (%2). %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The parts folder &apos;%1&apos; may have been damaged (%2). %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The parts folder &apos;%1&apos; has been changed (%2). %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>There are new or modified files in the parts folder &apos;%1&apos;. These changes will be discarded by the update.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>There are unreadable files in the parts folder &apos;%1&apos;. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to open parts folder &apos;%1&apos; for update. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Parts folder repo &apos;%1&apos; is empty. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to determine network site for &apos;%1&apos;. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to access network site for &apos;%1&apos;. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to retrieve network references for &apos;%1&apos;. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to retrieve master network reference for &apos;%1&apos;. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Error %1
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>the board outline layer, </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>silkscreen layer(s), </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>copper layer(s), </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>mask layer(s), </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>paste mask layer(s), </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to translate svg curves in %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 layer export is empty.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 layer export is empty (case 2).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>silk layer %1 export is empty</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>silk export failure</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>exported drill file is empty</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>drill export failure</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>exported mask layer %1 is empty</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 mask export failure (2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>mask export failure</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>exported paste mask layer is empty</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 layer: unable to save to &apos;%2&apos;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fritzing is unable to process the cutouts in this custom PCB shape. </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>You may need to reload the shape SVG. </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fritzing requires that you make cutouts using a shape &apos;subtraction&apos; or &apos;difference&apos; operation in your vector graphics editor.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -6478,6 +6342,25 @@ Fritzing werkt nog steeds, maar je kunt geen eigenschappen van de onderdelen wij
     </message>
 </context>
 <context>
+    <name>RegenerateDatabaseThread</name>
+    <message>
+        <source>Unable to open temporary file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Database failure</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to remove original db file %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to copy database file %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>Resistor</name>
     <message>
         <source>resistance</source>
@@ -6581,6 +6464,14 @@ Fritzing werkt nog steeds, maar je kunt geen eigenschappen van de onderdelen wij
         <source>width</source>
         <translation>breedte</translation>
     </message>
+    <message>
+        <source>&amp;cm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;in</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>S2S</name>
@@ -6602,10 +6493,6 @@ Fritzing werkt nog steeds, maar je kunt geen eigenschappen van de onderdelen wij
     </message>
     <message>
         <source>Missing connector %1 in &apos;%2&apos; schematic of &apos;%3&apos;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Uunable to load schematic &apos;%1&apos; for &apos;%2&apos;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6666,22 +6553,6 @@ Fritzing werkt nog steeds, maar je kunt geen eigenschappen van de onderdelen wij
 <context>
     <name>SetColorDialog</name>
     <message>
-        <source>Set %1 Color...</source>
-        <translation type="obsolete">Stel %1 kleur in...</translation>
-    </message>
-    <message>
-        <source>Choose a new %1 color.</source>
-        <translation type="obsolete">Kies een nieuw %1 kleur.</translation>
-    </message>
-    <message>
-        <source>current %1 color (%2)</source>
-        <translation type="obsolete">huidige %1 kleur (%2)</translation>
-    </message>
-    <message>
-        <source>standard %1 color (%2)</source>
-        <translation type="obsolete">standaard %1 kleur (%2)</translation>
-    </message>
-    <message>
         <source>Make this the default %1 color</source>
         <translation>Maak van deze de standaard %1 kleur</translation>
     </message>
@@ -6692,18 +6563,6 @@ Fritzing werkt nog steeds, maar je kunt geen eigenschappen van de onderdelen wij
     <message>
         <source>OK</source>
         <translation>OK</translation>
-    </message>
-    <message>
-        <source>Select custom %1 color</source>
-        <translation type="obsolete">Selecteer aangepaste kleur %1</translation>
-    </message>
-    <message>
-        <source>custom color (%1)</source>
-        <translation type="obsolete">Aangepaste kleur (%1)</translation>
-    </message>
-    <message>
-        <source>selected color (%1)</source>
-        <translation type="obsolete">geselecteerde kleur (%1)</translation>
     </message>
     <message>
         <source>%1 Color...</source>
@@ -7503,10 +7362,6 @@ Noot:Je kunt dit venster ook oproepen door op de tekst van de routing status te 
         <translation>Sluiten</translation>
     </message>
     <message>
-        <source>No new versions found.</source>
-        <translation>Geen nieuwe versie gevonden.</translation>
-    </message>
-    <message>
         <source>A new main release is available for downloading:</source>
         <translation>Een nieuwe algemene release is beschikbaar om te downloaden :</translation>
     </message>
@@ -7515,12 +7370,72 @@ Noot:Je kunt dit venster ook oproepen door op de tekst van de routing status te 
         <translation>een nieuwe test release is beschikbaar om te downloaden :</translation>
     </message>
     <message>
-        <source>Checking...</source>
-        <translation>Controleren...</translation>
+        <source>Update parts</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Sorry, unable to retrieve update info</source>
-        <translation>Excuseer, niet mogelijk om de update info af te halen</translation>
+        <source>&lt;p&gt;No new versions found.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Checking for new releases...&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Fritzing is unable to check for--and update--new parts.&lt;br/&gt;If you want this functionality, please enable write permission on this folder:&lt;br/&gt; &apos;%1&apos;.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Checking for new parts...&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;No new releases or new parts found&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Sorry, unable to retrieve update info&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Sorry, unable to retrieve parts update info&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Downloading new parts...&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Sorry, unable to download new parts&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;New parts successfully installed!&lt;/p&gt;&lt;p&gt;Fritzing must be restarted, so the &apos;Close&apos; button will close Fritzing.&lt;br/&gt;The new parts will be available when you run Fritzing again.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Sorry, unable to install new parts: %1&lt;br/&gt;Fritzing must nevertheless be restarted, so the &apos;Close&apos; button will close Fritzing.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;&lt;b&gt;There is a parts library update available!&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Would you like Fritzing to download and install the update now?&lt;br/&gt;See the &lt;a href=&apos;https://github.com/fritzing/fritzing-parts/compare/%1...master&apos;&gt;list of changes here.&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Note: the update may take some minutes and you will have to restart Fritzing.&lt;br/&gt;You can also update later via the &lt;i&gt;Help &amp;rarr; Check for Updates&lt;/i&gt; menu.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>New files:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Modified Files:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fritzing was unable to clean the files, so the update cannot proceed.&lt;br/&gt;You may have to reinstall Fritzing.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;Installing new parts. This may take a few minutes.&lt;br/&gt;Please do not interrupt the process, as your parts folder could be damaged.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -7547,18 +7462,6 @@ Noot:Je kunt dit venster ook oproepen door op de tekst van de routing status te 
     </message>
     <message>
         <source>Fritzing CreatorKit</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>The Fritzing Creator Kit provides a fast, easy and entertaining introduction to the world of interactive electronics.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>order now &gt;&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Get your Creator Kit now.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -7623,6 +7526,10 @@ Noot:Je kunt dit venster ook oproepen door op de tekst van de routing status te 
     </message>
     <message>
         <source>Fritzing Fab</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The Fritzing Creator Kit is out of Stock. For Updates please visit the fritzing.blog</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
