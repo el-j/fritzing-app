@@ -13,10 +13,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v2
-        with:
-          host: 'mac'
+      - name: Install HomeBrew
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+          brew --version
+
+      - name: install Qt5 with Brew
+        run: |
+          brew install qt5 
+          
       - name: Build and Install LibGit2
         run: |
          mkdir -p ../libgit2/build
