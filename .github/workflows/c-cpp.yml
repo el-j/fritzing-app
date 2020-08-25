@@ -16,13 +16,19 @@ jobs:
         uses: jurplel/install-qt-action@v2
         with:
           host: 'mac'
-      - name: Install dependencies LibGit&Boost
+      - name: Build and Install LibGit2
         run: |
          mkdir -p ../libgit2/build
           wget -q -O - https://github.com/libgit2/libgit2/archive/v0.28.1.tar.gz | tar xz && mv libgit2-0.28.1/* ../libgit2/
           (cd ../libgit2/build && cmake -D BUILD_SHARED_LIBS=OFF .. && cmake --build .)
           (cd .. && wget -q -O - https://dl.bintray.com/boostorg/release/1.70.0/source/boost_1_70_0.tar.bz2 | tar xj)
           echo "boost installed, libgit2 is build"
+          
+      - name: Get and Install Boost
+        run: |
+          (cd .. && wget -q -O - https://dl.bintray.com/boostorg/release/1.70.0/source/boost_1_70_0.tar.bz2 | tar xj)
+          echo "boost installed"
+
       - name: Deploy and Build Fritzing
         run: |
              ls /usr/local/opt
