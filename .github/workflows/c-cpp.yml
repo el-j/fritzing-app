@@ -1,0 +1,55 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+        
+      - name: Install HomeBrew
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+          brew --version
+
+      - name: install Qt5 with Brew
+        run: |
+          brew install qt5 
+          
+      - name: Build and Install LibGit2
+        run: |
+         mkdir -p ../libgit2/build
+          wget -q -O - https://github.com/libgit2/libgit2/archive/v0.28.1.tar.gz | tar xz && mv libgit2-0.28.1/* ../libgit2/
+          (cd ../libgit2/build && cmake -D BUILD_SHARED_LIBS=OFF .. && cmake --build .)
+          (cd .. && wget -q -O - https://dl.bintray.com/boostorg/release/1.70.0/source/boost_1_70_0.tar.bz2 | tar xj)
+          echo "libgit2 is build"
+          
+      - name: Get and Install Boost
+        run: |
+          (cd .. && wget -q -O - https://dl.bintray.com/boostorg/release/1.70.0/source/boost_1_70_0.tar.bz2 | tar xj)
+          echo "boost installed"
+
+      - name: Deploy and Build Fritzing
+        run: |
+             ls /usr/local/opt
+             pwd
+             ls -alrt
+             ./tools/deploy_fritzing_mac.sh
+             echo "done DEPLOY SCRIPT"
+             cd ../deploy-app
+             ls -alrt
+      - name: copy file to server
+        run: |
+          pwd
+          cd ../deploy-app
+          ls -alrt
+          pwd
+          echo "get cloudsend script"
+          curl -O 'https://gist.githubusercontent.com/tavinus/93bdbc051728748787dc22a58dfe58d8/raw/cloudsend.sh' && chmod +x cloudsend.sh
+           ./cloudsend.sh './fritzing.dmg' 'https://base.joev.de/nextcloud/index.php/s/8cDkTc8Z2ajqdxY'
+    
