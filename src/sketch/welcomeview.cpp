@@ -19,8 +19,10 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 ********************************************************************/
 
 #include "welcomeview.h"
-#include "../debugdialog.h"
-#include "../help/tipsandtricks.h"
+#include "debugdialog.h"
+#include "help/tipsandtricks.h"
+#include "utils/uploadpair.h"
+#include "referencemodel/sqlitereferencemodel.h"
 
 #include <QTextEdit>
 #include <QGridLayout>
@@ -44,14 +46,14 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 
 ////////////////////////////////////////////////////////////
 
-static const int TitleRole = Qt::UserRole;
-static const int IntroRole = Qt::UserRole + 1;
-static const int DateRole = Qt::UserRole + 2;
-static const int AuthorRole = Qt::UserRole + 3;
-static const int IconRole = Qt::UserRole + 4;
-static const int RefRole = Qt::UserRole + 5;
-static const int ImageSpace = 65;
-static const int TopSpace = 5;
+constexpr auto TitleRole = Qt::UserRole;
+constexpr auto IntroRole = Qt::UserRole + 1;
+constexpr auto DateRole = Qt::UserRole + 2;
+constexpr auto AuthorRole = Qt::UserRole + 3;
+constexpr auto IconRole = Qt::UserRole + 4;
+constexpr auto RefRole = Qt::UserRole + 5;
+constexpr auto ImageSpace = 65;
+constexpr auto TopSpace = 1;
 
 QString WelcomeView::m_activeHeaderLabelColor = "#333";
 QString WelcomeView::m_inactiveHeaderLabelColor = "#b1b1b1";
@@ -59,7 +61,7 @@ QString WelcomeView::m_inactiveHeaderLabelColor = "#b1b1b1";
 ///////////////////////////////////////////////////////////////////////////////
 
 void zeroMargin(QLayout * layout) {
-	layout->setMargin(0);
+	layout->setContentsMargins(0, 0, 0, 0);
 	layout->setSpacing(0);
 }
 
@@ -68,10 +70,10 @@ QString makeUrlText(const QString & url, const QString & urlText, const QString 
 }
 
 QString hackColor(QString oldText, const QString & color) {
-	QRegExp colorFinder("color:(#[^;]*);");
-	int ix = oldText.indexOf(colorFinder);
-	if (ix >= 0) {
-		oldText.replace(colorFinder.cap(1), color);
+	QRegularExpression colorFinder("color:(#[^;]*);");
+	QRegularExpressionMatch match;
+	if (oldText.contains(colorFinder, &match)) {
+		oldText.replace(match.captured(1), color);
 	}
 	return oldText;
 }
@@ -92,24 +94,115 @@ int pixelSize(const QString & sizeString) {
 
 
 QString cleanData(const QString & data) {
-	static QRegExp ListItemMatcher("<li>.*</li>");
-	ListItemMatcher.setMinimal(true);           // equivalent of lazy matcher
+	static QRegularExpression ListItemMatcher("<li>.*</li>", QRegularExpression::InvertedGreedinessOption | QRegularExpression::MultilineOption | QRegularExpression::DotMatchesEverythingOption);
 
 	QDomDocument doc;
 	QStringList listItems;
 	int pos = 0;
-	while (pos < data.count()) {
-		int ix = data.indexOf(ListItemMatcher, pos);
+	QString errorMsg;
+	int errorLine;
+	int errorColumn;
+	while (pos < data.size()) {
+		QRegularExpressionMatch match;
+		int ix = data.indexOf(ListItemMatcher, pos, &match);
 		if (ix < 0) break;
 
-		QString listItem = ListItemMatcher.cap(0);
+		QString listItem = match.captured(0);
 		//DebugDialog::debug("ListItem " + listItem);
-		if (doc.setContent(listItem)) {
+		if (doc.setContent(listItem, &errorMsg, &errorLine, &errorColumn)) {
 			listItems << listItem;
+		} else {
+			DebugDialog::debug(QString("Error reading data %1 %2 %3").arg(errorMsg).arg(errorLine).arg(errorColumn));
 		}
-		pos += listItem.count();
+		pos += listItem.size();
 	}
 	return listItems.join("");
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+CustomListItem::CustomListItem(const QString &leftText, const QIcon &leftIcon, const QString &leftData,
+			       const QString &rightText, const QIcon &rightIcon, const QString &rightData,
+			       int listWidgetWidth, QWidget *parent)
+	: QWidget(parent), leftData(leftData), rightData(rightData) {
+	QHBoxLayout *layout = new QHBoxLayout(this);
+	int padding = 3;
+	layout->setContentsMargins(2, 2, 2, 2);
+	layout->setSpacing(0);
+
+	QList<QSize> availableIconSizes = leftIcon.availableSizes();
+	m_iconSize = availableIconSizes.isEmpty() ? QSize(16, 16) : availableIconSizes.first();
+
+	leftButton = new QPushButton(leftIcon, "", this);
+	rightButton = new QPushButton(rightIcon, "", this);
+
+	leftButton->setFlat(true);
+	rightButton->setFlat(true);
+
+	QString buttonStyle = QString("QPushButton { "
+								  "text-align: left; "
+								  "background-color: transparent; "
+								  "border: none; "
+								  "padding-left: %1px; "
+								  "padding-right: %1px; "
+								  "color: #333;"
+								  "}"
+								  "QPushButton:pressed { "
+								  "color: #005; "
+								  "}")
+							  .arg(padding);
+	leftButton->setStyleSheet(buttonStyle);
+	rightButton->setStyleSheet(buttonStyle);
+
+	QFont buttonFont("Droid Sans", 10, QFont::Normal);
+	leftButton->setFont(buttonFont);
+	rightButton->setFont(buttonFont);
+
+	int scrollbarWidth = this->style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+	int leftButtonWidth = static_cast<int>((listWidgetWidth - scrollbarWidth) * 0.7);
+	int rightButtonWidth = static_cast<int>((listWidgetWidth - scrollbarWidth) * 0.3);
+
+	leftButton->setFixedWidth(leftButtonWidth);
+	rightButton->setFixedWidth(rightButtonWidth);
+
+	QFontMetrics metrics(leftButton->font());
+	QString elidedLeftText = metrics.elidedText(leftText, Qt::ElideRight, leftButtonWidth - m_iconSize.width() - 4 * padding);
+	QString elidedRightText = metrics.elidedText(rightText, Qt::ElideRight, rightButtonWidth - m_iconSize.width() - 4 * padding);
+
+	leftButton->setText(elidedLeftText);
+	leftButton->setToolTip(leftData);
+	rightButton->setText(elidedRightText);
+	rightButton->setToolTip(rightData);
+
+	layout->addWidget(leftButton);
+	layout->addWidget(rightButton);
+
+	connect(leftButton, &QPushButton::clicked, this, &CustomListItem::onLeftButtonClicked);
+	connect(rightButton, &QPushButton::clicked, this, &CustomListItem::onRightButtonClicked);
+
+	setLayout(layout);
+}
+
+QSize CustomListItem::sizeHint() const {
+	QFontMetrics metrics(font());
+	int textHeight = metrics.height();
+
+	int verticalPadding = 10;
+	int totalHeight = qMax(textHeight, m_iconSize.height()) + verticalPadding;
+
+	// Width is based on the list widget's width
+	int listWidgetWidth = parentWidget() ? parentWidget()->width() : 100;
+	int totalWidth = listWidgetWidth - layout()->contentsMargins().left() - layout()->contentsMargins().right();
+
+	return QSize(totalWidth, totalHeight);
+}
+
+void CustomListItem::onLeftButtonClicked() {
+    emit leftItemClicked(leftData);
+}
+
+void CustomListItem::onRightButtonClicked() {
+    emit rightItemClicked(rightData);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -239,11 +332,11 @@ BlogListDelegate::~BlogListDelegate()
 
 void BlogListDelegate::paint ( QPainter * painter, const QStyleOptionViewItem & option, const QModelIndex & index) const
 {
-	BlogListWidget * listWidget = qobject_cast<BlogListWidget *>(this->parent());
-	if (listWidget == NULL) return;
+	auto *listWidget = qobject_cast<BlogListWidget *>(this->parent());
+	if (!listWidget) return;
 
-	QStyle * style = listWidget->style();
-	if (style == NULL) return;
+	auto *style = listWidget->style();
+	if (!style) return;
 
 	painter->save();
 
@@ -251,7 +344,7 @@ void BlogListDelegate::paint ( QPainter * painter, const QStyleOptionViewItem & 
 
 	style->drawPrimitive(QStyle::PE_PanelItemViewItem, &option, painter, listWidget);
 
-	QPixmap pixmap = qvariant_cast<QPixmap>(index.data(IconRole));
+	auto pixmap = qvariant_cast<QPixmap>(index.data(IconRole));
 	QString title = index.data(TitleRole).toString();
 	QString date = index.data(DateRole).toString();
 	QString author = index.data(AuthorRole).toString();
@@ -300,7 +393,7 @@ void BlogListDelegate::paint ( QPainter * painter, const QStyleOptionViewItem & 
 	painter->restore();
 }
 
-QSize BlogListDelegate::sizeHint ( const QStyleOptionViewItem & option, const QModelIndex & index ) const
+QSize BlogListDelegate::sizeHint (const QStyleOptionViewItem &, const QModelIndex &) const
 {
 	return QSize(100, ImageSpace); // very dumb value
 }
@@ -311,7 +404,6 @@ WelcomeView::WelcomeView(QWidget * parent) : QFrame(parent)
 {
 	this->setObjectName("welcomeView");
 
-	m_tip = NULL;
 	setAcceptDrops(true);
 	initLayout();
 
@@ -321,7 +413,7 @@ WelcomeView::WelcomeView(QWidget * parent) : QFrame(parent)
 
 	QString protocol = QSslSocket::supportsSsl() ? "https" : "http";
 	// TODO: blog network calls should only happen once, not for each window?
-	QNetworkAccessManager * manager = new QNetworkAccessManager(this);
+	auto * manager = new QNetworkAccessManager(this);
 	connect(manager, SIGNAL(finished(QNetworkReply *)), this, SLOT(gotBlogSnippet(QNetworkReply *)));
 	manager->get(QNetworkRequest(QUrl(QString("%1://blog.fritzing.org/recent-posts-app/").arg(protocol))));
 
@@ -334,12 +426,9 @@ WelcomeView::WelcomeView(QWidget * parent) : QFrame(parent)
 	nextTip();
 }
 
-WelcomeView::~WelcomeView() {
-}
-
 void WelcomeView::initLayout()
 {
-	QGridLayout * mainLayout = new QGridLayout();
+	auto * mainLayout = new QGridLayout();
 
 	//mainLayout->setSpacing (0);
 	//mainLayout->setContentsMargins (0, 0, 0, 0);
@@ -363,16 +452,16 @@ void WelcomeView::initLayout()
 
 
 QWidget * WelcomeView::initRecent() {
-	QFrame * frame = new QFrame;
+	auto * frame = new QFrame;
 	frame->setObjectName("recentFrame");
-	QVBoxLayout * frameLayout = new QVBoxLayout;
+	auto * frameLayout = new QVBoxLayout;
 	zeroMargin(frameLayout);
 
-	QFrame * titleFrame = new QFrame;
+	auto * titleFrame = new QFrame;
 	titleFrame-> setObjectName("recentTitleFrame");
-	QHBoxLayout * titleFrameLayout = new QHBoxLayout;
+	auto * titleFrameLayout = new QHBoxLayout;
 	zeroMargin(titleFrameLayout);
-	QLabel * label = new QLabel(tr("Recent Sketches"));
+	auto * label = new QLabel(tr("Recent Sketches"));
 
 	label->setObjectName("recentTitle");
 	titleFrameLayout->addWidget(label);
@@ -383,19 +472,22 @@ QWidget * WelcomeView::initRecent() {
 	m_recentListWidget = new QListWidget();
 	m_recentListWidget->setObjectName("recentList");
 	m_recentListWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	connect(m_recentListWidget, SIGNAL(itemClicked (QListWidgetItem *)), this, SLOT(recentItemClicked(QListWidgetItem *)));
 
-
-	frameLayout->addWidget(m_recentListWidget);
+	auto * listsFrame = new QFrame;
+	auto * listsFrameLayout = new QHBoxLayout;
+	zeroMargin(listsFrameLayout);
+	listsFrameLayout->addWidget(m_recentListWidget);
+	listsFrame ->setLayout(listsFrameLayout);
+	frameLayout->addWidget(listsFrame);
 
 	QStringList names;
 	names << "recentSpace" << "recentNewSketch" << "recentOpenSketch";
 
-	foreach (QString name, names) {
-		QWidget * widget = NULL;
+	Q_FOREACH (QString name, names) {
+		QWidget * widget = nullptr;
 		QLayout * whichLayout = frameLayout;
-		QLabel * icon = NULL;
-		QLabel * text = NULL;
+		QLabel * icon = nullptr;
+		QLabel * text = nullptr;
 		if (name == "recentSpace") {
 			widget = new QLabel();
 		}
@@ -431,8 +523,8 @@ QWidget * WelcomeView::initRecent() {
 }
 
 QWidget * WelcomeView::makeRecentItem(const QString & objectName, const QString & iconText, const QString & textText, QLabel * & icon, QLabel * & text) {
-	QFrame * rFrame = new QFrame;
-	QHBoxLayout * rFrameLayout = new QHBoxLayout;
+	auto * rFrame = new QFrame;
+	auto * rFrameLayout = new QHBoxLayout;
 
 	zeroMargin(rFrameLayout);
 
@@ -453,35 +545,13 @@ QWidget * WelcomeView::makeRecentItem(const QString & objectName, const QString 
 
 QWidget * WelcomeView::initShop() {
 
-	QFrame * frame = new QFrame();
+	auto * frame = new QFrame();
 	frame->setObjectName("shopFrame");
-	QVBoxLayout * frameLayout = new QVBoxLayout;
+	auto * frameLayout = new QVBoxLayout;
 	zeroMargin(frameLayout);
 
-	QWidget * headerFrame = createHeaderFrame( tr("Donate"), "Donate", tr("Fab"), "Fab", m_inactiveHeaderLabelColor,  m_activeHeaderLabelColor, m_donateLabel, m_fabLabel);
+	QWidget * headerFrame = createHeaderFrame( "Fab", tr("Fab"), "", "",  m_activeHeaderLabelColor, m_inactiveHeaderLabelColor, m_fabLabel, m_fabLabel);
 	frameLayout->addWidget(headerFrame);
-
-	m_donateUberFrame = createShopContentFrame(":/resources/images/donate_zoom.png",
-                                           tr("Fritzing development needs you"),
-                                           tr("Software development and maintenance is a lot of work. Without your support, it is not possible to keep that up."),
-                                           "https://fritzing.org/shop/donations/",
-                                           tr("Donate and leave a comment."),
-                                           tr("Donate now"),
-                                           ":/resources/images/icons/WS-donateLogo.png",
-                                           "#2D81C5");
-
-    frameLayout->addWidget(m_donateUberFrame);
-
-//	m_shopUberFrame = createShopContentFrame(":/resources/images/welcome_kit.png",
-//	                  tr("Fritzing CreatorKit"),
-//                      tr("The Fritzing Creator Kit is out of Stock."),
-//                      "https://fritzing.org/creatorkit",
-//	                  tr(""),
-//	                  tr(""),
-//	                  ":/resources/images/icons/WS-shopLogo.png",
-//	                  "#f5a400"
-//                                                                                       );
-//	frameLayout->addWidget(m_shopUberFrame);
 
 	m_fabUberFrame = createShopContentFrame(":/resources/images/pcbs_2013.png",
 	                                        tr("Fritzing Fab"),
@@ -496,38 +566,31 @@ QWidget * WelcomeView::initShop() {
 
 	frame->setLayout(frameLayout);
 
-    QDate cd = QDate::currentDate();
-    if (cd.day()<3) {
-        clickBlog("donate");
-    } else {
-        clickBlog("fab");
-    }
-
 	return frame;
 }
 
 QWidget * WelcomeView::createShopContentFrame(const QString & imagePath, const QString & headline, const QString & description,
         const QString & url, const QString & urlText, const QString & urlText2, const QString & logoPath, const QString & footerLabelColor )
 {
-	QFrame * uberFrame = new QFrame();
+	auto * uberFrame = new QFrame();
 	uberFrame->setObjectName("shopUberFrame");
-	QVBoxLayout * shopUberFrameLayout = new QVBoxLayout;
+	auto * shopUberFrameLayout = new QVBoxLayout;
 	zeroMargin(shopUberFrameLayout);
 
-	QFrame* shopContentFrame = new QFrame();
+	auto* shopContentFrame = new QFrame();
 	shopContentFrame->setObjectName("shopContentFrame");
 
-	QHBoxLayout * contentFrameLayout = new QHBoxLayout;
+	auto * contentFrameLayout = new QHBoxLayout;
 	zeroMargin(contentFrameLayout);
 
-	QLabel * label = new QLabel(QString("<img src='%1' />").arg(imagePath));
+	auto * label = new QLabel(QString("<img src='%1' />").arg(imagePath));
 	label->setObjectName("shopContentImage");
 	contentFrameLayout->addWidget(label);
 
-	QFrame * contentTextFrame = new QFrame();
+	auto * contentTextFrame = new QFrame();
 	contentTextFrame->setObjectName("shopContentTextFrame");
 
-	QVBoxLayout * contentTextFrameLayout = new QVBoxLayout;
+	auto * contentTextFrameLayout = new QVBoxLayout;
 	zeroMargin(contentTextFrameLayout);
 
 	contentTextFrameLayout->addSpacerItem(new QSpacerItem(1, 1, QSizePolicy::Fixed, QSizePolicy::Expanding));
@@ -559,19 +622,19 @@ QWidget * WelcomeView::createShopContentFrame(const QString & imagePath, const Q
 	shopUberFrameLayout->addWidget(shopContentFrame);
 	shopUberFrameLayout->addSpacerItem(new QSpacerItem(1, 1, QSizePolicy::Minimum, QSizePolicy::Expanding));
 
-	QFrame * shopFooterFrame = new QFrame();
+	auto * shopFooterFrame = new QFrame();
 	shopFooterFrame->setObjectName("shopFooterFrame");
 
-	QHBoxLayout * footerFrameLayout = new QHBoxLayout;
+	auto * footerFrameLayout = new QHBoxLayout;
 	zeroMargin(footerFrameLayout);
 	footerFrameLayout->addSpacerItem(new QSpacerItem(1, 1, QSizePolicy::Expanding));
 
-	QLabel * footerLabel = new QLabel(QString("<a href='%1' style='text-decoration:none; color:%3;'>%2</a>").arg(url).arg(urlText2).arg(footerLabelColor));
+	auto * footerLabel = new QLabel(QString("<a href='%1' style='text-decoration:none; color:%3;'>%2</a>").arg(url).arg(urlText2).arg(footerLabelColor));
 	footerLabel->setObjectName("shopLogoText");
 	footerFrameLayout->addWidget(footerLabel);
     connect(footerLabel, &QLabel::linkActivated, this, &WelcomeView::clickBlog);
 
-	QLabel * footerLogoLabel = new QLabel(tr("<a href='%1'><img src='%2'/></a>").arg(url).arg(logoPath));
+	auto * footerLogoLabel = new QLabel(tr("<a href='%1'><img src='%2'/></a>").arg(url).arg(logoPath));
 	footerLogoLabel->setObjectName("shopLogo");
 	footerFrameLayout->addWidget(footerLogoLabel);
     connect(footerLogoLabel, &QLabel::linkActivated, this, &WelcomeView::clickBlog);
@@ -585,12 +648,12 @@ QWidget * WelcomeView::createShopContentFrame(const QString & imagePath, const Q
 
 QWidget * WelcomeView::initBlog() {
 
-	QFrame * frame = new QFrame();
+	auto * frame = new QFrame();
 	frame->setObjectName("blogFrame");
-	QVBoxLayout * frameLayout = new QVBoxLayout;
+	auto * frameLayout = new QVBoxLayout;
 	zeroMargin(frameLayout);
 
-	QWidget * headerFrame = createHeaderFrame(tr("Projects"), "Projects", tr("Blog"), "Blog", m_inactiveHeaderLabelColor,  m_activeHeaderLabelColor, m_projectsLabel, m_blogLabel);
+	QWidget * headerFrame = createHeaderFrame("Projects", tr("Projects"), "Blog", tr("Blog"), m_inactiveHeaderLabelColor,  m_activeHeaderLabelColor, m_projectsLabel, m_blogLabel);
 	frameLayout->addWidget(headerFrame);
 
 	m_blogListWidget = createBlogContentFrame("https://blog.fritzing.org", tr("Fritzing News."), ":/resources/images/icons/WS-blogLogo.png", "#802742");
@@ -614,10 +677,10 @@ QWidget * WelcomeView::initBlog() {
 
 QFrame * WelcomeView::createHeaderFrame (const QString & url1, const QString & urlText1, const QString & url2, const QString & urlText2, const QString & inactiveColor, const QString & activeColor,
         QLabel * & label1, QLabel * & label2) {
-	QFrame * titleFrame = new QFrame();
+	auto * titleFrame = new QFrame();
 	titleFrame->setObjectName("wsSwitchableFrameHeader");
 
-	QHBoxLayout * titleFrameLayout = new QHBoxLayout;
+	auto * titleFrameLayout = new QHBoxLayout;
 	zeroMargin(titleFrameLayout);
 
 	label1 = new QLabel(makeUrlText(url1, urlText1, inactiveColor));
@@ -625,15 +688,16 @@ QFrame * WelcomeView::createHeaderFrame (const QString & url1, const QString & u
 	titleFrameLayout->addWidget(label1);
 	connect(label1, SIGNAL(linkActivated(const QString &)), this, SLOT(clickBlog(const QString &)));
 
-	QLabel * titleSpace = new QLabel("|");
-	titleSpace->setObjectName("headerTitleSpace");
-	titleFrameLayout->addWidget(titleSpace);
+	if (!urlText2.isEmpty()) {
+		auto * titleSpace = new QLabel("|");
+		titleSpace->setObjectName("headerTitleSpace");
+		titleFrameLayout->addWidget(titleSpace);
 
-	label2 = new QLabel(makeUrlText(url2, urlText2, activeColor));
-	label2->setObjectName("headerTitle2");
-	titleFrameLayout->addWidget(label2);
-	connect(label2, SIGNAL(linkActivated(const QString &)), this, SLOT(clickBlog(const QString &)));
-
+		label2 = new QLabel(makeUrlText(url2, urlText2, activeColor));
+		label2->setObjectName("headerTitle2");
+		titleFrameLayout->addWidget(label2);
+		connect(label2, SIGNAL(linkActivated(const QString &)), this, SLOT(clickBlog(const QString &)));
+	}
 	titleFrameLayout->addSpacerItem(new QSpacerItem(1, 1, QSizePolicy::Expanding));
 	titleFrame->setLayout(titleFrameLayout);
 
@@ -641,11 +705,11 @@ QFrame * WelcomeView::createHeaderFrame (const QString & url1, const QString & u
 }
 
 BlogListWidget * WelcomeView::createBlogContentFrame(const QString & url, const QString & urlText, const QString & logoPath, const QString & footerLabelColor) {
-	QFrame * uberFrame = new QFrame;
-	QVBoxLayout * uberFrameLayout = new QVBoxLayout;
+	auto * uberFrame = new QFrame;
+	auto * uberFrameLayout = new QVBoxLayout;
 	zeroMargin(uberFrameLayout);
 
-	BlogListWidget * listWidget = new BlogListWidget;
+	auto * listWidget = new BlogListWidget;
 	listWidget->setObjectName("blogList");
 	listWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	listWidget->setItemDelegate(new BlogListDelegate(listWidget));
@@ -653,14 +717,14 @@ BlogListWidget * WelcomeView::createBlogContentFrame(const QString & url, const 
 
 	uberFrameLayout->addWidget(listWidget);
 
-	QFrame * footerFrame = new QFrame();
+	auto * footerFrame = new QFrame();
 	footerFrame->setObjectName("blogFooterFrame");
 
-	QHBoxLayout * footerFrameLayout = new QHBoxLayout;
+	auto * footerFrameLayout = new QHBoxLayout;
 	zeroMargin(footerFrameLayout);
 	footerFrameLayout->addSpacerItem(new QSpacerItem(1, 1, QSizePolicy::Expanding));
 
-	QLabel * footerLabel = new QLabel(QString("<a href='%1'  style='font-family:Droid Sans; text-decoration:none; color:%3;'>%2</a>").arg(url).arg(urlText).arg(footerLabelColor));
+	auto * footerLabel = new QLabel(QString("<a href='%1'  style='font-family:Droid Sans; text-decoration:none; color:%3;'>%2</a>").arg(url).arg(urlText).arg(footerLabelColor));
 	footerLabel->setObjectName("blogLogoText");
 	footerFrameLayout->addWidget(footerLabel);
 	connect(footerLabel, SIGNAL(linkActivated(const QString &)), this, SLOT(clickBlog(const QString &)));
@@ -684,56 +748,93 @@ void WelcomeView::showEvent(QShowEvent * event) {
 }
 
 void WelcomeView::updateRecent() {
-	if (m_recentListWidget == NULL) return;
+	if (!m_recentListWidget) return;
 
 	QSettings settings;
-	QStringList files = settings.value("recentFileList").toStringList();
+	auto files = settings.value("recentFileList").toStringList();
 	m_recentListWidget->clear();
+	int listWidgetWidth = m_recentListWidget->width();
 
-	bool gotOne = false;
+	auto gotOne = false;
 
-	QIcon icon(":/resources/images/icons/WS-fzz-icon.png");
+	QIcon defaultIcon(":/resources/images/icons/WS-fzz-icon.png");
+	QIcon aislerIcon(":/resources/images/icons/aisler_donut-cloud_logo_icon.png");
+
 	for (int i = 0; i < files.size(); ++i) {
 		QFileInfo finfo(files[i]);
 		if (!finfo.exists()) continue;
 
 		gotOne = true;
-		QListWidgetItem * item = new QListWidgetItem(icon, finfo.fileName());
-		item->setData(Qt::UserRole, finfo.absoluteFilePath());
-		item->setToolTip(finfo.absoluteFilePath());
-		m_recentListWidget->addItem(item);
+		QString leftText = finfo.fileName();
+		QString leftData = finfo.absoluteFilePath();
+
+		settings.beginGroup("sketches");
+		QVariant settingValue = settings.value(finfo.absoluteFilePath());
+		settings.endGroup();
+
+		QString rightText;
+		QIcon rightIcon;
+		QString rightData;
+
+		if (settingValue.isValid() && !settingValue.isNull()) {
+			auto [fabName, link] = settingValue.value<UploadPair>();
+			if (link.endsWith(QChar('/'))) {
+				link.chop(1);  // Remove the last character
+			}
+			rightText = QString("%1").arg(fabName);
+			rightData = link; // Data for the right button click
+			QPixmap pixmap = SqliteReferenceModel().retrieveIcon(fabName);
+			if (!pixmap.isNull()) {
+				rightIcon = QIcon(pixmap);
+			} else {
+				if (fabName.compare("Aisler", Qt::CaseInsensitive) == 0) {
+					rightIcon = aislerIcon;
+				}
+			}
+		}
+
+		CustomListItem *customItem = new CustomListItem(leftText, defaultIcon, leftData,
+								rightText, rightIcon, rightData, listWidgetWidth);
+		connect(customItem, &CustomListItem::leftItemClicked, this, &WelcomeView::recentSketchClicked);
+		connect(customItem, &CustomListItem::rightItemClicked, this, &WelcomeView::uploadLinkClicked);
+
+		QListWidgetItem *item = new QListWidgetItem(m_recentListWidget);
+		item->setSizeHint(customItem->sizeHint());
+		m_recentListWidget->setItemWidget(item, customItem);
 	}
 
 	if (!gotOne) {
 		// put in a placeholder if there are no recent files
-		QListWidgetItem * item = new QListWidgetItem(icon, tr("No recent sketches found"));
-		item->setData(Qt::UserRole, "");
-		m_recentListWidget->addItem(item);
+		CustomListItem *emptyItem = new CustomListItem(tr("No recent sketches found"), defaultIcon, QString(),
+								       QString(), QIcon(), QString(), listWidgetWidth);
+		QListWidgetItem *item = new QListWidgetItem(m_recentListWidget);
+		item->setSizeHint(emptyItem->sizeHint());
+		m_recentListWidget->setItemWidget(item, emptyItem);
 	}
 }
 
 void WelcomeView::clickRecent(const QString & url) {
 	if (url == "open") {
-		emit openSketch();
+		Q_EMIT openSketch();
 		return;
 	}
 	if (url == "new") {
-		emit newSketch();
+		Q_EMIT newSketch();
 		return;
 	}
 }
 
 void WelcomeView::gotBlogSnippet(QNetworkReply * networkReply) {
-	bool blog = networkReply->url().toString().contains("blog");
+	bool blog = networkReply->url().toString().contains("recent");
 	QString prefix = networkReply->url().scheme() + "://" + networkReply->url().authority();
 	QNetworkAccessManager * manager = networkReply->manager();
 	int responseCode = networkReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
-	bool goodBlog = false;
+	auto goodBlog = false;
 	QDomDocument doc;
 	QString errorStr;
-	int errorLine;
-	int errorColumn;
+	auto errorLine = 0;
+	auto errorColumn = 0;
 	if (responseCode == 200) {
 		QString data(networkReply->readAll());
 		//DebugDialog::debug("response data " + data);
@@ -760,31 +861,24 @@ void WelcomeView::clickBlog(const QString & url) {
 	if (url.toLower() == "fab") {
 //		m_shopUberFrame->setVisible(false);
 		m_fabUberFrame->setVisible(true);
-        m_donateUberFrame->setVisible(false);
 		m_fabLabel->setText(hackColor(m_fabLabel->text(), m_activeHeaderLabelColor));
 //		m_shopLabel->setText(hackColor(m_shopLabel->text(), m_inactiveHeaderLabelColor));
-        m_donateLabel->setText(hackColor(m_donateLabel->text(), m_inactiveHeaderLabelColor));
-
 		return;
 	}
 
 	if (url.toLower() == "shop") {
 //		m_shopUberFrame->setVisible(true);
 		m_fabUberFrame->setVisible(false);
-        m_donateUberFrame->setVisible(false);
 		m_fabLabel->setText(hackColor(m_fabLabel->text(), m_inactiveHeaderLabelColor));
 //		m_shopLabel->setText(hackColor(m_shopLabel->text(), m_activeHeaderLabelColor));
-        m_donateLabel->setText(hackColor(m_donateLabel->text(), m_inactiveHeaderLabelColor));
 		return;
 	}
 
     if (url.toLower() == "donate") {
 //        m_shopUberFrame->setVisible(false);
         m_fabUberFrame->setVisible(false);
-        m_donateUberFrame->setVisible(true);
         m_fabLabel->setText(hackColor(m_fabLabel->text(), m_inactiveHeaderLabelColor));
 //        m_shopLabel->setText(hackColor(m_shopLabel->text(), m_inactiveHeaderLabelColor));
-        m_donateLabel->setText(hackColor(m_donateLabel->text(), m_activeHeaderLabelColor));
         return;
     }
 
@@ -842,7 +936,7 @@ void WelcomeView::clickBlog(const QString & url) {
 
 
 void WelcomeView::readBlog(const QDomDocument & doc, bool doEmit, bool blog, const QString & prefix) {
-	BlogListWidget * listWidget = (blog) ? m_blogListWidget : m_projectListWidget;
+	auto *listWidget = (blog) ? m_blogListWidget : m_projectListWidget;
 	listWidget->clear();
 	listWidget->imageRequestList().clear();
 
@@ -881,7 +975,7 @@ void WelcomeView::readBlog(const QDomDocument & doc, bool doEmit, bool blog, con
 		if (stuff.value("title", "").isEmpty()) continue;
 		if (stuff.value("href", "").isEmpty()) continue;
 
-		QListWidgetItem * item = new QListWidgetItem();
+		auto *item = new QListWidgetItem();
 		item->setData(TitleRole, stuff.value("title"));
 		item->setData(RefRole, stuff.value("href"));
 		QString text = stuff.value("intro", "");
@@ -907,9 +1001,9 @@ void WelcomeView::readBlog(const QDomDocument & doc, bool doEmit, bool blog, con
 
 	if (doEmit) {
 		getNextBlogImage(0, blog);
-		foreach (QWidget *widget, QApplication::topLevelWidgets()) {
-			WelcomeView * other = widget->findChild<WelcomeView *>();
-			if (other == NULL) continue;
+		Q_FOREACH (QWidget *widget, QApplication::topLevelWidgets()) {
+			auto * other = widget->findChild<WelcomeView *>();
+			if (!other) continue;
 			if (other == this) continue;
 
 			other->readBlog(doc, false, blog, prefix);
@@ -923,7 +1017,7 @@ void WelcomeView::getNextBlogImage(int ix, bool blog) {
 		QString image = listWidget->imageRequestList().at(i);
 		if (image.isEmpty()) continue;
 
-		QNetworkAccessManager * manager = new QNetworkAccessManager(this);
+		auto * manager = new QNetworkAccessManager(this);
 		manager->setProperty("index", i);
 		manager->setProperty("blog", blog);
 		connect(manager, SIGNAL(finished(QNetworkReply *)), this, SLOT(gotBlogImage(QNetworkReply *)));
@@ -932,22 +1026,22 @@ void WelcomeView::getNextBlogImage(int ix, bool blog) {
 }
 
 void WelcomeView::gotBlogImage(QNetworkReply * networkReply) {
-	QNetworkAccessManager * manager = networkReply->manager();
-	if (manager == NULL) return;
+	auto *manager = networkReply->manager();
+	if (!manager) return;
 
-	int index = manager->property("index").toInt();
-	bool blog = manager->property("blog").toBool();
+	auto index = manager->property("index").toInt();
+	auto blog = manager->property("blog").toBool();
 
-	int responseCode = networkReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+	auto responseCode = networkReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 	if (responseCode == 200) {
 		QByteArray data(networkReply->readAll());
 		QPixmap pixmap;
 		if (pixmap.loadFromData(data)) {
 			QPixmap scaled = pixmap.scaled(QSize(ImageSpace, ImageSpace), Qt::KeepAspectRatio);
 			setBlogItemImage(scaled, index, blog);
-			foreach (QWidget *widget, QApplication::topLevelWidgets()) {
-				WelcomeView * other = widget->findChild<WelcomeView *>();
-				if (other == NULL) continue;
+			Q_FOREACH (QWidget *widget, QApplication::topLevelWidgets()) {
+				auto *other = widget->findChild<WelcomeView *>();
+				if (!other) continue;
 				if (other == this) continue;
 
 				other->setBlogItemImage(scaled, index, blog);
@@ -957,20 +1051,19 @@ void WelcomeView::gotBlogImage(QNetworkReply * networkReply) {
 
 	manager->deleteLater();
 	networkReply->deleteLater();
-	getNextBlogImage(index + 1, blog);
 }
 
 QWidget * WelcomeView::initTip() {
-	QFrame * tipFrame = new QFrame();
+	auto *tipFrame = new QFrame();
 	tipFrame->setObjectName("tipFrame");
-	QVBoxLayout * tipLayout = new QVBoxLayout();
+	auto *tipLayout = new QVBoxLayout();
 	zeroMargin(tipLayout);
 
-	QLabel * tipTitle = new QLabel(tr("Tip of the Day:"));
+	auto *tipTitle = new QLabel(tr("Tip of the Day:"));
 	tipTitle->setObjectName("tipTitle");
 	tipLayout->addWidget(tipTitle);
 
-	QScrollArea * scrollArea = new QScrollArea;
+	auto *scrollArea = new QScrollArea;
 	scrollArea->setObjectName("tipScrollArea");
 	scrollArea->setWidgetResizable(true);
 	// scrollArea->setAlignment(Qt::AlignTop | Qt::AlignLeft);
@@ -986,14 +1079,14 @@ QWidget * WelcomeView::initTip() {
 	tipLayout->addWidget(scrollArea);
 
 	tipLayout->addSpacerItem(new QSpacerItem(1, 1, QSizePolicy::Fixed, QSizePolicy::Fixed));
-	QFrame * footerFrame = new QFrame();
+	auto * footerFrame = new QFrame();
 	footerFrame->setObjectName("tipFooterFrame");
 
-	QHBoxLayout * footerFrameLayout = new QHBoxLayout;
+	auto *footerFrameLayout = new QHBoxLayout;
 	zeroMargin(footerFrameLayout);
 
 
-	QLabel * footerLabel = new QLabel(QString("<a href='http://blog.fritzing.org'  style='font-family:Droid Sans; text-decoration:none; color:#2e94af;'>%1</a>").arg(tr("All Tips")));
+	auto *footerLabel = new QLabel(QString("<a href='http://blog.fritzing.org'  style='font-family:Droid Sans; text-decoration:none; color:#2e94af;'>%1</a>").arg(tr("All Tips")));
 	footerLabel->setObjectName("allTips");
 	footerFrameLayout->addWidget(footerLabel);
 	connect(footerLabel, SIGNAL(linkActivated(const QString &)), this->window(), SLOT(tipsAndTricks()));
@@ -1023,18 +1116,22 @@ void WelcomeView::dragEnterEvent(QDragEnterEvent *event)
 }
 
 void WelcomeView::nextTip() {
-	if (m_tip == NULL) return;
+	if (!m_tip) return;
 
 	m_tip->setText(QString("<a href='tip' style='text-decoration:none; color:#2e94af;'>%1</a>").arg(TipsAndTricks::randomTip()));
 }
 
-void WelcomeView::recentItemClicked(QListWidgetItem * item) {
-	QString data = item->data(Qt::UserRole).toString();
-	if (data.isEmpty()) return;
-
-	emit recentSketch(data, data);
+void WelcomeView::recentSketchClicked(const QString &data) {
+    if (!data.isEmpty()) {
+	Q_EMIT recentSketch(data, data);
+    }
 }
 
+void WelcomeView::uploadLinkClicked(const QString &data) {
+    if (!data.isEmpty()) {
+	QDesktopServices::openUrl(QUrl(data));
+    }
+}
 
 void WelcomeView::blogItemClicked(QListWidgetItem * item) {
 	QString url = item->data(RefRole).toString();
@@ -1046,8 +1143,8 @@ void WelcomeView::blogItemClicked(QListWidgetItem * item) {
 
 void WelcomeView::setBlogItemImage(QPixmap & pixmap, int index, bool blog) {
 	// TODO: this is not totally thread-safe if there are multiple sketch widgets opened within a very short time
-	BlogListWidget * listWidget = (blog) ? m_blogListWidget : m_projectListWidget;
-	QListWidgetItem * item = listWidget->item(index);
+	auto *listWidget = (blog) ? m_blogListWidget : m_projectListWidget;
+	auto *item = listWidget->item(index);
 	if (item) {
 		item->setData(IconRole, pixmap);
 	}

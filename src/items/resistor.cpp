@@ -19,21 +19,16 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 ********************************************************************/
 
 #include "resistor.h"
-#include "../utils/graphicsutils.h"
 #include "../utils/textutils.h"
 #include "../utils/focusoutcombobox.h"
 #include "../utils/boundedregexpvalidator.h"
-#include "../fsvgrenderer.h"
 #include "../sketch/infographicsview.h"
-#include "../svg/svgfilesplitter.h"
-#include "../commands.h"
 #include "../layerattributes.h"
-#include "moduleidnames.h"
 #include "partlabel.h"
 #include "../debugdialog.h"
 
 #include <qmath.h>
-#include <QRegExpValidator>
+#include <QRegularExpressionValidator>
 
 static QStringList Resistances;
 static QHash<QString, QString> PinSpacings;
@@ -49,8 +44,7 @@ static QHash<QString, QColor> Tolerances;
 Resistor::Resistor( ModelPart * modelPart, ViewLayer::ViewID viewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel)
 	: Capacitor(modelPart, viewID, viewGeometry, id, itemMenu, doLabel)
 {
-	m_changingPinSpacing = false;
-	if (Resistances.count() == 0) {
+    if (Resistances.empty()) {
 		Resistances
 		        << QString("0") + OhmSymbol
 		        << QString("1") + OhmSymbol << QString("1.5") + OhmSymbol << QString("2.2") + OhmSymbol << QString("3.3") + OhmSymbol << QString("4.7") + OhmSymbol << QString("6.8") + OhmSymbol
@@ -59,10 +53,10 @@ Resistor::Resistor( ModelPart * modelPart, ViewLayer::ViewID viewID, const ViewG
 		        << QString("1k") + OhmSymbol << QString("1.5k") + OhmSymbol << QString("2.2k") + OhmSymbol << QString("3.3k") + OhmSymbol << QString("4.7k") + OhmSymbol << QString("6.8k") + OhmSymbol
 		        << QString("10k") + OhmSymbol << QString("15k") + OhmSymbol << QString("22k") + OhmSymbol << QString("33k") + OhmSymbol << QString("47k") + OhmSymbol << QString("68k") + OhmSymbol
 		        << QString("100k") + OhmSymbol << QString("150k") + OhmSymbol << QString("220k") + OhmSymbol << QString("330k") + OhmSymbol << QString("470k") + OhmSymbol << QString("680k") + OhmSymbol
-		        << QString("1M") + OhmSymbol;
+		        << QString("1M") + OhmSymbol << QString("1G") + OhmSymbol;
 	}
 
-	if (PinSpacings.count() == 0) {
+    if (PinSpacings.empty()) {
 		PinSpacings.insert("100 mil (stand-up right)", "pcb/axial_stand0_2_100mil_pcb.svg");
 		PinSpacings.insert("100 mil (stand-up left)", "pcb/axial_stand1_2_100mil_pcb.svg");
 		PinSpacings.insert("200 mil", "pcb/axial_lay_2_200mil_pcb.svg");
@@ -73,7 +67,7 @@ Resistor::Resistor( ModelPart * modelPart, ViewLayer::ViewID viewID, const ViewG
 		PinSpacings.insert("800 mil", "pcb/axial_lay_2_800mil_pcb.svg");
 	}
 
-	if (ColorBands.count() == 0) {
+    if (ColorBands.empty()) {
 		ColorBands.insert(0, QColor(0, 0, 0));
 		ColorBands.insert(1, QColor(138, 61, 6));
 		ColorBands.insert(2, QColor(196, 8, 8));
@@ -88,7 +82,7 @@ Resistor::Resistor( ModelPart * modelPart, ViewLayer::ViewID viewID, const ViewG
 		ColorBands.insert(-2, QColor(192, 192, 192));
 	}
 
-	if (Tolerances.count() == 0) {
+	if (Tolerances.empty()) {
 		// TODO: move this into properties.xml
 		Tolerances.insert(PlusMinusSymbol + "0.05%", QColor(140, 140, 140));
 		Tolerances.insert(PlusMinusSymbol + "0.1%", QColor(130, 16, 210));
@@ -116,9 +110,6 @@ Resistor::Resistor( ModelPart * modelPart, ViewLayer::ViewID viewID, const ViewG
 	updateResistances(m_ohms);
 }
 
-Resistor::~Resistor() {
-}
-
 void Resistor::setResistance(QString resistance, QString pinSpacing, bool force) {
 
 	QString tolerance = prop("tolerance");
@@ -141,7 +132,7 @@ void Resistor::setResistance(QString resistance, QString pinSpacing, bool force)
 		if (force || pinSpacing.compare(m_pinSpacing) != 0) {
 
 			InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-			if (infoGraphicsView == NULL) break;
+			if (infoGraphicsView == nullptr) break;
 
 			if (modelPart()->properties().value("package").compare("tht", Qt::CaseInsensitive) == 0)
 			{
@@ -172,7 +163,7 @@ void Resistor::setResistance(QString resistance, QString pinSpacing, bool force)
 	modelPart()->setLocalProp("tolerance", tolerance);
 
 	updateResistances(m_ohms);
-	if (m_partLabel) m_partLabel->displayTextsIf();
+	if (m_partLabel != nullptr) m_partLabel->displayTextsIf();
 }
 
 QString Resistor::retrieveSvg(ViewLayer::ViewLayerID viewLayerID, QHash<QString, QString> & svgHash, bool blackOnly, double dpi, double & factor)
@@ -211,6 +202,9 @@ QString Resistor::makeSvg(const QString & resistance, ViewLayer::ViewLayerID vie
 	QDomDocument domDocument;
 	QString fn = (viewLayerID == ViewLayer::Breadboard) ? m_breadboardSvgFile : m_iconSvgFile;
 	QFile file(fn);
+	if (!file.open(QIODevice::ReadOnly)) {
+		DebugDialog::debug(QString("Unable to open :%1").arg(fn));
+	}
 	if (!domDocument.setContent(&file, &errorStr, &errorLine, &errorColumn)) {
 		DebugDialog::debug(QString("makesvg failed %1 %2 %3").arg(errorStr).arg(errorLine).arg(errorColumn));
 		return "";
@@ -256,22 +250,29 @@ bool Resistor::collectExtraInfo(QWidget * parent, const QString & family, const 
 	if (prop.compare("resistance", Qt::CaseInsensitive) == 0) {
 		returnProp = tr("resistance");
 
-		FocusOutComboBox * focusOutComboBox = new FocusOutComboBox();
+		auto * focusOutComboBox = new FocusOutComboBox();
 		focusOutComboBox->setEnabled(swappingEnabled);
 		focusOutComboBox->setEditable(true);
 		QString current = m_ohms + OhmSymbol;
 		focusOutComboBox->addItems(Resistances);
 		focusOutComboBox->setCurrentIndex(focusOutComboBox->findText(current));
-		BoundedRegExpValidator * validator = new BoundedRegExpValidator(focusOutComboBox);
+		auto * validator = new BoundedRegExpValidator(focusOutComboBox);
 		validator->setSymbol(OhmSymbol);
 		validator->setConverter(TextUtils::convertFromPowerPrefix);
-		validator->setBounds(0, 9900000000.0);
-		validator->setRegExp(QRegExp(QString("((\\d{1,3})|(\\d{1,3}\\.)|(\\d{1,3}\\.\\d{1,2}))[\\x%1umkMG]{0,1}[\\x03A9]{0,1}").arg(TextUtils::MicroSymbolCode, 4, 16, QChar('0'))));
+		validator->setBounds(MIN_RESISTANCE, MAX_RESISTANCE);
+		validator->setRegularExpression(QRegularExpression(QString("((\\d{1,10})|(\\d{1,10}\\.)|(\\d{1,10}\\.\\d{1,5}))[\\x%1umkMG]{0,1}[\\x03A9]{0,1}").arg(TextUtils::MicroSymbolCode, 4, 16, QChar('0'))));
 		focusOutComboBox->setValidator(validator);
-		connect(focusOutComboBox, SIGNAL(currentIndexChanged(const QString &)), this, SLOT(resistanceEntry(const QString &)));
+		connect(focusOutComboBox->validator(), SIGNAL(sendState(QValidator::State)), this, SLOT(textModified(QValidator::State)));
+		connect(focusOutComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(resistanceEntry(int)));
 
 		focusOutComboBox->setObjectName("infoViewComboBox");
-		focusOutComboBox->setToolTip(tr("You can either type in a resistance value, or select one from the drop down. Format nnn.dP where P is one of 'umkMG'"));
+		focusOutComboBox->setToolTip(tr("Select from the dropdown, or type in a %1 value\n"
+												"Range: [%2 - %3] %4\n"
+												"Background: Green = ok, Red = incorrect value, Grey = current value").
+											 arg(returnProp).
+											 arg(TextUtils::convertToPowerPrefix(MIN_RESISTANCE)).
+											 arg(TextUtils::convertToPowerPrefix(MAX_RESISTANCE)).
+											 arg(OhmSymbol));
 
 		returnValue = current;
 		returnWidget = focusOutComboBox;
@@ -304,7 +305,7 @@ QString Resistor::pinSpacing() {
 
 void Resistor::addedToScene(bool temporary)
 {
-	if (this->scene()) {
+	if (this->scene() != nullptr) {
 		setResistance(m_ohms, m_pinSpacing, true);
 	}
 
@@ -355,7 +356,7 @@ bool Resistor::canEditPart() {
 QStringList Resistor::collectValues(const QString & family, const QString & prop, QString & value) {
 	if (prop.compare("pin spacing", Qt::CaseInsensitive) == 0) {
 		QStringList values;
-		foreach (QString f, PinSpacings.keys()) {
+		Q_FOREACH (QString f, PinSpacings.keys()) {
 			values.append(f);
 		}
 		value = m_pinSpacing;
@@ -365,11 +366,15 @@ QStringList Resistor::collectValues(const QString & family, const QString & prop
 	return Capacitor::collectValues(family, prop, value);
 }
 
-void Resistor::resistanceEntry(const QString & text) {
+void Resistor::resistanceEntry(int index) {
+	auto * comboBox = qobject_cast<QComboBox *>(sender());
+	if (comboBox == nullptr) return;
 	//DebugDialog::debug(QString("resistance entry %1").arg(text));
 
+	QString text = comboBox->itemText(index);
+
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView != NULL) {
+	if (infoGraphicsView != nullptr) {
 		infoGraphicsView->setResistance(text, "");
 	}
 }
@@ -405,4 +410,19 @@ ViewLayer::ViewID Resistor::useViewIDForPixmap(ViewLayer::ViewID vid, bool swapp
 	}
 
 	return ItemBase::useViewIDForPixmap(vid, swappingEnabled);
+}
+
+QHash<QString, QString> Resistor::prepareProps(ModelPart * modelPart, bool wantDebug, QStringList & keys)
+{
+	QHash<QString, QString> props = ItemBase::prepareProps(modelPart, wantDebug, keys);
+
+	// ensure resistance and other properties are after family;
+	if (keys.removeOne("resistance"))
+		keys.insert(1, "resistance");
+	if (keys.removeOne("tolerance"))
+		keys.insert(2, "tolerance");
+	if (keys.removeOne("power"))
+		keys.insert(3, "power");
+
+	return props;
 }

@@ -23,16 +23,11 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QList>
 #include <QLineF>
 #include <QBuffer>
+#include <QtGlobal>
 #include <qmath.h>
 #include <QtDebug>
-
-const double GraphicsUtils::IllustratorDPI = 72;
-const double GraphicsUtils::StandardFritzingDPI = 1000;
-const double GraphicsUtils::SVGDPI = 90;
-const double GraphicsUtils::InchesPerMeter = 39.370078;
-const double GraphicsUtils::StandardSchematicSeparationMils = 295.275591;   // 7.5mm
-const double GraphicsUtils::StandardSchematicSeparation10thinMils = 100;   // 0.1 inches
-
+#include <vector>
+#include <algorithm>
 
 void GraphicsUtils::distanceFromLine(double cx, double cy, double ax, double ay, double bx, double by,
                                      double & dx, double & dy, double &distanceSegment, bool & atEndpoint)
@@ -81,86 +76,29 @@ void GraphicsUtils::distanceFromLine(double cx, double cy, double ax, double ay,
 struct PD {
 	QPointF p;
 	double d;
-};
+	PD(qreal x, qreal y, double _d) : p(x, y), d(_d) { }
 
-bool pdLessThan(PD* pd1, PD* pd2) {
-	return pd1->d < pd2->d;
+};
+inline bool operator<(const PD& lhs, const PD& rhs) noexcept {
+	return lhs.d < rhs.d;
 }
 
 QPointF GraphicsUtils::calcConstraint(QPointF initial, QPointF current) {
-	QList<PD *> pds;
-
-	PD * pd = new PD;
-	pd->p.setX(current.x());
-	pd->p.setY(initial.y());
-	pd->d = (current.y() - initial.y()) * (current.y() - initial.y());
-	pds.append(pd);
-
-	pd = new PD;
-	pd->p.setX(initial.x());
-	pd->p.setY(current.y());
-	pd->d = (current.x() - initial.x()) * (current.x() - initial.x());
-	pds.append(pd);
-
-	double dx, dy, d;
-	bool atEndpoint;
+	std::vector<PD> pds;
+	pds.emplace_back(current.x(), initial.y(), (current.y() - initial.y()) * (current.y() - initial.y()));
+	pds.emplace_back(initial.x(), initial.y(), (current.x() - initial.x()) * (current.x() - initial.x()));
 
 	QLineF plus45(initial.x() - 10000, initial.y() - 10000, initial.x() + 10000, initial.y() + 10000);
-	distanceFromLine(current.x(), current.y(), plus45.p1().x(), plus45.p1().y(), plus45.p2().x(), plus45.p2().y(), dx, dy, d, atEndpoint);
-	pd = new PD;
-	pd->p.setX(dx);
-	pd->p.setY(dy);
-	pd->d = d;
-	pds.append(pd);
+	auto dl0 = distanceFromLine(current.x(), current.y(), plus45.p1().x(), plus45.p1().y(), plus45.p2().x(), plus45.p2().y());
+	pds.emplace_back(std::get<0>(dl0), std::get<1>(dl0), std::get<2>(dl0));
 
 	QLineF minus45(initial.x() + 10000, initial.y() - 10000, initial.x() - 10000, initial.y() + 10000);
-	distanceFromLine(current.x(), current.y(), minus45.p1().x(), minus45.p1().y(), minus45.p2().x(), minus45.p2().y(), dx, dy, d, atEndpoint);
-	pd = new PD;
-	pd->p.setX(dx);
-	pd->p.setY(dy);
-	pd->d = d;
-	pds.append(pd);
+	auto dl1 = distanceFromLine(current.x(), current.y(), minus45.p1().x(), minus45.p1().y(), minus45.p2().x(), minus45.p2().y());
+	pds.emplace_back(std::get<0>(dl1), std::get<1>(dl1), std::get<2>(dl1));
 
-	qSort(pds.begin(), pds.end(), pdLessThan);
-	QPointF result = pds[0]->p;
-	foreach (PD* pd, pds) {
-		delete pd;
-	}
+	std::sort(pds.begin(), pds.end());
+	QPointF result = pds.front().p;
 	return result;
-}
-
-double GraphicsUtils::pixels2mils(double p, double dpi) {
-	return p * 1000.0 / dpi;
-}
-
-double GraphicsUtils::pixels2ins(double p, double dpi) {
-	return p / dpi;
-}
-
-double GraphicsUtils::distanceSqd(QPointF p1, QPointF p2) {
-	return ((p1.x() - p2.x()) * (p1.x() - p2.x())) + ((p1.y() - p2.y()) * (p1.y() - p2.y()));
-}
-
-double GraphicsUtils::distanceSqd(QPoint p1, QPoint p2) {
-	double dpx = p1.x() - p2.x();
-	double dpy = p1.y() - p2.y();
-	return (dpx * dpx) + (dpy * dpy);
-}
-
-double GraphicsUtils::mm2mils(double mm) {
-	return (mm / 25.4 * 1000);
-}
-
-double GraphicsUtils::mm2pixels(double mm) {
-	return (90 * mm / 25.4);
-}
-
-double GraphicsUtils::pixels2mm(double p, double dpi) {
-	return (p / dpi * 25.4);
-}
-
-double GraphicsUtils::mils2pixels(double m, double dpi) {
-	return (dpi * m / 1000);
 }
 
 void GraphicsUtils::saveTransform(QXmlStreamWriter & streamWriter, const QTransform & transform) {
@@ -226,6 +164,13 @@ double GraphicsUtils::getNearestOrdinate(double ordinate, double units) {
 
 void GraphicsUtils::shortenLine(QPointF & p1, QPointF & p2, double d1, double d2) {
 	double angle1 = atan2(p2.y() - p1.y(), p2.x() - p1.x());
+	double length = QLineF(p1, p2).length();
+	if (d1 > length) {
+		d1 = length;
+	}
+	if (d2 > length) {
+		d2 = length;
+	}
 	double angle2 = angle1 - M_PI;
 	double dx1 = d1 * cos(angle1);
 	double dy1 = d1 * sin(angle1);
@@ -237,22 +182,26 @@ void GraphicsUtils::shortenLine(QPointF & p1, QPointF & p2, double d1, double d2
 	p2.setY(p2.y() + dy2);
 }
 
-bool GraphicsUtils::isRect(const QPolygonF & poly) {
+bool GraphicsUtils::isFuzzyRect(const QPolygonF & poly) {
 	if (poly.count() != 5) return false;
-	if (poly.at(0) != poly.at(4)) return false;
 
 	// either we start running across top or running along side
+	const auto& poly0 = poly.at(0);
+	const auto& poly1 = poly.at(1);
+	const auto& poly2 = poly.at(2);
+	const auto& poly3 = poly.at(3);
+	const auto& poly4 = poly.at(4);
+	if (!qFuzzyIsNull(poly0.x() - poly4.x())) return false;
+	if (!qFuzzyIsNull(poly0.y() - poly4.y())) return false;
 
-	if (poly.at(0).x() == poly.at(1).x() &&
-	        poly.at(1).y() == poly.at(2).y() &&
-	        poly.at(2).x() == poly.at(3).x() &&
-	        poly.at(3).y() == poly.at(4).y()) return true;
-
-	if (poly.at(0).y() == poly.at(1).y() &&
-	        poly.at(1).x() == poly.at(2).x() &&
-	        poly.at(2).y() == poly.at(3).y() &&
-	        poly.at(3).x() == poly.at(4).x()) return true;
-
+	if (qFuzzyIsNull(poly0.x() - poly1.x()) &&
+	    qFuzzyIsNull(poly1.y() - poly2.y()) &&
+	    qFuzzyIsNull(poly2.x() - poly3.x()) &&
+	    qFuzzyIsNull(poly3.y() - poly4.y())) return true;
+	if (qFuzzyIsNull(poly0.y() - poly1.y()) &&
+	    qFuzzyIsNull(poly1.x() - poly2.x()) &&
+	    qFuzzyIsNull(poly2.y() - poly3.y()) &&
+	    qFuzzyIsNull(poly3.x() - poly4.x())) return true;
 	return false;
 }
 
@@ -278,7 +227,7 @@ QRectF GraphicsUtils::getRect(const QPolygonF & poly)
 
 // based on code from http://code-heaven.blogspot.com/2009/05/c-program-for-liang-barsky-line.html
 bool GraphicsUtils::liangBarskyLineClip(double x1, double y1, double x2, double y2, double wxmin, double wxmax, double wymin, double wymax,
-                                        double & x11, double & y11, double & x22, double & y22)
+	                                      double & x11, double & y11, double & x22, double & y22)
 {
 	double p1 = -(x2 - x1 );
 	double q1 = x1 - wxmin;
@@ -356,7 +305,7 @@ QString GraphicsUtils::toHtmlImage(QPixmap *pixmap, const char* format) {
 	QBuffer buffer(&bytes);
 	buffer.open(QIODevice::WriteOnly);
 	pixmap->save(&buffer, format); // writes pixmap into bytes in PNG format
-	return QString("data:image/%1;base64,%2").arg(QString(format).toLower()).arg(QString(bytes.toBase64()));
+	return QString("data:image/%1;base64,%2").arg(QString(format).toLower(), QString(bytes.toBase64()));
 }
 
 QPainterPath GraphicsUtils::shapeFromPath(const QPainterPath &path, const QPen &pen, double shapeStrokeWidth, bool includeOriginalPath)
@@ -366,7 +315,7 @@ QPainterPath GraphicsUtils::shapeFromPath(const QPainterPath &path, const QPen &
 
 	// We unfortunately need this hack as QPainterPathStroker will set a width of 1.0
 	// if we pass a value of 0.0 to QPainterPathStroker::setWidth()
-	static const double penWidthZero = double(0.00000001);
+	static constexpr auto penWidthZero = double(0.00000001);
 
 	if (path == QPainterPath())
 		return path;
@@ -397,9 +346,9 @@ void GraphicsUtils::qt_graphicsItem_highlightSelected(QPainter *painter, const Q
 	if (qMin(mbrect.width(), mbrect.height()) < double(1.0))
 		return;
 
-	double itemPenWidth = 1.0;
-	const double pad = itemPenWidth / 2;
-	const double penWidth = 0; // cosmetic pen
+	constexpr double itemPenWidth = 1.0;
+	constexpr double pad = itemPenWidth / 2;
+	constexpr double penWidth = 0; // cosmetic pen
 
 	const QColor fgcolor = option->palette.windowText().color();
 	const QColor bgcolor( // ensure good contrast against fgcolor
@@ -457,7 +406,7 @@ bool almostEqual(qreal a, qreal b) {
 	return (qAbs(a - b) < nearly);
 }
 
-bool GraphicsUtils::isFlipped(const QMatrix & matrix, double & rotation) {
+bool GraphicsUtils::isFlipped(const QTransform & matrix, double & rotation) {
 	static qreal halfSqrt2 = 0.7071;
 
 	// flipped means flipped horizontally (around the vertical axis)

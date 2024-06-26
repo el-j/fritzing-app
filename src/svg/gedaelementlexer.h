@@ -24,13 +24,13 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QString>
 #include <QStringList>
 #include <QHash>
-#include <QRegExp>
+#include <QRegularExpression>
 
 class GedaElementLexer
 {
 public:
 	GedaElementLexer(const QString &source);
-	~GedaElementLexer();
+	~GedaElementLexer() = default;
 	int lex();
 	QString currentCommand();
 	double currentNumber();
@@ -42,21 +42,21 @@ protected:
 	QString clean(const QString & source);
 
 protected:
+	QRegularExpression m_nonWhitespaceMatcher;
+	QRegularExpression m_commentMatcher;
+	QRegularExpression m_elementMatcher;
+	QRegularExpression m_stringMatcher;
+	QRegularExpression m_integerMatcher;
+	QRegularExpression m_hexMatcher;
 	QString m_source;
-	const QChar *m_chars;
-	int m_size;
-	int m_pos;
+	const QChar *m_chars = nullptr;
+	int m_size = 0;
+	int m_pos = 0;
 	QChar m_current;
 	QString m_currentCommand;
-	long m_currentNumber;
-	long m_currentHexString;
+	long m_currentNumber = 0l;
+	long m_currentHexString = 0l;
 	QString m_currentString;
-	QRegExp m_integerMatcher;
-	QRegExp m_hexMatcher;
-	QRegExp m_stringMatcher;
-	QRegExp m_elementMatcher;
-	QRegExp m_commentMatcher;
-	QRegExp m_nonWhitespaceMatcher;
 	QStringList m_comments;
 };
 

@@ -8,8 +8,8 @@ win32 {
 # Need to call git with manually specified paths to repository
 BASE_GIT_COMMAND = git --git-dir $$PWD/../.git --work-tree $$PWD/..
 
-$$(TRAVIS) {
-    # When running on travis, the tag is created *after* the build was successful.
+$$(CI) {
+    # When running on travis ci, the tag is created *after* the build was successful.
     # So we can not use 'git describe', but we generate a string that should look exactly
     # like what git describe would deliver
     GIT_VERSION = CD-$$(TRAVIS_BUILD_NUMBER)-0-$$system($$BASE_GIT_COMMAND rev-parse --short HEAD)
@@ -23,7 +23,14 @@ GIT_DATE = $$system($$BASE_GIT_COMMAND show --no-patch --no-notes --pretty='%cd'
 win32 {
     # Try to squeeze something ISO-8601-ish out of windows
     BUILD_DATE = $$system( powershell (Get-Date -Format "o") )
-} else {
+}
+
+macx {
+    # MacOS uses BSD date rather than GNU date. 
+    BUILD_DATE = $$system( date +%Y-%m-%dT%H:%M:%S%z )
+}
+
+!win32:!macx {
     BUILD_DATE = $$system( date --iso-8601=seconds )
 }
 

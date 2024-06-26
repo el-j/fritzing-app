@@ -40,7 +40,7 @@ protected:
 class RecoveryDialog : public QDialog {
 	Q_OBJECT
 public:
-	RecoveryDialog(QFileInfoList fileList, QWidget *parent = 0, Qt::WindowFlags flags = 0);
+	RecoveryDialog(QFileInfoList fileList, QWidget *parent = 0, Qt::WindowFlags flags = Qt::WindowFlags());
 	QList<QTreeWidgetItem*> getFileList();
 
 protected:
@@ -51,7 +51,7 @@ protected:
 	QPushButton *m_recover;
 	QPushButton *m_ignore;
 
-protected slots:
+protected Q_SLOTS:
 	void updateRecoverButton();
 };
 

@@ -42,6 +42,7 @@ public:
 	void addTimer(QTimer *);
 	void push(QUndoCommand *);
 	bool hasTimers();
+	void waitForTimers();
 
 #ifndef QT_NO_DEBUG
 public:
@@ -72,7 +73,7 @@ class CommandTimer : public QTimer
 public:
 	CommandTimer(QUndoCommand * command, int delayMS, WaitPushUndoStack * undoStack);
 
-protected slots:
+protected Q_SLOTS:
 	void timedout();
 
 protected:

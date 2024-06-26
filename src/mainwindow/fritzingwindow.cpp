@@ -28,25 +28,32 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QAbstractButton>
 
 #include "fritzingwindow.h"
-#include "../debugdialog.h"
-#include "../utils/misc.h"
-#include "../utils/folderutils.h"
-#include "../utils/fileprogressdialog.h"
+#include "debugdialog.h"
+#include "utils/misc.h"
+#include "utils/folderutils.h"
+#include "utils/fileprogressdialog.h"
 
 const QString FritzingWindow::QtFunkyPlaceholder = QLatin1String("[*]");  // this is some weird hack Qt uses in window titles as a placeholder to setr the modified state
 QString FritzingWindow::ReadOnlyPlaceholder(" [READ-ONLY] ");
-static QString ___fritzingTitle___;
 QStringList FritzingWindow::OtherKnownExtensions;
 
-FritzingWindow::FritzingWindow(const QString &untitledFileName, int &untitledFileCount, QString fileExt, QWidget * parent, Qt::WindowFlags f)
+FritzingWindow::FritzingWindow(QWidget * parent, Qt::WindowFlags f)
 	: QMainWindow(parent, f)
 {
-	___fritzingTitle___ = QObject::tr("Fritzing");
-	m_readOnly = false;
-
 	// Let's set the icon
 	this->setWindowIcon(QIcon(QPixmap(":resources/images/fritzing_icon.png")));
 
+	m_undoStack = new WaitPushUndoStack(this);
+	connect(m_undoStack, &WaitPushUndoStack::cleanChanged, this, &FritzingWindow::undoStackCleanChanged);
+}
+
+FritzingWindow::~FritzingWindow() {
+	disconnect(m_undoStack, &WaitPushUndoStack::cleanChanged, this, &FritzingWindow::undoStackCleanChanged);
+	if (m_closeAct)
+		disconnect(m_closeAct, &QAction::triggered, this, &FritzingWindow::close);
+}
+
+void FritzingWindow::initializeTitle(const QString &untitledFileName, int &untitledFileCount, QString fileExt) {
 	QString fn = untitledFileName;
 
 	if(untitledFileCount > 1) {
@@ -57,23 +64,20 @@ FritzingWindow::FritzingWindow(const QString &untitledFileName, int &untitledFil
 
 	untitledFileCount++;
 
-	setTitle();
-
-	m_undoStack = new WaitPushUndoStack(this);
-	connect(m_undoStack, SIGNAL(cleanChanged(bool)), this, SLOT(undoStackCleanChanged(bool)) );
+	FritzingWindow::setTitle();
 }
 
 void FritzingWindow::createCloseAction() {
 	m_closeAct = new QAction(tr("&Close Window"), this);
 	m_closeAct->setShortcut(tr("Ctrl+W"));
 	m_closeAct->setStatusTip(tr("Close the current sketch"));
-	connect(m_closeAct, SIGNAL(triggered()), this, SLOT(close()));
+	connect(m_closeAct, &QAction::triggered, this, &FritzingWindow::close);
 }
 
 void FritzingWindow::setTitle() {
 	setWindowTitle(tr("%1 - %2")
-	               .arg(QFileInfo(m_fwFilename).fileName()+(m_readOnly?ReadOnlyPlaceholder:"")+QtFunkyPlaceholder)
-	               .arg(fritzingTitle()));
+					   .arg(QFileInfo(m_fwFilename).fileName()+(m_readOnly?ReadOnlyPlaceholder:"")+QtFunkyPlaceholder,
+					   fritzingTitle()));
 }
 
 // returns true if the user wanted to save the file
@@ -134,7 +138,7 @@ bool FritzingWindow::saveAs(const QString & filename, bool readOnly) {
 	if (newFilename.isEmpty()) return false; // Cancel pressed
 
 	if (readOnly && (newFilename.compare(filename, Qt::CaseInsensitive) == 0)) {
-		QMessageBox::warning(NULL, QObject::tr("Fritzing"),
+		QMessageBox::warning(nullptr, QObject::tr("Fritzing"),
 		                     QObject::tr("The file '%1' is read-only; please use a different filename.")
 		                     .arg(newFilename) );
 		return false;
@@ -145,8 +149,8 @@ bool FritzingWindow::saveAs(const QString & filename, bool readOnly) {
 
 	QStringList extensions = getExtensions();
 	bool hasExtension = false;
-	foreach (QString extension, extensions) {
-		if(alreadyHasExtension(newFilename, extension)) {
+	for (const QString &extension : extensions) {
+		if (alreadyHasExtension(newFilename, extension)) {
 			hasExtension = true;
 			break;
 		}
@@ -168,10 +172,10 @@ bool FritzingWindow::alreadyHasExtension(const QString &fileName, const QString 
 	if(!fileExt.isEmpty()) {
 		return fileName.endsWith(fileExt);
 	} else {
-		foreach (QString extension, fritzingExtensions()) {
+		for (const QString &extension : fritzingExtensions()) {
 			if (fileName.endsWith(extension)) return true;
 		}
-		foreach (QString extension, OtherKnownExtensions) {
+		for (const QString &extension : OtherKnownExtensions) {
 			if (fileName.endsWith(extension)) return true;
 		}
 
@@ -205,7 +209,6 @@ bool FritzingWindow::beforeClosing(bool showCancel, bool & discard) {
 
 QMessageBox::StandardButton FritzingWindow::beforeClosingMessage(const QString & filename, bool showCancel)
 {
-
 	QMessageBox messageBox(this);
 	setBeforeClosingText(filename, messageBox);
 	QMessageBox::StandardButtons buttons = QMessageBox::Save | QMessageBox::Discard;
@@ -215,15 +218,12 @@ QMessageBox::StandardButton FritzingWindow::beforeClosingMessage(const QString &
 	messageBox.setStandardButtons(buttons);
 	messageBox.setDefaultButton(QMessageBox::Save);
 	if (m_fwFilename.startsWith(untitledFileName())) {
-		messageBox.setButtonText(QMessageBox::Save, tr("Save..."));
+		QAbstractButton *button = messageBox.button(QMessageBox::Save);
+		if (button) {
+			button->setText(tr("Save..."));
+		}
 	}
-	else {
-		messageBox.setButtonText(QMessageBox::Save, tr("Save"));
-	}
-	messageBox.setButtonText(QMessageBox::Discard, tr("Don't Save"));
-	if (showCancel) {
-		messageBox.setButtonText(QMessageBox::Cancel, tr("Cancel"));
-	}
+
 	messageBox.setIcon(QMessageBox::Warning);
 	messageBox.setWindowModality(Qt::WindowModal);
 	messageBox.button(QMessageBox::Discard)->setShortcut(tr("Ctrl+D"));
@@ -243,12 +243,12 @@ void FritzingWindow::setReadOnly(bool readOnly) {
 	bool hasChanged = m_readOnly != readOnly;
 	m_readOnly = readOnly;
 	if(hasChanged) {
-		emit readOnlyChanged(readOnly);
+		Q_EMIT readOnlyChanged(readOnly);
 	}
 }
 
 const QString FritzingWindow::fritzingTitle() {
-	return ___fritzingTitle___;
+	return QObject::tr("Fritzing");
 }
 
 const QString &  FritzingWindow::fileName() {

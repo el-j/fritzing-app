@@ -38,13 +38,11 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "../autoroute/mazerouter/mazerouter.h"
 #include "../autoroute/autorouteprogressdialog.h"
 #include "../autoroute/drc.h"
-#include "../items/virtualwire.h"
 #include "../items/resizableboard.h"
 #include "../items/jumperitem.h"
 #include "../items/via.h"
-#include "../fsvgrenderer.h"
 #include "../items/note.h"
-#include "../eagle/fritzing2eagle.h"
+#include "../items/groundplane.h"
 #include "../sketch/breadboardsketchwidget.h"
 #include "../sketch/schematicsketchwidget.h"
 #include "../sketch/pcbsketchwidget.h"
@@ -55,15 +53,12 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "../sketch/fgraphicsscene.h"
 #include "../utils/fmessagebox.h"
 #include "../utils/fileprogressdialog.h"
-#include "../svg/svgfilesplitter.h"
-#include "../version/version.h"
-#include "../svg/groundplanegenerator.h"
 #include "../help/tipsandtricks.h"
 #include "../dialogs/setcolordialog.h"
+#include "../dialogs/fabuploaddialog.h"
 #include "../utils/folderutils.h"
 #include "../utils/graphicsutils.h"
 #include "../utils/textutils.h"
-#include "../connectors/ercdata.h"
 #include "../items/moduleidnames.h"
 #include "../utils/zoomslider.h"
 #include "../dock/layerpalette.h"
@@ -72,6 +67,8 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "../processeventblocker.h"
 #include "../sketchtoolbutton.h"
 #include "../help/firsttimehelpdialog.h"
+#include "../connectors/debugconnectors.h"
+#include "mainwindow/fprobeactions.h"
 
 ////////////////////////////////////////////////////////
 
@@ -143,6 +140,8 @@ void MainWindow::closeIfEmptySketch(MainWindow* mw) {
 	}
 	mw->move(x()+cascFactorX,y()+cascFactorY);
 	mw->show();
+	mw->activateWindow();
+	mw->raise();
 }
 
 void MainWindow::mainLoad() {
@@ -158,15 +157,28 @@ void MainWindow::mainLoad() {
 
 	QString fileName = FolderUtils::getOpenFileName(
 	                       this,
-	                       tr("Select a Fritzing File to Open"),
+						   tr("Select a Fritzing file to open"),
 	                       path,
-	                       tr("Fritzing Files (*%1 *%2 *%3 *%4 *%5);;Fritzing (*%1);;Fritzing Shareable (*%2);;Fritzing Part (*%3);;Fritzing Bin (*%4);;Fritzing Shareable Bin (*%5)")
-	                       .arg(FritzingSketchExtension)
-	                       .arg(FritzingBundleExtension)
-	                       .arg(FritzingBundledPartExtension)
-	                       .arg(FritzingBinExtension)
-	                       .arg(FritzingBundledBinExtension)
-	                   );
+						   tr("Fritzing Files (*%1 *%2 *%3 *%4 *%5);;Fritzing (*%1);;Fritzing Shareable (*%2);;Fritzing Part (*%3);;Fritzing Bin (*%4);;Fritzing Shareable Bin (*%5)")
+						   .arg(FritzingSketchExtension
+						   , FritzingBundleExtension
+						   , FritzingBundledPartExtension
+						   , FritzingBinExtension
+						   , FritzingBundledBinExtension)
+#ifndef QT_NO_DEBUG
+				// Loading an unbundled part is useful while creating a new part.
+				// However, unbundled parts should not be distributed,
+				// since this will lead to many errors (missing files, wrong files,
+				// unreliable version numbers, different parts with using the same ID,
+				// and many more. If you want to share a new part, you can export it
+				// with Fritzing once it is finished, or manually bundle it as fzpz .
+				// Note that loading unbundled parts is already possible in the release
+				// version, too, but only via drag and drop.
+							+
+						   tr(";;Fritzing Unbundled Part (*%1)")
+						   .arg(FritzingPartExtension)
+#endif
+					   );
 
 	if (fileName.isEmpty()) return;
 
@@ -194,7 +206,7 @@ void MainWindow::mainLoadAux(const QString & fileName)
 			QTextStream stream(&file);
 			while (!stream.atEnd()) {
 				QString line = stream.readLine().trimmed();
-				foreach (QString ext, fritzingExtensions()) {
+				Q_FOREACH (QString ext, fritzingExtensions()) {
 					if (line.endsWith(ext)) {
 						QFileInfo lineInfo(line);
 						if (lineInfo.exists()) {
@@ -236,8 +248,7 @@ void MainWindow::mainLoadAux(const QString & fileName)
 	if (!file.open(QFile::ReadOnly | QFile::Text)) {
 		FMessageBox::warning(this, tr("Fritzing"),
 		                     tr("Cannot read file  1 %1:\n%2.")
-		                     .arg(fileName)
-		                     .arg(file.errorString()));
+							 .arg(fileName, file.errorString()));
 		return;
 	}
 
@@ -295,7 +306,7 @@ MainWindow * MainWindow::revertAux()
 bool MainWindow::loadWhich(const QString & fileName, bool setAsLastOpened, bool addToRecent, bool checkObsolete, const QString & displayName)
 {
 	if (!QFileInfo(fileName).exists()) {
-		FMessageBox::warning(NULL, tr("Fritzing"), tr("File '%1' not found").arg(fileName));
+		FMessageBox::warning(nullptr, tr("Fritzing"), tr("File '%1' not found").arg(fileName));
 		return false;
 	}
 
@@ -313,8 +324,8 @@ bool MainWindow::loadWhich(const QString & fileName, bool setAsLastOpened, bool 
 		setCurrentFile(fileName, false, false);
 	}
 	else if(fileName.endsWith(FritzingBundleExtension)) {
-		loadBundledSketch(fileName, addToRecent, setAsLastOpened, checkObsolete);
-		result = true;
+		QString error = loadBundledSketch(fileName, addToRecent, setAsLastOpened, checkObsolete);
+		result = error.isEmpty();
 	}
 	else if (
 	    fileName.endsWith(FritzingBinExtension)
@@ -324,7 +335,8 @@ bool MainWindow::loadWhich(const QString & fileName, bool setAsLastOpened, bool 
 		result = true;
 	}
 	else if (fileName.endsWith(FritzingPartExtension)) {
-		notYetImplemented(tr("directly loading parts"));
+		loadPart(fileName, true);
+		result = true;
 	}
 	else if (fileName.endsWith(FritzingBundledPartExtension)) {
 		loadBundledPart(fileName, true);
@@ -338,7 +350,7 @@ bool MainWindow::loadWhich(const QString & fileName, bool setAsLastOpened, bool 
 	return result;
 }
 
-void MainWindow::mainLoad(const QString & fileName, const QString & displayName, bool checkObsolete) {
+bool MainWindow::mainLoad(const QString & fileName, const QString & displayName, bool checkObsolete) {
 
 	if (m_fileProgressDialog) {
 		m_fileProgressDialog->setMaximum(200);
@@ -362,6 +374,13 @@ void MainWindow::mainLoad(const QString & fileName, const QString & displayName,
 
 	QList<ModelPart *> modelParts;
 
+	bool doMigratePartLabelOffset = false;
+	QMetaObject::Connection migratePartLabelOffsetConnection = connect(
+		m_sketchModel, &ModelBase::migratePartLabelOffset, this, [&doMigratePartLabelOffset](const QString &fritzingVersion){
+		DebugDialog::debug(QString("Migrate part labels for from %1 project to Fritzing 1.0.0").arg(fritzingVersion));
+		doMigratePartLabelOffset = true;
+	});
+
 	connect(m_sketchModel, SIGNAL(loadedViews(ModelBase *, QDomElement &)),
 	        this, SLOT(loadedViewsSlot(ModelBase *, QDomElement &)), Qt::DirectConnection);
 	connect(m_sketchModel, SIGNAL(loadedRoot(const QString &, ModelBase *, QDomElement &)),
@@ -369,12 +388,17 @@ void MainWindow::mainLoad(const QString & fileName, const QString & displayName,
 	connect(m_sketchModel, SIGNAL(obsoleteSMDOrientationSignal()),
 	        this, SLOT(obsoleteSMDOrientationSlot()), Qt::DirectConnection);
 	connect(m_sketchModel, SIGNAL(oldSchematicsSignal(const QString &, bool &)),
-	        this, SLOT(oldSchematicsSlot(const QString &, bool &)), Qt::DirectConnection);
+	        this, SLOT(oldSchematicsSlot(const QString &, bool &)), Qt::DirectConnection);	
+	connect(m_sketchModel, &SketchModel::loadedProjectProperties,
+			this, &MainWindow::loadedProjectPropertiesSlot, Qt::DirectConnection);
+
 	m_obsoleteSMDOrientation = false;
 
-	m_sketchModel->loadFromFile(fileName, m_referenceModel, modelParts, true);
+	bool result = m_sketchModel->loadFromFile(fileName, m_referenceModel, modelParts, true);
 
 	//DebugDialog::debug("core loaded");
+	disconnect(m_sketchModel, &SketchModel::loadedProjectProperties,
+			   this, &MainWindow::loadedProjectPropertiesSlot);
 	disconnect(m_sketchModel, SIGNAL(loadedViews(ModelBase *, QDomElement &)),
 	           this, SLOT(loadedViewsSlot(ModelBase *, QDomElement &)));
 	disconnect(m_sketchModel, SIGNAL(loadedRoot(const QString &, ModelBase *, QDomElement &)),
@@ -389,7 +413,7 @@ void MainWindow::mainLoad(const QString & fileName, const QString & displayName,
 	}
 
 	QList<long> newIDs;
-	m_breadboardGraphicsView->loadFromModelParts(modelParts, BaseCommand::SingleView, NULL, false, NULL, false, newIDs);
+	m_breadboardGraphicsView->loadFromModelParts(modelParts, BaseCommand::SingleView, nullptr, false, nullptr, false, newIDs);
 
 	ProcessEventBlocker::processEvents();
 	if (m_fileProgressDialog) {
@@ -398,7 +422,7 @@ void MainWindow::mainLoad(const QString & fileName, const QString & displayName,
 	}
 
 	newIDs.clear();
-	m_pcbGraphicsView->loadFromModelParts(modelParts, BaseCommand::SingleView, NULL, false, NULL, false, newIDs);
+	m_pcbGraphicsView->loadFromModelParts(modelParts, BaseCommand::SingleView, nullptr, false, nullptr, false, newIDs);
 
 
 	ProcessEventBlocker::processEvents();
@@ -410,7 +434,7 @@ void MainWindow::mainLoad(const QString & fileName, const QString & displayName,
 	newIDs.clear();
 	m_schematicGraphicsView->setConvertSchematic(m_convertedSchematic);
 	m_schematicGraphicsView->setOldSchematic(this->m_useOldSchematic);
-	m_schematicGraphicsView->loadFromModelParts(modelParts, BaseCommand::SingleView, NULL, false, NULL, false, newIDs);
+	m_schematicGraphicsView->loadFromModelParts(modelParts, BaseCommand::SingleView, nullptr, false, nullptr, false, newIDs);
 	m_schematicGraphicsView->setConvertSchematic(false);
 
 	if (m_sketchModel->checkForReversedWires()) {
@@ -426,9 +450,9 @@ void MainWindow::mainLoad(const QString & fileName, const QString & displayName,
 
 	if (m_obsoleteSMDOrientation) {
 		QSet<ItemBase *> toConvert;
-		foreach (QGraphicsItem * item, m_pcbGraphicsView->items()) {
-			ItemBase * itemBase = dynamic_cast<ItemBase *>(item);
-			if (itemBase == NULL) continue;
+		Q_FOREACH (QGraphicsItem * item, m_pcbGraphicsView->items()) {
+			auto * itemBase = dynamic_cast<ItemBase *>(item);
+			if (itemBase == nullptr) continue;
 
 			itemBase = itemBase->layerKinChief();
 			if (itemBase->modelPart()->flippedSMD() && itemBase->viewLayerPlacement() == ViewLayer::NewBottom) {
@@ -437,9 +461,9 @@ void MainWindow::mainLoad(const QString & fileName, const QString & displayName,
 		}
 
 		QList<ConnectorItem *> already;
-		foreach (ItemBase * itemBase, toConvert) {
-			PaletteItem * paletteItem = qobject_cast<PaletteItem *>(itemBase);
-			if (paletteItem == NULL) continue;          // shouldn't happen
+		Q_FOREACH (ItemBase * itemBase, toConvert) {
+			auto * paletteItem = qobject_cast<PaletteItem *>(itemBase);
+			if (paletteItem == nullptr) continue;          // shouldn't happen
 
 			paletteItem->rotateItem(180, true);
 		}
@@ -449,6 +473,11 @@ void MainWindow::mainLoad(const QString & fileName, const QString & displayName,
 		QFileInfo fileInfo(m_fwFilename);
 		m_programView->linkFiles(m_linkedProgramFiles, fileInfo.absoluteDir().absolutePath());
 	}
+
+	if (doMigratePartLabelOffset) {
+		migratePartLabelOffset(modelParts);
+	}
+	disconnect(migratePartLabelOffsetConnection);
 
 	if (!m_useOldSchematic && checkObsolete) {
 		if (m_pcbGraphicsView) {
@@ -460,16 +489,19 @@ void MainWindow::mainLoad(const QString & fileName, const QString & displayName,
 	}
 
 	initZoom();
-
+#ifndef QT_NO_DEBUG
+	m_debugConnectors->onChangeConnection();
+#endif
+	return result;
 }
 
 void MainWindow::copy() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 	m_currentGraphicsView->copy();
 }
 
 void MainWindow::cut() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 	m_currentGraphicsView->cut();
 }
 
@@ -483,16 +515,16 @@ void MainWindow::paste() {
 
 void MainWindow::pasteAux(bool pasteInPlace)
 {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	QClipboard *clipboard = QApplication::clipboard();
-	if (clipboard == NULL) {
+	if (clipboard == nullptr) {
 		// shouldn't happen
 		return;
 	}
 
 	const QMimeData* mimeData = clipboard->mimeData(QClipboard::Clipboard);
-	if (mimeData == NULL) return;
+	if (mimeData == nullptr) return;
 
 	if (!mimeData->hasFormat("application/x-dnditemsdata")) return;
 
@@ -500,7 +532,7 @@ void MainWindow::pasteAux(bool pasteInPlace)
 	QList<ModelPart *> modelParts;
 	QHash<QString, QRectF> boundingRects;
 	if (m_sketchModel->paste(m_referenceModel, itemData, modelParts, boundingRects, false)) {
-		QUndoCommand * parentCommand = new QUndoCommand("Paste");
+		auto * parentCommand = new QUndoCommand("Paste"); // if you translate "Paste", you must also do so for the check in sketchwidget.cpp.
 
 		QList<SketchWidget *> sketchWidgets;
 		sketchWidgets << m_breadboardGraphicsView << m_schematicGraphicsView << m_pcbGraphicsView;
@@ -508,14 +540,18 @@ void MainWindow::pasteAux(bool pasteInPlace)
 		sketchWidgets.prepend(m_currentGraphicsView);
 
 		QList<long> newIDs;
-		foreach (SketchWidget * sketchWidget, sketchWidgets) {
+		Q_FOREACH (SketchWidget * sketchWidget, sketchWidgets) {
 			newIDs.clear();
 			QRectF r;
 			QRectF boundingRect = boundingRects.value(sketchWidget->viewName(), r);
-			sketchWidget->loadFromModelParts(modelParts, BaseCommand::SingleView, parentCommand, true, pasteInPlace ? &r : &boundingRect, false, newIDs);
+			sketchWidget->loadFromModelParts(modelParts, BaseCommand::SingleView, parentCommand, true, pasteInPlace ? &r : &boundingRect, false, newIDs, pasteInPlace);
+			Q_FOREACH (long id, newIDs) {
+				auto * checkPartLabelLayerVisibilityCommand = new CheckPartLabelLayerVisibilityCommand(sketchWidget, id, parentCommand);
+				checkPartLabelLayerVisibilityCommand->setRedoOnly();
+			}
 		}
 
-		foreach (long id, newIDs) {
+		Q_FOREACH (long id, newIDs) {
 			new IncLabelTextCommand(m_breadboardGraphicsView, id, parentCommand);
 		}
 
@@ -532,7 +568,7 @@ void MainWindow::pasteAux(bool pasteInPlace)
 }
 
 void MainWindow::duplicate() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->copy();
 	paste();
@@ -543,25 +579,25 @@ void MainWindow::duplicate() {
 void MainWindow::doDelete() {
 	//DebugDialog::debug(QString("invoking do delete") );
 
-	if (m_currentGraphicsView != NULL) {
+	if (m_currentGraphicsView) {
 		m_currentGraphicsView->deleteSelected(retrieveWire(), false);
 	}
 }
 
 void MainWindow::doDeleteMinus() {
-	if (m_currentGraphicsView != NULL) {
+	if (m_currentGraphicsView) {
 		m_currentGraphicsView->deleteSelected(retrieveWire(), true);
 	}
 }
 
 void MainWindow::selectAll() {
-	if (m_currentGraphicsView != NULL) {
+	if (m_currentGraphicsView) {
 		m_currentGraphicsView->selectDeselectAllCommand(true);
 	}
 }
 
 void MainWindow::deselect() {
-	if (m_currentGraphicsView != NULL) {
+	if (m_currentGraphicsView) {
 		m_currentGraphicsView->selectDeselectAllCommand(false);
 	}
 }
@@ -578,7 +614,7 @@ void MainWindow::tipsAndTricks()
 
 void MainWindow::firstTimeHelp()
 {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	FirstTimeHelpDialog::setViewID(m_currentGraphicsView->viewID());
 	FirstTimeHelpDialog::showFirstTimeHelp();
@@ -658,6 +694,9 @@ void MainWindow::populateMenuFromXMLFile(QMenu *parentMenu, QStringList &actions
 {
 	QDomDocument dom;
 	QFile file(folderPath+indexFileName);
+	if (!file.open(QIODevice::ReadOnly)) {
+		DebugDialog::debug(QString("Unable to open :%1").arg(folderPath+indexFileName));
+	}
 	dom.setContent(&file);
 
 	QDomElement domElem = dom.documentElement();
@@ -670,7 +709,7 @@ void MainWindow::populateMenuFromXMLFile(QMenu *parentMenu, QStringList &actions
 
 	QHash<QString, struct SketchDescriptor *> index = indexAvailableElements(indexDomElem, folderPath, actionsTracker, localeName);
 	QList<SketchDescriptor *> sketchDescriptors(index.values());
-	qSort(sketchDescriptors.begin(), sketchDescriptors.end(), sortSketchDescriptors);
+	std::sort(sketchDescriptors.begin(), sketchDescriptors.end(), sortSketchDescriptors);
 
 	if (sketchDescriptors.size() > 0) {
 		// set up the "all" category
@@ -679,14 +718,14 @@ void MainWindow::populateMenuFromXMLFile(QMenu *parentMenu, QStringList &actions
 		QDomElement language = dom.createElement("language");
 		language.setAttribute("name", tr("All"));
 		all.appendChild(language);
-		foreach (SketchDescriptor * sketchDescriptor, sketchDescriptors) {
+		Q_FOREACH (SketchDescriptor * sketchDescriptor, sketchDescriptors) {
 			QDomElement sketch = dom.createElement("sketch");
 			sketch.setAttribute("id", sketchDescriptor->id);
 			all.appendChild(sketch);
 		}
 	}
 	populateMenuWithIndex(index, parentMenu, taxonomyDomElem, localeName);
-	foreach (SketchDescriptor * sketchDescriptor, index.values()) {
+	Q_FOREACH (SketchDescriptor * sketchDescriptor, index.values()) {
 		delete sketchDescriptor;
 	}
 }
@@ -706,7 +745,7 @@ QHash<QString, struct SketchDescriptor *> MainWindow::indexAvailableElements(QDo
 		const QString src = QFileInfo(srcAux).exists()? srcAux: srcPrefix+srcAux;
 		if(QFileInfo(src).exists()) {
 			actionsTracker << name;
-			QAction * action = new QAction(name, this);
+			auto * action = new QAction(name, this);
 			action->setData(src);
 			connect(action,SIGNAL(triggered()),this,SLOT(openRecentOrExampleFile()));
 			retval[id] = new SketchDescriptor(id,name,src, action);
@@ -729,14 +768,14 @@ void MainWindow::populateMenuWithIndex(const QHash<QString, struct SketchDescrip
 				}
 				else
 				{
-					qWarning() << tr("MainWindow::populateMenuWithIndex: couldn't load example with id='%1'").arg(id);
+					qWarning() << QString("MainWindow::populateMenuWithIndex: couldn't load example with id='%1'").arg(id);
 				}
 			}
 		}
 		else if (e.nodeName() == "category") {
 			QDomElement bestLang = getBestLanguageChild(localeName, e);
 			QString name = bestLang.attribute("name");
-			QMenu * currMenu = new QMenu(name, parentMenu);
+			auto * currMenu = new QMenu(name, parentMenu);
 			parentMenu->addMenu(currMenu);
 			populateMenuWithIndex(index, currMenu, e, localeName);
 		}
@@ -745,7 +784,7 @@ void MainWindow::populateMenuWithIndex(const QHash<QString, struct SketchDescrip
 		}
 		else if (e.nodeName() == "url") {
 			QDomElement bestLang = getBestLanguageChild(localeName, e);
-			QAction * action = new QAction(bestLang.attribute("name"), this);
+			auto * action = new QAction(bestLang.attribute("name"), this);
 			action->setData(bestLang.attribute("href"));
 			connect(action, SIGNAL(triggered()), this, SLOT(openURL()));
 			parentMenu->addAction(action);
@@ -762,13 +801,13 @@ void MainWindow::populateMenuFromFolderContent(QMenu * parentMenu, const QString
 			QString currFile = content.at(i);
 			QString currFilePath = currDir->absoluteFilePath(currFile);
 			if(QFileInfo(currFilePath).isDir()) {
-				QMenu * currMenu = new QMenu(currFile, parentMenu);
+				auto * currMenu = new QMenu(currFile, parentMenu);
 				parentMenu->addMenu(currMenu);
 				populateMenuFromFolderContent(currMenu, currFilePath);
 			} else {
 				QString actionText = QFileInfo(currFilePath).completeBaseName();
 				m_openExampleActions << actionText;
-				QAction * currAction = new QAction(actionText, this);
+				auto * currAction = new QAction(actionText, this);
 				currAction->setData(currFilePath);
 				connect(currAction,SIGNAL(triggered()),this,SLOT(openRecentOrExampleFile()));
 				parentMenu->addAction(currAction);
@@ -783,21 +822,21 @@ void MainWindow::populateMenuFromFolderContent(QMenu * parentMenu, const QString
 void MainWindow::createOpenRecentMenu() {
 	m_openRecentFileMenu = new QMenu(tr("&Open Recent Files"), this);
 
-	for (int i = 0; i < MaxRecentFiles; ++i) {
-		m_openRecentFileActs[i] = new QAction(this);
-		m_openRecentFileActs[i]->setVisible(false);
-		connect(m_openRecentFileActs[i], SIGNAL(triggered()),this, SLOT(openRecentOrExampleFile()));
+	for (auto & m_openRecentFileAct : m_openRecentFileActs) {
+		m_openRecentFileAct = new QAction(this);
+		m_openRecentFileAct->setVisible(false);
+		connect(m_openRecentFileAct, SIGNAL(triggered()),this, SLOT(openRecentOrExampleFile()));
 	}
 
 
-	for (int i = 0; i < MaxRecentFiles; ++i) {
-		m_openRecentFileMenu->addAction(m_openRecentFileActs[i]);
+	for (auto & m_openRecentFileAct : m_openRecentFileActs) {
+		m_openRecentFileMenu->addAction(m_openRecentFileAct);
 	}
 	updateRecentFileActions();
 }
 
 void MainWindow::updateFileMenu() {
-	m_printAct->setEnabled(m_currentGraphicsView != NULL || m_currentWidget->contentView() == m_programView);
+	m_printAct->setEnabled(m_currentGraphicsView || m_currentWidget->contentView() == m_programView);
 
 	updateRecentFileActions();
 	m_orderFabAct->setEnabled(true);
@@ -870,7 +909,7 @@ void MainWindow::createEditMenuActions() {
 	m_deleteAct = new QAction(tr("&Delete"), this);
 	m_deleteAct->setStatusTip(tr("Delete selection"));
 	connect(m_deleteAct, SIGNAL(triggered()), this, SLOT(doDelete()));
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	m_deleteAct->setShortcut(Qt::Key_Backspace);
 #else
 	m_deleteAct->setShortcut(QKeySequence::Delete);
@@ -879,7 +918,7 @@ void MainWindow::createEditMenuActions() {
 	m_deleteMinusAct = new QAction(tr("Delete Minus"), this);
 	m_deleteMinusAct->setStatusTip(tr("Delete selection without attached wires"));
 	connect(m_deleteMinusAct, SIGNAL(triggered()), this, SLOT(doDeleteMinus()));
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	m_deleteMinusAct->setShortcut(Qt::Key_Backspace | Qt::AltModifier);
 #endif
 
@@ -905,7 +944,7 @@ void MainWindow::createEditMenuActions() {
 	connect(m_addNoteAct, SIGNAL(triggered()), this, SLOT(addNote()));
 
 	m_preferencesAct = new QAction(tr("&Preferences..."), this);
-	m_preferencesAct->setStatusTip(tr("Show the application's about box"));
+	m_preferencesAct->setStatusTip(tr("Edit the application's preferences"));
 	m_preferencesAct->setMenuRole(QAction::PreferencesRole);						// make sure this is added to the correct menu on mac
 	connect(m_preferencesAct, SIGNAL(triggered()), QApplication::instance(), SLOT(preferences()));
 }
@@ -938,13 +977,10 @@ void MainWindow::createPartMenuActions() {
 	m_dumpAllPartsAction = new QAction(tr("Dump all parts"), this);
 	m_dumpAllPartsAction->setStatusTip(tr("Debug dump all parts in this view"));
 	connect(m_dumpAllPartsAction, SIGNAL(triggered()), this, SLOT(dumpAllParts()));
-
+#endif
 	m_testConnectorsAction = new QAction(tr("Test Connectors"), this);
 	m_testConnectorsAction->setStatusTip(tr("Connect all connectors to a single test part"));
-	connect(m_testConnectorsAction, SIGNAL(triggered()), this, SLOT(testConnectors()));
-
-#endif
-
+	connect(m_testConnectorsAction, &QAction::triggered, this, &MainWindow::testConnectors);
 
 	m_rotate45cwAct = new QAction(tr("Rotate 45° Clockwise"), this);
 	m_rotate45cwAct->setStatusTip(tr("Rotate current selection 45 degrees clockwise"));
@@ -952,6 +988,7 @@ void MainWindow::createPartMenuActions() {
 
 	m_rotate90cwAct = new QAction(tr("Rotate 90° Clockwise"), this);
 	m_rotate90cwAct->setStatusTip(tr("Rotate the selected parts by 90 degrees clockwise"));
+	m_rotate90cwAct->setShortcut(QKeySequence("]"));
 	connect(m_rotate90cwAct, SIGNAL(triggered()), this, SLOT(rotate90cw()));
 
 	m_rotate180Act = new QAction(tr("Rotate 180°"), this);
@@ -960,6 +997,7 @@ void MainWindow::createPartMenuActions() {
 
 	m_rotate90ccwAct = new QAction(tr("Rotate 90° Counter Clockwise"), this);
 	m_rotate90ccwAct->setStatusTip(tr("Rotate current selection 90 degrees counter clockwise"));
+	m_rotate90ccwAct->setShortcut(QKeySequence("["));
 	connect(m_rotate90ccwAct, SIGNAL(triggered()), this, SLOT(rotate90ccw()));
 
 	m_rotate45ccwAct = new QAction(tr("Rotate 45° Counter Clockwise"), this);
@@ -968,6 +1006,7 @@ void MainWindow::createPartMenuActions() {
 
 	m_flipHorizontalAct = new QAction(tr("&Flip Horizontal"), this);
 	m_flipHorizontalAct->setStatusTip(tr("Flip current selection horizontally"));
+	m_flipHorizontalAct->setShortcut(QKeySequence("|"));
 	connect(m_flipHorizontalAct, SIGNAL(triggered()), this, SLOT(flipHorizontal()));
 
 	m_flipVerticalAct = new QAction(tr("&Flip Vertical"), this);
@@ -1074,6 +1113,7 @@ void MainWindow::createPartMenuActions() {
 
 	m_findPartInSketchAct = new QAction(tr("Find part in sketch..."), this);
 	m_findPartInSketchAct->setStatusTip(tr("Search for parts in a sketch by matching text"));
+	m_findPartInSketchAct->setShortcut(QKeySequence::Find);
 	connect(m_findPartInSketchAct, SIGNAL(triggered()), this, SLOT(findPartInSketch()));
 
 	m_hidePartSilkscreenAct = new QAction(tr("Hide part silkscreen"), this);
@@ -1127,6 +1167,14 @@ void MainWindow::createViewMenuActions(bool showWelcome) {
 	m_colorWiresByLengthAct->setStatusTip(tr("Display breadboard wires using standard color coding by length"));
 	m_colorWiresByLengthAct->setCheckable(true);
 	connect(m_colorWiresByLengthAct, SIGNAL(triggered()), this, SLOT(colorWiresByLength()));
+
+	m_startSimulatorAct = new QAction(tr("Start Simulator"), this);
+	m_startSimulatorAct->setStatusTip(tr("Starts the simulator (DC analysis)"));
+	connect(m_startSimulatorAct, SIGNAL(triggered()), m_simulator, SLOT(startSimulation()));
+
+	m_stopSimulatorAct = new QAction(tr("Stop Simulator"), this);
+	m_stopSimulatorAct->setStatusTip(tr("Stops the simulator and removes simulator data"));
+	connect(m_stopSimulatorAct, SIGNAL(triggered()), m_simulator, SLOT(stopSimulation()));
 
 	m_showGridAct = new QAction(tr("Show Grid"), this);
 	m_showGridAct->setStatusTip(tr("Show the grid"));
@@ -1232,10 +1280,6 @@ void MainWindow::createHelpMenuActions() {
 	m_openHelpAct->setStatusTip(tr("Open Fritzing help"));
 	connect(m_openHelpAct, SIGNAL(triggered(bool)), this, SLOT(openHelp()));
 
-	m_openDonateAct = new QAction(tr("Donate to Fritzing"), this);
-	m_openDonateAct->setStatusTip(tr("Open Fritzing donation web page"));
-	connect(m_openDonateAct, SIGNAL(triggered(bool)), this, SLOT(openDonate()));
-
 	m_examplesAct = new QAction(tr("Online Projects Gallery"), this);
 	m_examplesAct->setStatusTip(tr("Open Fritzing examples"));
 	connect(m_examplesAct, SIGNAL(triggered(bool)), this, SLOT(openExamples()));
@@ -1244,9 +1288,9 @@ void MainWindow::createHelpMenuActions() {
 	m_partsRefAct->setStatusTip(tr("Open Parts Reference"));
 	connect(m_partsRefAct, SIGNAL(triggered(bool)), this, SLOT(openPartsReference()));
 
-	/*m_visitFritzingDotOrgAct = new QAction(tr("Visit fritzing.org"), this);
-	m_visitFritzingDotOrgAct->setStatusTip(tr("www.fritzing.org"));
-	connect(m_visitFritzingDotOrgAct, SIGNAL(triggered(bool)), this, SLOT(visitFritzingDotOrg()));*/
+	m_visitFritzingDotOrgAct = new QAction(tr("Visit fritzing.org"), this);
+	m_visitFritzingDotOrgAct->setStatusTip(tr("fritzing.org"));
+	connect(m_visitFritzingDotOrgAct, SIGNAL(triggered(bool)), this, SLOT(visitFritzingDotOrg()));
 
 	m_checkForUpdatesAct = new QAction(tr("Check for updates..."), this);
 	m_checkForUpdatesAct->setStatusTip(tr("Check whether a newer version of Fritzing is available for download"));
@@ -1296,35 +1340,41 @@ void MainWindow::createMenus()
 	createWindowMenu();
 	createTraceMenus();
 	createHelpMenu();
+
+	auto * actionProbe = new FProbeActions("MenuBar", menuBar());
 }
 
-void MainWindow::createRotateSubmenu(QMenu * parentMenu) {
-	QMenu *rotateMenu = parentMenu->addMenu(tr("Rotate"));
+QMenu * MainWindow::createRotateSubmenu(QMenu * parentMenu) {
+	QMenu * rotateMenu = parentMenu->addMenu(tr("Rotate"));
 	rotateMenu->addAction(m_rotate45cwAct);
 	rotateMenu->addAction(m_rotate90cwAct);
 	rotateMenu->addAction(m_rotate180Act);
 	rotateMenu->addAction(m_rotate90ccwAct);
 	rotateMenu->addAction(m_rotate45ccwAct);
+	return rotateMenu;
 }
 
-void MainWindow::createZOrderSubmenu(QMenu * parentMenu) {
+QMenu * MainWindow::createZOrderSubmenu(QMenu * parentMenu) {
 	QMenu *zOrderMenu = parentMenu->addMenu(tr("Raise and Lower"));
 	zOrderMenu->addAction(m_bringToFrontAct);
 	zOrderMenu->addAction(m_bringForwardAct);
 	zOrderMenu->addAction(m_sendBackwardAct);
 	zOrderMenu->addAction(m_sendToBackAct);
+
+	return zOrderMenu;
 }
 
 /*
 void MainWindow::createZOrderWireSubmenu(QMenu * parentMenu) {
-    QMenu *zOrderWireMenu = parentMenu->addMenu(tr("Raise and Lower"));
-    zOrderWireMenu->addAction(m_bringToFrontWireAct);
-    zOrderWireMenu->addAction(m_bringForwardWireAct);
-    zOrderWireMenu->addAction(m_sendBackwardWireAct);
-    zOrderWireMenu->addAction(m_sendToBackWireAct);
+	QMenu *zOrderWireMenu = parentMenu->addMenu(tr("Raise and Lower"));
+	zOrderWireMenu->addAction(m_bringToFrontWireAct);
+	zOrderWireMenu->addAction(m_bringForwardWireAct);
+	zOrderWireMenu->addAction(m_sendBackwardWireAct);
+	zOrderWireMenu->addAction(m_sendToBackWireAct);
 }
 */
-void MainWindow::createAlignSubmenu(QMenu * parentMenu) {
+
+QMenu * MainWindow::createAlignSubmenu(QMenu * parentMenu) {
 	QMenu *alignMenu = parentMenu->addMenu(tr("Align"));
 	alignMenu->addAction(m_alignLeftAct);
 	alignMenu->addAction(m_alignHorizontalCenterAct);
@@ -1332,13 +1382,17 @@ void MainWindow::createAlignSubmenu(QMenu * parentMenu) {
 	alignMenu->addAction(m_alignTopAct);
 	alignMenu->addAction(m_alignVerticalCenterAct);
 	alignMenu->addAction(m_alignBottomAct);
+
+	return alignMenu;
 }
 
-void MainWindow::createAddToBinSubmenu(QMenu * parentMenu) {
+QMenu * MainWindow::createAddToBinSubmenu(QMenu * parentMenu) {
 	QMenu *addToBinMenu = parentMenu->addMenu(tr("&Add to bin..."));
 	addToBinMenu->setStatusTip(tr("Add selected part to bin"));
 	QList<QAction*> acts = m_binManager->openedBinsActions(selectedModuleID());
 	addToBinMenu->addActions(acts);
+
+	return addToBinMenu;
 }
 
 void MainWindow::createFileMenu() {
@@ -1385,6 +1439,8 @@ void MainWindow::createFileMenu() {
 	populateExportMenu();
 
 	m_exportMenu->addAction(m_exportBomAct);
+	m_exportMenu->addAction(m_exportBomCsvAct);
+	m_exportMenu->addAction(m_exportIpcAct);
 	m_exportMenu->addAction(m_exportNetlistAct);
 	m_exportMenu->addAction(m_exportSpiceNetlistAct);
 
@@ -1426,7 +1482,9 @@ void MainWindow::createEditMenu()
 	m_editMenu->addSeparator();
 	m_editMenu->addAction(m_addNoteAct);
 	m_editMenu->addSeparator();
+#ifndef Q_OS_MACOS
 	m_editMenu->addAction(m_preferencesAct);
+#endif
 	updateEditMenu();
 	connect(m_editMenu, SIGNAL(aboutToShow()), this, SLOT(updateEditMenu()));
 }
@@ -1443,16 +1501,17 @@ void MainWindow::createPartMenu() {
 	m_partMenu->addSeparator();
 	m_partMenu->addAction(m_flipHorizontalAct);
 	m_partMenu->addAction(m_flipVerticalAct);
-	createRotateSubmenu(m_partMenu);
-	createZOrderSubmenu(m_partMenu);
+	m_rotateMenu = createRotateSubmenu(m_partMenu);
+	m_zOrderMenu = createZOrderSubmenu(m_partMenu);
+
 	//createZOrderWireSubmenu(m_partMenu);
-	createAlignSubmenu(m_partMenu);
+	m_alignMenu = createAlignSubmenu(m_partMenu);
 	m_partMenu->addAction(m_moveLockAct);
 	m_partMenu->addAction(m_stickyAct);
 	m_partMenu->addAction(m_selectMoveLockAct);
 
 	m_partMenu->addSeparator();
-	createAddToBinSubmenu(m_partMenu);
+	m_addToBinMenu = createAddToBinSubmenu(m_partMenu);
 	m_partMenu->addAction(m_showPartLabelAct);
 	m_partMenu->addSeparator();
 	m_partMenu->addAction(m_selectAllObsoleteAct);
@@ -1523,6 +1582,8 @@ void MainWindow::createTraceMenus()
 
 	groundFillMenu->addAction(m_copperFillAct);
 	groundFillMenu->addAction(m_groundFillAct);
+	groundFillMenu->addAction(m_copperFillOldAct);
+	groundFillMenu->addAction(m_groundFillOldAct);
 	groundFillMenu->addAction(m_removeGroundFillAct);
 	groundFillMenu->addAction(m_setGroundFillSeedsAct);
 	groundFillMenu->addAction(m_clearGroundFillSeedsAct);
@@ -1591,26 +1652,28 @@ void MainWindow::createHelpMenu()
 	m_helpMenu->addAction(m_enableDebugAct);
 	m_helpMenu->addSeparator();
 	m_helpMenu->addAction(m_aboutAct);
-	m_helpMenu->addAction(m_openDonateAct);
 	m_helpMenu->addAction(m_tipsAndTricksAct);
 	m_helpMenu->addAction(m_firstTimeHelpAct);
 #ifndef QT_NO_DEBUG
 	m_helpMenu->addAction(m_aboutQtAct);
 #endif
+#ifdef Q_OS_MACOS
+	m_helpMenu->addAction(m_preferencesAct);
+#endif
 }
 
 
 void MainWindow::updateLayerMenu(bool resetLayout) {
-	if (m_viewMenu == NULL) return;
-	if (m_showAllLayersAct == NULL) return;
+	if (m_viewMenu == nullptr) return;
+	if (m_showAllLayersAct == nullptr) return;
 
 	QList<QAction *> actions;
 	actions << m_zoomInAct << m_zoomOutAct << m_zoomInShortcut << m_fitInWindowAct << m_actualSizeAct <<
-	        m_100PercentSizeAct << m_alignToGridAct << m_showGridAct << m_setGridSizeAct << m_setBackgroundColorAct <<
-	        m_colorWiresByLengthAct;
+			m_100PercentSizeAct << m_alignToGridAct << m_showGridAct << m_setGridSizeAct << m_setBackgroundColorAct <<
+			m_colorWiresByLengthAct;
 
-	bool enabled = (m_currentGraphicsView != NULL);
-	foreach (QAction * action, actions) action->setEnabled(enabled);
+	bool enabled = (m_currentGraphicsView);
+	Q_FOREACH (QAction * action, actions) action->setEnabled(enabled);
 
 	actions.clear();
 
@@ -1631,10 +1694,10 @@ void MainWindow::updateLayerMenu(bool resetLayout) {
 	if (m_showAllLayersAct) m_viewMenu->addAction(m_showAllLayersAct);
 	if (m_hideAllLayersAct) m_viewMenu->addAction(m_hideAllLayersAct);
 
-	m_hideAllLayersAct->setEnabled(false);
-	m_showAllLayersAct->setEnabled(false);
+	if (m_hideAllLayersAct) m_hideAllLayersAct->setEnabled(false);
+	if (m_showAllLayersAct) m_showAllLayersAct->setEnabled(false);
 
-	if (m_currentGraphicsView == NULL) {
+	if (m_currentGraphicsView == nullptr) {
 		return;
 	}
 
@@ -1647,12 +1710,12 @@ void MainWindow::updateLayerMenu(bool resetLayout) {
 	LayerList keys = viewLayers.keys();
 
 	// make sure they're in ascending order when inserting into the menu
-	qSort(keys.begin(), keys.end());
+	std::sort(keys.begin(), keys.end());
 
-	foreach (ViewLayer::ViewLayerID key, keys) {
+	Q_FOREACH (ViewLayer::ViewLayerID key, keys) {
 		ViewLayer * viewLayer = viewLayers.value(key);
 		//DebugDialog::debug(QString("Layer: %1 is %2").arg(viewLayer->action()->text()).arg(viewLayer->action()->isEnabled()));
-		if (viewLayer != NULL) {
+		if (viewLayer) {
 			if (viewLayer->parentLayer()) continue;
 			m_viewMenu->addAction(viewLayer->action());
 			disconnect(viewLayer->action(), SIGNAL(triggered()), this, SLOT(updateLayerMenu()));
@@ -1664,7 +1727,7 @@ void MainWindow::updateLayerMenu(bool resetLayout) {
 	if (keys.count() <= 0) return;
 
 	ViewLayer *prev = viewLayers.value(keys[0]);
-	if (prev == NULL) {
+	if (prev == nullptr) {
 		// jrc: I think prev == NULL is actually a side effect from an earlier bug
 		// but I haven't figured out the cause yet
 		// at any rate, when this bug occurs, keys[0] is some big negative number that looks like an
@@ -1679,8 +1742,8 @@ void MainWindow::updateLayerMenu(bool resetLayout) {
 	for (int i = 1; i < keys.count(); i++) {
 		ViewLayer *viewLayer = viewLayers.value(keys[i]);
 		//DebugDialog::debug(QString("Layer: %1 is %2").arg(viewLayer->action()->text()).arg(viewLayer->action()->isChecked()));
-		if (viewLayer != NULL) {
-			if (prev != NULL && prev->action()->isChecked() != viewLayer->action()->isChecked() ) {
+		if (viewLayer) {
+			if (prev && prev->action()->isChecked() != viewLayer->action()->isChecked() ) {
 				// if the actions aren't all checked or unchecked I don't bother about the "checked" variable
 				sameState = false;
 				break;
@@ -1697,15 +1760,15 @@ void MainWindow::updateLayerMenu(bool resetLayout) {
 	//DebugDialog::debug(QString("checked: %1").arg(checked));
 	if (sameState) {
 		if(checked) {
-			m_hideAllLayersAct->setEnabled(true);
+			if (m_hideAllLayersAct) m_hideAllLayersAct->setEnabled(true);
 		}
 		else {
-			m_showAllLayersAct->setEnabled(true);
+			if (m_showAllLayersAct) m_showAllLayersAct->setEnabled(true);
 		}
 	}
 	else {
-		m_showAllLayersAct->setEnabled(true);
-		m_hideAllLayersAct->setEnabled(true);
+		if (m_showAllLayersAct) m_showAllLayersAct->setEnabled(true);
+		if (m_hideAllLayersAct) m_hideAllLayersAct->setEnabled(true);
 	}
 
 	if (resetLayout) {
@@ -1719,7 +1782,7 @@ void MainWindow::updateWireMenu() {
 	// and that wire is cached by the menu in Wire::mousePressEvent
 
 	Wire * wire = m_activeWire;
-	m_activeWire = NULL;
+	m_activeWire = nullptr;
 
 	if (wire) {
 		enableAddBendpointAct(wire);
@@ -1733,12 +1796,12 @@ void MainWindow::updateWireMenu() {
 	bool gotRat = false;
 	bool ctlOK = false;
 
-	if (wire != NULL) {
+	if (wire) {
 
 		if (wire->getRatsnest()) {
 			QList<ConnectorItem *> ends;
 			Wire * jt = wire->findTraced(m_currentGraphicsView->getTraceFlag(), ends);
-			createTraceOK = (jt == NULL) || (!jt->getTrace());
+			createTraceOK = (jt == nullptr) || (!jt->getTrace());
 			deleteOK = true;
 			gotRat = true;
 			enableZOK = false;
@@ -1771,7 +1834,7 @@ void MainWindow::updateWireMenu() {
 		wireColorMenu->setEnabled(true);
 		QString colorString = wire->colorString();
 		//DebugDialog::debug("wire colorstring " + colorString);
-		foreach (QAction * action, wireColorMenu->actions()) {
+		Q_FOREACH (QAction * action, wireColorMenu->actions()) {
 			QString colorName = action->data().toString();
 			//DebugDialog::debug("colorname " + colorName);
 			action->setChecked(colorName.compare(colorString) == 0);
@@ -1812,12 +1875,23 @@ void MainWindow::updateWireMenu() {
 	}
 }
 
-void MainWindow::updatePartMenu() {
-	if (m_partMenu == NULL) return;
+void MainWindow::setEnableSubmenu( QMenu * menu, bool value ) {
+	Q_FOREACH (QAction * action, menu->actions()) {
+		action->setEnabled(value);
+	}
+	menu->setEnabled(value);
+	menu->menuAction()->setEnabled(value);
+}
 
-	if (m_currentGraphicsView == NULL) {
-		foreach (QAction * action, m_partMenu->actions()) {
+void MainWindow::updatePartMenu() {
+	if (m_partMenu == nullptr) return;
+
+	if (m_currentGraphicsView == nullptr) {
+		Q_FOREACH (QAction * action, m_partMenu->actions()) {
 			action->setEnabled(false);
+			if (action->menu()) {
+				setEnableSubmenu(action->menu(), false);
+			}
 		}
 		return;
 	}
@@ -1838,18 +1912,8 @@ void MainWindow::updatePartMenu() {
 		}
 	}
 
-	m_alignLeftAct->setEnabled(itemCount.selCount - itemCount.wireCount > 1);
-	m_alignRightAct->setEnabled(itemCount.selCount - itemCount.wireCount > 1);
-	m_alignTopAct->setEnabled(itemCount.selCount - itemCount.wireCount > 1);
-	m_alignBottomAct->setEnabled(itemCount.selCount - itemCount.wireCount > 1);
-	m_alignVerticalCenterAct->setEnabled(itemCount.selCount - itemCount.wireCount > 1);
-	m_alignHorizontalCenterAct->setEnabled(itemCount.selCount - itemCount.wireCount > 1);
-
-	//DebugDialog::debug(QString("enable layer actions %1")upat.arg(enable));
-	m_bringToFrontAct->setEnabled(zenable);
-	m_bringForwardAct->setEnabled(zenable);
-	m_sendBackwardAct->setEnabled(zenable);
-	m_sendToBackAct->setEnabled(zenable);
+	setEnableSubmenu(m_alignMenu, itemCount.selCount - itemCount.wireCount > 1);
+	setEnableSubmenu(m_zOrderMenu, zenable);
 
 	m_moveLockAct->setEnabled(itemCount.selCount > 0 && itemCount.selCount > itemCount.wireCount);
 	m_moveLockAct->setChecked(itemCount.moveLockCount > 0);
@@ -1862,16 +1926,15 @@ void MainWindow::updatePartMenu() {
 	bool renable = (itemCount.selRotatable > 0);
 	bool renable45 = (itemCount.sel45Rotatable > 0);
 
-	//DebugDialog::debug(QString("enable rotate (2) %1").arg(enable));
-
-	m_rotate90cwAct->setEnabled(renable && enable);
-	m_rotate180Act->setEnabled(renable && enable);
-	m_rotate90ccwAct->setEnabled(renable && enable);
+	setEnableSubmenu(m_rotateMenu, renable && enable);
 	m_rotate45ccwAct->setEnabled(renable && renable45 && enable);
 	m_rotate45cwAct->setEnabled(renable && renable45 && enable);
 
+
 	m_flipHorizontalAct->setEnabled(enable && (itemCount.selHFlipable > 0) && (m_currentGraphicsView != m_pcbGraphicsView));
 	m_flipVerticalAct->setEnabled(enable && (itemCount.selVFlipable > 0) && (m_currentGraphicsView != m_pcbGraphicsView));
+
+	setEnableSubmenu(m_addToBinMenu, enable);
 
 	updateItemMenu();
 	updateEditMenu();
@@ -1893,10 +1956,10 @@ void MainWindow::updatePartMenu() {
 				viaConnectorItems << via->connectorItem()->getCrossLayerConnectorItem();
 			}
 
-			foreach (ConnectorItem * viaConnectorItem, viaConnectorItems) {
-				foreach (ConnectorItem * connectorItem, viaConnectorItem->connectedToItems()) {
+			Q_FOREACH (ConnectorItem * viaConnectorItem, viaConnectorItems) {
+				Q_FOREACH (ConnectorItem * connectorItem, viaConnectorItem->connectedToItems()) {
 					Wire * wire = qobject_cast<Wire *>(connectorItem->attachedTo());
-					if (wire == NULL) continue;
+					if (wire == nullptr) continue;
 					if (wire->getRatsnest()) continue;
 
 					if (wire->isTraceType(m_currentGraphicsView->getTraceFlag())) {
@@ -1921,7 +1984,7 @@ void MainWindow::updatePartMenu() {
 		itemBases.append(itemBase);
 		itemBases.append(itemBase->layerKinChief()->layerKin());
 		bool hpsa = false;
-		foreach (ItemBase * lkpi, itemBases) {
+		Q_FOREACH (ItemBase * lkpi, itemBases) {
 			if (lkpi->viewLayerID() == ViewLayer::Silkscreen1 || lkpi->viewLayerID() == ViewLayer::Silkscreen0) {
 				hpsa = true;
 				m_hidePartSilkscreenAct->setText(lkpi->layerHidden() ? tr("Show part silkscreen") : tr("Hide part silkscreen"));
@@ -1944,7 +2007,7 @@ void MainWindow::updatePartMenu() {
 	m_selectAllObsoleteAct->setEnabled(true);
 	m_swapObsoleteAct->setEnabled(itemCount.obsoleteCount > 0);
 
-	m_findPartInSketchAct->setEnabled(m_currentGraphicsView != NULL);
+	m_findPartInSketchAct->setEnabled(m_currentGraphicsView);
 	m_regeneratePartsDatabaseAct->setEnabled(true);
 	m_openProgramWindowAct->setEnabled(true);
 }
@@ -1952,21 +2015,21 @@ void MainWindow::updatePartMenu() {
 void MainWindow::updateTransformationActions() {
 	// update buttons in sketch toolbar at bottom
 
-	if (m_currentGraphicsView == NULL) return;
-	if (m_rotate90cwAct == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
+	if (m_rotate90cwAct == nullptr) return;
 
 	ItemCount itemCount = m_currentGraphicsView->calcItemCount();
 	bool enable = (itemCount.selRotatable > 0);
 	bool renable = (itemCount.sel45Rotatable > 0);
 
-	//DebugDialog::debug(QString("enable rotate (1) %1").arg(enable));
+//	DebugDialog::debug(QString("enable rotate (1) %1 %2").arg(enable).arg(m_rotate90ccwAct->isEnabled()));
 
 	m_rotate90cwAct->setEnabled(enable);
 	m_rotate180Act->setEnabled(enable);
 	m_rotate90ccwAct->setEnabled(enable);
 	m_rotate45ccwAct->setEnabled(enable && renable);
 	m_rotate45cwAct->setEnabled(enable && renable);
-	foreach(SketchToolButton* rotateButton, m_rotateButtons) {
+	Q_FOREACH(SketchToolButton* rotateButton, m_rotateButtons) {
 		rotateButton->setEnabled(enable);
 	}
 
@@ -1974,40 +2037,40 @@ void MainWindow::updateTransformationActions() {
 	m_flipVerticalAct->setEnabled((itemCount.selVFlipable > 0) && (m_currentGraphicsView != m_pcbGraphicsView));
 
 	enable = m_flipHorizontalAct->isEnabled() || m_flipVerticalAct->isEnabled();
-	foreach(SketchToolButton* flipButton, m_flipButtons) {
+	Q_FOREACH(SketchToolButton* flipButton, m_flipButtons) {
 		flipButton->setEnabled(enable);
 	}
 }
 
 void MainWindow::updateItemMenu() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	ConnectorItem * activeConnectorItem = m_activeConnectorItem;
-	m_activeConnectorItem = NULL;
+	m_activeConnectorItem = nullptr;
 
 	QList<QGraphicsItem *> items = m_currentGraphicsView->scene()->selectedItems();
 
 	int selCount = 0;
-	ItemBase * itemBase = NULL;
-	foreach(QGraphicsItem * item, items) {
+	ItemBase * itemBase = nullptr;
+	Q_FOREACH(QGraphicsItem * item, items) {
 		ItemBase * ib = ItemBase::extractTopLevelItemBase(item);
-		if (ib == NULL) continue;
+		if (ib == nullptr) continue;
 
 		selCount++;
 		if (selCount == 1) itemBase = ib;
 		else if (selCount > 1) break;
 	}
 
-	PaletteItem *selected = qobject_cast<PaletteItem *>(itemBase);
-	bool enabled = (selCount == 1) && (selected != NULL);
+	auto *selected = qobject_cast<PaletteItem *>(itemBase);
+	bool enabled = (selCount == 1) && (selected);
 
 	m_saveBundledPart->setEnabled(enabled && !selected->modelPart()->isCore());
 
 
 	// can't open wire in parts editor
-	enabled &= selected != NULL && itemBase != NULL && itemBase->canEditPart();
+	enabled &= selected && itemBase && itemBase->canEditPart();
 
-	m_disconnectAllAct->setEnabled(enabled && m_currentGraphicsView->canDisconnectAll() && (itemBase->rightClickedConnector() != NULL));
+	m_disconnectAllAct->setEnabled(enabled && m_currentGraphicsView->canDisconnectAll() && (itemBase->rightClickedConnector()));
 
 	bool gfsEnabled = false;
 	if (activeConnectorItem) {
@@ -2021,23 +2084,23 @@ void MainWindow::updateItemMenu() {
 }
 
 void MainWindow::updateEditMenu() {
-	if (m_currentGraphicsView == NULL) {
-		foreach (QAction * action, m_editMenu->actions()) {
+	if (m_currentGraphicsView == nullptr) {
+		Q_FOREACH (QAction * action, m_editMenu->actions()) {
 			action->setEnabled(action == m_preferencesAct);
 		}
 		return;
 	}
 
-	foreach (QAction * action, m_editMenu->actions()) {
+	Q_FOREACH (QAction * action, m_editMenu->actions()) {
 		action->setEnabled(true);
 	}
 
 	QClipboard *clipboard = QApplication::clipboard();
 	m_pasteAct->setEnabled(false);
 	m_pasteInPlaceAct->setEnabled(false);
-	if (clipboard != NULL) {
+	if (clipboard) {
 		const QMimeData *mimeData = clipboard->mimeData(QClipboard::Clipboard);
-		if (mimeData != NULL) {
+		if (mimeData) {
 			if (mimeData->hasFormat("application/x-dnditemsdata")) {
 				m_pasteAct->setEnabled(true);
 				m_pasteInPlaceAct->setEnabled(true);
@@ -2049,7 +2112,7 @@ void MainWindow::updateEditMenu() {
 	const QList<QGraphicsItem *> items =  m_currentGraphicsView->scene()->selectedItems();
 	bool copyActsEnabled = false;
 	bool deleteActsEnabled = false;
-	foreach (QGraphicsItem * item, items) {
+	Q_FOREACH (QGraphicsItem * item, items) {
 		if (m_currentGraphicsView->canDeleteItem(item, items.count())) {
 			deleteActsEnabled = true;
 		}
@@ -2068,20 +2131,19 @@ void MainWindow::updateEditMenu() {
 }
 
 void MainWindow::updateTraceMenu() {
-	if (m_pcbTraceMenu == NULL) return;
+	if (m_pcbTraceMenu == nullptr) return;
 
 	bool tEnabled = false;
-	bool twEnabled = false;
+	bool twEnabled = true;
 	bool ctlEnabled = false;
-	bool arEnabled = false;
 
 	TraceMenuThing traceMenuThing;
 
-	if (m_currentGraphicsView != NULL) {
+	if (m_currentGraphicsView) {
 		QList<QGraphicsItem *> items = m_currentGraphicsView->scene()->items();
-		foreach (QGraphicsItem * item, items) {
+		Q_FOREACH (QGraphicsItem * item, items) {
 			Wire * wire = dynamic_cast<Wire *>(item);
-			if (wire == NULL) {
+			if (wire == nullptr) {
 				if (m_currentGraphicsView == m_pcbGraphicsView) {
 					updatePCBTraceMenu(item, traceMenuThing);
 				}
@@ -2096,7 +2158,6 @@ void MainWindow::updateTraceMenu() {
 				//}
 			}
 			else if (wire->isTraceType(m_currentGraphicsView->getTraceFlag())) {
-				arEnabled = true;
 				tEnabled = true;
 				twEnabled = true;
 				if (wire->isSelected()) {
@@ -2111,12 +2172,6 @@ void MainWindow::updateTraceMenu() {
 					}
 				}
 			}
-		}
-	}
-
-	if (!arEnabled) {
-		if (m_currentGraphicsView != NULL) {
-			arEnabled = m_currentGraphicsView->hasAnyNets();
 		}
 	}
 
@@ -2152,6 +2207,14 @@ void MainWindow::updateTraceMenu() {
 	m_groundFillAct->setText(groundFillString);
 	m_copperFillAct->setEnabled(traceMenuThing.boardCount >= 1);
 	m_copperFillAct->setText(copperFillString);
+
+	QString groundFillOldString = tr("Old Ground Fill (%1)").arg(sides);
+	QString copperFillOldString = tr("Old Copper Fill (%1)").arg(sides);
+
+	m_groundFillOldAct->setEnabled(traceMenuThing.boardCount >= 1);
+	m_groundFillOldAct->setText(groundFillOldString);
+	m_copperFillOldAct->setEnabled(traceMenuThing.boardCount >= 1);
+	m_copperFillOldAct->setText(copperFillOldString);
 	m_removeGroundFillAct->setEnabled(traceMenuThing.gfrEnabled && traceMenuThing.boardCount >= 1);
 
 	// TODO: set and clear enabler logic
@@ -2159,7 +2222,6 @@ void MainWindow::updateTraceMenu() {
 	m_clearGroundFillSeedsAct->setEnabled(traceMenuThing.gfsEnabled && traceMenuThing.boardCount >= 1);
 
 	m_newDesignRulesCheckAct->setEnabled(traceMenuThing.boardCount >= 1);
-	m_checkLoadedTracesAct->setEnabled(true);
 	m_autorouterSettingsAct->setEnabled(m_currentGraphicsView == m_pcbGraphicsView);
 	m_updateRoutingStatusAct->setEnabled(true);
 
@@ -2170,8 +2232,8 @@ void MainWindow::updateTraceMenu() {
 
 void MainWindow::updatePCBTraceMenu(QGraphicsItem * item, TraceMenuThing & traceMenuThing)
 {
-	ItemBase * itemBase = dynamic_cast<ItemBase *>(item);
-	if (itemBase == NULL) return;
+	auto * itemBase = dynamic_cast<ItemBase *>(item);
+	if (itemBase == nullptr) return;
 	if (!itemBase->isEverVisible()) return;
 
 	if (!traceMenuThing.gfsEnabled) {
@@ -2218,7 +2280,7 @@ void MainWindow::zoomOut() {
 }
 
 void MainWindow::fitInWindow() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	double newZoom = m_currentGraphicsView->fitInWindow();
 	m_zoomSlider->setValue(newZoom);
@@ -2252,22 +2314,22 @@ void MainWindow::showWelcomeView() {
 }
 
 void MainWindow::showBreadboardView() {
-	int ix = (m_welcomeView == NULL) ? 0 : 1;
+	int ix = (m_welcomeView == nullptr) ? 0 : 1;
 	setCurrentTabIndex(ix);
 }
 
 void MainWindow::showSchematicView() {
-	int ix = (m_welcomeView == NULL) ? 1 : 2;
+	int ix = (m_welcomeView == nullptr) ? 1 : 2;
 	setCurrentTabIndex(ix);
 }
 
 void MainWindow::showPCBView() {
-	int ix = (m_welcomeView == NULL) ? 2 : 3;
+	int ix = (m_welcomeView == nullptr) ? 2 : 3;
 	setCurrentTabIndex(ix);
 }
 
 void MainWindow::showProgramView() {
-	int ix = (m_welcomeView == NULL) ? 3 : 4;
+	int ix = (m_welcomeView == nullptr) ? 3 : 4;
 	setCurrentTabIndex(ix);
 }
 
@@ -2290,10 +2352,6 @@ void MainWindow::openHelp() {
 	QDesktopServices::openUrl(QString("https://fritzing.org/learning/"));
 }
 
-void MainWindow::openDonate() {
-	QDesktopServices::openUrl(QString("https://fritzing.org/shop/donations/"));
-}
-
 void MainWindow::openExamples() {
 	QDesktopServices::openUrl(QString("https://fritzing.org/projects/"));
 }
@@ -2303,7 +2361,7 @@ void MainWindow::openPartsReference() {
 }
 
 void MainWindow::visitFritzingDotOrg() {
-	QDesktopServices::openUrl(QString("https://www.fritzing.org"));
+	QDesktopServices::openUrl(QString("https://fritzing.org"));
 }
 
 void MainWindow::reportBug() {
@@ -2321,20 +2379,21 @@ void MainWindow::partsEditorHelp() {
 
 
 void MainWindow::enableDebug() {
-	DebugDialog::setEnabled(m_enableDebugAct->isChecked());
+	bool enabled = m_enableDebugAct->isChecked();
+	DebugDialog::setEnabled(enabled);
 	if (!m_windowMenu->actions().contains(m_toggleDebuggerOutputAct)) {
 		m_windowMenu->insertSeparator(m_windowMenuSeparator);
 		m_windowMenu->insertAction(m_windowMenuSeparator, m_toggleDebuggerOutputAct);
-		toggleDebuggerOutput(true);
 	}
+	toggleDebuggerOutput(enabled);
 }
 
 
 void MainWindow::openNewPartsEditor(PaletteItem * paletteItem)
 {
-	foreach (QWidget *widget, QApplication::topLevelWidgets()) {
-		PEMainWindow * peMainWindow = qobject_cast<PEMainWindow *>(widget);
-		if (peMainWindow == NULL) continue;
+	Q_FOREACH (QWidget *widget, QApplication::topLevelWidgets()) {
+		auto * peMainWindow = qobject_cast<PEMainWindow *>(widget);
+		if (peMainWindow == nullptr) continue;
 
 		if (peMainWindow->editsModuleID(paletteItem->moduleID())) {
 			if (peMainWindow->isMinimized()) peMainWindow->showNormal();
@@ -2344,7 +2403,7 @@ void MainWindow::openNewPartsEditor(PaletteItem * paletteItem)
 		}
 	}
 
-	PEMainWindow * peMainWindow = new PEMainWindow(m_referenceModel, NULL);
+	auto * peMainWindow = new PEMainWindow(m_referenceModel, nullptr);
 	peMainWindow->init(m_referenceModel, false);
 	if (peMainWindow->setInitialItem(paletteItem)) {
 		peMainWindow->show();
@@ -2358,14 +2417,14 @@ void MainWindow::openNewPartsEditor(PaletteItem * paletteItem)
 
 void MainWindow::getPartsEditorNewAnd(ItemBase * fromItem)
 {
-	PaletteItem * paletteItem = qobject_cast<PaletteItem *>(fromItem);
-	if (paletteItem == NULL) return;
+	auto * paletteItem = qobject_cast<PaletteItem *>(fromItem);
+	if (paletteItem == nullptr) return;
 
 	openNewPartsEditor(paletteItem);
 }
 
 void MainWindow::openInPartsEditorNew() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	PaletteItem *selectedPart = m_currentGraphicsView->getSelectedPart();
 	openNewPartsEditor(selectedPart);
@@ -2430,17 +2489,18 @@ void MainWindow::toggleDebuggerOutput(bool toggle) {
 	}
 	else
 	{
+		DebugDialog::hideDebug();
 	}
 }
 
 void MainWindow::updateWindowMenu() {
 	m_toggleDebuggerOutputAct->setChecked(DebugDialog::visible());
-	foreach (QWidget * widget, QApplication::topLevelWidgets()) {
-		MainWindow * mainWindow = qobject_cast<MainWindow *>(widget);
-		if (mainWindow == NULL) continue;
+	Q_FOREACH (QWidget * widget, QApplication::topLevelWidgets()) {
+		auto * mainWindow = qobject_cast<MainWindow *>(widget);
+		if (mainWindow == nullptr) continue;
 
 		QAction *action = mainWindow->raiseWindowAction();
-		if (action != NULL) {
+		if (action) {
 			action->setChecked(action == m_raiseWindowAct);
 			m_windowMenu->addAction(action);
 		}
@@ -2457,7 +2517,7 @@ void MainWindow::notYetImplemented(QString action) {
 }
 
 void MainWindow::rotateIncCW() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	if (m_rotate45cwAct->isEnabled()) {
 		rotate45cw();
@@ -2468,66 +2528,66 @@ void MainWindow::rotateIncCW() {
 }
 
 void MainWindow::rotateIncCWRubberBand() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	if (m_rotate45cwAct->isEnabled()) {
-		m_currentGraphicsView->rotateX(45, true, NULL);
+		m_currentGraphicsView->rotateX(45, true, nullptr);
 	}
 	else if (m_rotate90cwAct->isEnabled()) {
-		m_currentGraphicsView->rotateX(90, true, NULL);
+		m_currentGraphicsView->rotateX(90, true, nullptr);
 	}
 }
 
 void MainWindow::rotateIncCCW() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	if (m_rotate45ccwAct->isEnabled()) {
-		m_currentGraphicsView->rotateX(315, true, NULL);
+		m_currentGraphicsView->rotateX(315, true, nullptr);
 	}
 	else if (m_rotate90ccwAct->isEnabled()) {
-		m_currentGraphicsView->rotateX(270, true, NULL);
+		m_currentGraphicsView->rotateX(270, true, nullptr);
 	}
 }
 
 void MainWindow::rotateIncCCWRubberBand() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	if (m_rotate45ccwAct->isEnabled()) {
-		m_currentGraphicsView->rotateX(315, true, NULL);
+		m_currentGraphicsView->rotateX(315, true, nullptr);
 	}
 	else if (m_rotate90ccwAct->isEnabled()) {
-		m_currentGraphicsView->rotateX(270, true, NULL);
+		m_currentGraphicsView->rotateX(270, true, nullptr);
 	}
 }
 
 void MainWindow::rotate90cw() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
-	m_currentGraphicsView->rotateX(90, false, NULL);
+	m_currentGraphicsView->rotateX(90, false, nullptr);
 }
 
 void MainWindow::rotate90ccw() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
-	m_currentGraphicsView->rotateX(270, false, NULL);
+	m_currentGraphicsView->rotateX(270, false, nullptr);
 }
 
 void MainWindow::rotate45ccw() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
-	m_currentGraphicsView->rotateX(315, false, NULL);
+	m_currentGraphicsView->rotateX(315, false, nullptr);
 }
 
 void MainWindow::rotate45cw() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
-	m_currentGraphicsView->rotateX(45, false, NULL);
+	m_currentGraphicsView->rotateX(45, false, nullptr);
 }
 
 void MainWindow::rotate180() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
-	m_currentGraphicsView->rotateX(180, false, NULL);
+	m_currentGraphicsView->rotateX(180, false, nullptr);
 }
 
 void MainWindow::flipHorizontal() {
@@ -2539,82 +2599,82 @@ void MainWindow::flipVertical() {
 }
 
 void MainWindow::sendToBack() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->sendToBack();
 }
 
 void MainWindow::sendBackward() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->sendBackward();
 }
 
 void MainWindow::bringForward() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->bringForward();
 }
 
 void MainWindow::bringToFront() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->bringToFront();
 }
 
 void MainWindow::alignLeft() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->alignItems(Qt::AlignLeft);
 }
 
 void MainWindow::alignVerticalCenter() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->alignItems(Qt::AlignVCenter);
 }
 
 void MainWindow::alignRight() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->alignItems(Qt::AlignRight);
 }
 
 void MainWindow::alignTop() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->alignItems(Qt::AlignTop);
 }
 
 void MainWindow::alignHorizontalCenter() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->alignItems(Qt::AlignHCenter);
 }
 
 void MainWindow::alignBottom() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->alignItems(Qt::AlignBottom);
 }
 
 void MainWindow::showAllLayers() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->setAllLayersVisible(true);
 	updateLayerMenu();
 }
 
 void MainWindow::hideAllLayers() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->setAllLayersVisible(false);
 	updateLayerMenu();
 }
 
 void MainWindow::openURL() {
-	QAction *action = qobject_cast<QAction *>(sender());
-	if (action == NULL) return;
+	auto *action = qobject_cast<QAction *>(sender());
+	if (action == nullptr) return;
 
 	QString href = action->data().toString();
 	if (href.isEmpty()) return;
@@ -2623,7 +2683,7 @@ void MainWindow::openURL() {
 }
 
 void MainWindow::openRecentOrExampleFile() {
-	QAction *action = qobject_cast<QAction *>(sender());
+	auto *action = qobject_cast<QAction *>(sender());
 	if (action) {
 		openRecentOrExampleFile(action->data().toString(), action->text());
 	}
@@ -2635,7 +2695,7 @@ void MainWindow::openRecentOrExampleFile(const QString & filename, const QString
 	}
 
 	if (!QFileInfo(filename).exists()) {
-		QMessageBox::warning(NULL, tr("Fritzing"), tr("File '%1' not found").arg(filename));
+		QMessageBox::warning(nullptr, tr("Fritzing"), tr("File '%1' not found").arg(filename));
 		return;
 	}
 
@@ -2660,13 +2720,18 @@ void MainWindow::removeActionsStartingAt(QMenu * menu, int start) {
 }
 
 void MainWindow::hideShowProgramMenu() {
-	if (m_currentWidget == NULL) return;
+	if (m_currentWidget == nullptr) return;
 
-	bool show = m_programView == NULL || m_currentWidget->contentView() != m_programView;
+	bool show = m_programView == nullptr || m_currentWidget->contentView() != m_programView;
 	//if (m_fileMenu) m_fileMenu->menuAction()->setVisible(show);
 	if (m_viewMenu) {
 		m_viewMenu->menuAction()->setVisible(show);
 		m_viewMenu->setEnabled(show);
+	if (show) {
+		m_viewMenu->setTitle(tr("&View"));
+	} else {
+		m_viewMenu->setTitle(tr("View"));
+	}
 	}
 	if (m_partMenu) {
 		m_partMenu->menuAction()->setVisible(show);
@@ -2680,14 +2745,40 @@ void MainWindow::hideShowProgramMenu() {
 		m_selectAllAct->setEnabled(show);
 		m_undoAct->setEnabled(show);
 		m_redoAct->setEnabled(show);
+	if (show) {
+		m_editMenu->setTitle(tr("&Edit"));
+	} else {
+		m_editMenu->setTitle(tr("Edit"));
+	}
 	}
 	if (m_programView) m_programView->showMenus(!show);
 }
 
 void MainWindow::hideShowTraceMenu() {
-	if (m_pcbTraceMenu) m_pcbTraceMenu->menuAction()->setVisible(m_currentGraphicsView == m_pcbGraphicsView);
-	if (m_schematicTraceMenu) m_schematicTraceMenu->menuAction()->setVisible(m_currentGraphicsView == m_schematicGraphicsView);
-	if (m_breadboardTraceMenu) m_breadboardTraceMenu->menuAction()->setVisible(m_currentGraphicsView == m_breadboardGraphicsView);
+	if (m_pcbTraceMenu) {
+		m_pcbTraceMenu->menuAction()->setVisible(m_currentGraphicsView == m_pcbGraphicsView);
+		if(m_currentGraphicsView == m_pcbGraphicsView) {
+			m_pcbTraceMenu->setTitle(tr("&Routing"));
+		} else {
+			m_pcbTraceMenu->setTitle(tr("Routing"));
+		}
+	}
+	if (m_schematicTraceMenu) {
+		m_schematicTraceMenu->menuAction()->setVisible(m_currentGraphicsView == m_schematicGraphicsView);
+		if(m_currentGraphicsView == m_schematicGraphicsView) {
+			m_schematicTraceMenu->setTitle(tr("&Routing"));
+		} else {
+			m_schematicTraceMenu->setTitle(tr("Routing"));
+		}
+	}
+	if (m_breadboardTraceMenu) {
+		m_breadboardTraceMenu->menuAction()->setVisible(m_currentGraphicsView == m_breadboardGraphicsView);
+		if(m_currentGraphicsView == m_breadboardGraphicsView) {
+			m_breadboardTraceMenu->setTitle(tr("&Routing"));
+		} else {
+			m_breadboardTraceMenu->setTitle(tr("Routing"));
+		}
+	}
 }
 
 void MainWindow::createTraceMenuActions() {
@@ -2699,7 +2790,7 @@ void MainWindow::createTraceMenuActions() {
 	createOrderFabAct();
 	createActiveLayerActions();
 
-	QAction * traceAct = new QAction(tr("&Create trace from ratsnest"), this);
+	auto * traceAct = new QAction(tr("&Create trace from ratsnest"), this);
 	traceAct->setStatusTip(tr("Create a trace from the ratsnest line"));
 	m_createTraceWireAct = new WireAction(traceAct);
 	connect(m_createTraceWireAct, SIGNAL(triggered()), this, SLOT(createTrace()));
@@ -2765,9 +2856,17 @@ void MainWindow::createTraceMenuActions() {
 	m_groundFillAct->setStatusTip(tr("Fill empty regions of the copper layer--fill will include all traces connected to a GROUND"));
 	connect(m_groundFillAct, SIGNAL(triggered()), this, SLOT(groundFill()));
 
+	m_groundFillOldAct = new QAction(tr("Old Ground Fill"), this);
+	m_groundFillOldAct->setStatusTip(tr("Fill empty regions of the copper layer--fill will include all traces connected to a GROUND"));
+	connect(m_groundFillOldAct, SIGNAL(triggered()), this, SLOT(groundFillOld()));
+
 	m_copperFillAct = new QAction(tr("Copper Fill"), this);
 	m_copperFillAct->setStatusTip(tr("Fill empty regions of the copper layer--not including traces connected to a GROUND"));
 	connect(m_copperFillAct, SIGNAL(triggered()), this, SLOT(copperFill()));
+
+	m_copperFillOldAct = new QAction(tr("Old Copper Fill"), this);
+	m_copperFillOldAct->setStatusTip(tr("Fill empty regions of the copper layer--not including traces connected to a GROUND"));
+	connect(m_copperFillOldAct, SIGNAL(triggered()), this, SLOT(copperFillOld()));
 
 	m_removeGroundFillAct = new QAction(tr("Remove Copper Fill"), this);
 	m_removeGroundFillAct->setStatusTip(tr("Remove the copper fill"));
@@ -2790,23 +2889,17 @@ void MainWindow::createTraceMenuActions() {
 	m_setGroundFillKeepoutAct->setStatusTip(tr("Set the minimum distance between ground fill and traces or connectors"));
 	connect(m_setGroundFillKeepoutAct, SIGNAL(triggered()), this, SLOT(setGroundFillKeepout()));
 
-
-
 	m_newDesignRulesCheckAct = new QAction(tr("Design Rules Check (DRC)"), this);
 	m_newDesignRulesCheckAct->setStatusTip(tr("Highlights any parts that are too close together for safe board production"));
 	m_newDesignRulesCheckAct->setShortcut(tr("Shift+Ctrl+D"));
 	connect(m_newDesignRulesCheckAct, SIGNAL(triggered()), this, SLOT(newDesignRulesCheck()));
-
-	m_checkLoadedTracesAct = new QAction(tr("Check Loaded Traces"), this);
-	m_checkLoadedTracesAct->setStatusTip(tr("Select any traces where the screen location doesn't match the actual location. Only needed for sketches autorouted with version 0.7.10 or earlier"));
-	connect(m_checkLoadedTracesAct, SIGNAL(triggered()), this, SLOT(checkLoadedTraces()));
 
 	m_autorouterSettingsAct = new QAction(tr("Autorouter/DRC settings..."), this);
 	m_autorouterSettingsAct->setStatusTip(tr("Set autorouting parameters including keepout..."));
 	connect(m_autorouterSettingsAct, SIGNAL(triggered()), this, SLOT(autorouterSettings()));
 
 	m_fabQuoteAct = new QAction(tr("Fritzing Fab Quote..."), this);
-	m_fabQuoteAct->setStatusTip(tr("How much would it could to produce a PCB from this sketch with Fritzing Fab"));
+	m_fabQuoteAct->setStatusTip(tr("How much would it cost to produce a PCB from this sketch with Fritzing Fab"));
 	connect(m_fabQuoteAct, SIGNAL(triggered()), this, SLOT(fabQuote()));
 
 }
@@ -2849,8 +2942,8 @@ void MainWindow::createActiveLayerActions() {
 }
 
 void MainWindow::activeLayerBoth() {
-	PCBSketchWidget * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
-	if (pcbSketchWidget == NULL) return;
+	auto * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
+	if (pcbSketchWidget == nullptr) return;
 
 	pcbSketchWidget->setLayerActive(ViewLayer::Copper1, true);
 	pcbSketchWidget->setLayerActive(ViewLayer::Copper0, true);
@@ -2861,8 +2954,8 @@ void MainWindow::activeLayerBoth() {
 }
 
 void MainWindow::activeLayerTop() {
-	PCBSketchWidget * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
-	if (pcbSketchWidget == NULL) return;
+	auto * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
+	if (pcbSketchWidget == nullptr) return;
 
 	pcbSketchWidget->setLayerActive(ViewLayer::Copper1, true);
 	pcbSketchWidget->setLayerActive(ViewLayer::Silkscreen1, true);
@@ -2873,8 +2966,8 @@ void MainWindow::activeLayerTop() {
 }
 
 void MainWindow::activeLayerBottom() {
-	PCBSketchWidget * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
-	if (pcbSketchWidget == NULL) return;
+	auto * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
+	if (pcbSketchWidget == nullptr) return;
 
 	pcbSketchWidget->setLayerActive(ViewLayer::Copper1, false);
 	pcbSketchWidget->setLayerActive(ViewLayer::Silkscreen1, false);
@@ -2886,8 +2979,8 @@ void MainWindow::activeLayerBottom() {
 
 void MainWindow::toggleActiveLayer()
 {
-	PCBSketchWidget * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
-	if (pcbSketchWidget == NULL) return;
+	auto * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
+	if (pcbSketchWidget == nullptr) return;
 
 	int index = activeLayerIndex();
 	switch (index) {
@@ -2907,7 +3000,7 @@ void MainWindow::toggleActiveLayer()
 
 
 void MainWindow::createOrderFabAct() {
-	if (m_orderFabAct != NULL) return;
+	if (m_orderFabAct) return;
 
 	m_orderFabAct = new QAction(tr("Order a PCB..."), this);
 	m_orderFabAct->setStatusTip(tr("Order a PCB created from your sketch--from fabulous Fritzing Fab"));
@@ -2916,10 +3009,10 @@ void MainWindow::createOrderFabAct() {
 
 
 void MainWindow::newAutoroute() {
-	PCBSketchWidget * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
-	if (pcbSketchWidget == NULL) return;
+	auto * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
+	if (pcbSketchWidget == nullptr) return;
 
-	ItemBase * board = NULL;
+	ItemBase * board = nullptr;
 	if (pcbSketchWidget->autorouteTypePCB()) {
 		int boardCount;
 		board = pcbSketchWidget->findSelectedBoard(boardCount);
@@ -2928,7 +3021,7 @@ void MainWindow::newAutoroute() {
 			                      tr("Your sketch does not have a board yet!  Please add a PCB in order to use the autorouter."));
 			return;
 		}
-		if (board == NULL) {
+		if (board == nullptr) {
 			QMessageBox::critical(this, tr("Fritzing"),
 			                      tr("Please select the board you want to autoroute. The autorouter can only handle one board at a time."));
 			return;
@@ -2950,7 +3043,7 @@ void MainWindow::newAutoroute() {
 
 	pcbSketchWidget->scene()->clearSelection();
 	pcbSketchWidget->setIgnoreSelectionChangeEvents(true);
-	Autorouter * autorouter = NULL;
+	Autorouter * autorouter = nullptr;
 	autorouter = new MazeRouter(pcbSketchWidget, board, true);
 
 	connect(autorouter, SIGNAL(wantTopVisible()), this, SLOT(activeLayerTop()), Qt::DirectConnection);
@@ -2984,8 +3077,10 @@ void MainWindow::newAutoroute() {
 	pcbSketchWidget->setLayerActive(ViewLayer::Copper0, copper0Active);
 	pcbSketchWidget->setLayerActive(ViewLayer::Silkscreen0, copper0Active);
 	updateActiveLayerButtons();
-
 	ProcessEventBlocker::unblock();
+	RoutingStatus routingStatus;
+	routingStatus.zero();
+	Q_EMIT pcbSketchWidget->routingStatusSignal(pcbSketchWidget, routingStatus);
 }
 
 void MainWindow::createTrace() {
@@ -2994,10 +3089,10 @@ void MainWindow::createTrace() {
 
 void MainWindow::excludeFromAutoroute() {
 	Wire * wire = retrieveWire();
-	PCBSketchWidget * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
-	if (pcbSketchWidget == NULL) return;
+	auto * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
+	if (pcbSketchWidget == nullptr) return;
 
-	pcbSketchWidget->excludeFromAutoroute(wire == NULL ? m_excludeFromAutorouteAct->isChecked() : m_excludeFromAutorouteWireAct->isChecked());
+	pcbSketchWidget->excludeFromAutoroute(wire == nullptr ? m_excludeFromAutorouteAct->isChecked() : m_excludeFromAutorouteWireAct->isChecked());
 }
 
 void MainWindow::selectAllTraces()
@@ -3008,19 +3103,19 @@ void MainWindow::selectAllTraces()
 void MainWindow::updateRoutingStatus() {
 	RoutingStatus routingStatus;
 	routingStatus.zero();
-	m_currentGraphicsView->updateRoutingStatus(NULL, routingStatus, true);
+	m_currentGraphicsView->updateRoutingStatus(nullptr, routingStatus, true);
 }
 
 void MainWindow::selectAllExcludedTraces() {
-	PCBSketchWidget * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
-	if (pcbSketchWidget == NULL) return;
+	auto * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
+	if (pcbSketchWidget == nullptr) return;
 
 	pcbSketchWidget->selectAllExcludedTraces();
 }
 
 void MainWindow::selectAllIncludedTraces() {
-	PCBSketchWidget * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
-	if (pcbSketchWidget == NULL) return;
+	auto * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
+	if (pcbSketchWidget == nullptr) return;
 
 	pcbSketchWidget->selectAllIncludedTraces();
 }
@@ -3048,13 +3143,13 @@ void MainWindow::ensureClosable() {
 }
 
 void MainWindow::showPartLabels() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->showPartLabels(m_showPartLabelAct->data().toBool());
 }
 
 void MainWindow::addNote() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	ViewGeometry vg;
 	vg.setRect(0, 0, Note::initialMinWidth, Note::initialMinHeight);
@@ -3064,17 +3159,17 @@ void MainWindow::addNote() {
 	tl.setY(tl.y() + ((vpSize.height() - Note::initialMinHeight) / 2.0));
 	vg.setLoc(tl);
 
-	QUndoCommand * parentCommand = new QUndoCommand(tr("Add Note"));
+	auto * parentCommand = new QUndoCommand(tr("Add Note"));
 	m_currentGraphicsView->stackSelectionState(false, parentCommand);
 	m_currentGraphicsView->scene()->clearSelection();
-	new AddItemCommand(m_currentGraphicsView, BaseCommand::SingleView, ModuleIDNames::NoteModuleIDName, m_currentGraphicsView->defaultViewLayerPlacement(NULL), vg, ItemBase::getNextID(), false, -1, parentCommand);
+	new AddItemCommand(m_currentGraphicsView, BaseCommand::SingleView, ModuleIDNames::NoteModuleIDName, m_currentGraphicsView->defaultViewLayerPlacement(nullptr), vg, ItemBase::getNextID(), false, -1, parentCommand);
 	m_undoStack->push(parentCommand);
 }
 
 bool MainWindow::alreadyOpen(const QString & fileName) {
-	foreach (QWidget * widget, QApplication::topLevelWidgets()) {
-		MainWindow * mainWindow = qobject_cast<MainWindow *>(widget);
-		if (mainWindow == NULL) continue;
+	Q_FOREACH (QWidget * widget, QApplication::topLevelWidgets()) {
+		auto * mainWindow = qobject_cast<MainWindow *>(widget);
+		if (mainWindow == nullptr) continue;
 
 		// don't load two copies of the same file
 		if (mainWindow->fileName().compare(fileName) == 0) {
@@ -3092,15 +3187,15 @@ void MainWindow::enableAddBendpointAct(QGraphicsItem * graphicsItem) {
 	m_flattenCurveAct->setEnabled(false);
 
 	Wire * wire = dynamic_cast<Wire *>(graphicsItem);
-	if (wire == NULL) return;
+	if (wire == nullptr) return;
 	if (wire->getRatsnest()) return;
 
 	m_flattenCurveAct->setEnabled(wire->isCurved());
 
-	BendpointAction * bendpointAction = qobject_cast<BendpointAction *>(m_addBendpointAct);
-	BendpointAction * convertToViaAction = qobject_cast<BendpointAction *>(m_convertToViaAct);
-	FGraphicsScene * scene = qobject_cast<FGraphicsScene *>(graphicsItem->scene());
-	if (scene != NULL) {
+	auto * bendpointAction = qobject_cast<BendpointAction *>(m_addBendpointAct);
+	auto * convertToViaAction = qobject_cast<BendpointAction *>(m_convertToViaAct);
+	auto * scene = qobject_cast<FGraphicsScene *>(graphicsItem->scene());
+	if (scene) {
 		bendpointAction->setLastLocation(scene->lastContextMenuPos());
 		convertToViaAction->setLastLocation(scene->lastContextMenuPos());
 	}
@@ -3110,24 +3205,24 @@ void MainWindow::enableAddBendpointAct(QGraphicsItem * graphicsItem) {
 	if (m_currentGraphicsView->lastHoverEnterConnectorItem()) {
 		bendpointAction->setText(tr("Remove Bendpoint"));
 		bendpointAction->setLastHoverEnterConnectorItem(m_currentGraphicsView->lastHoverEnterConnectorItem());
-		bendpointAction->setLastHoverEnterItem(NULL);
+		bendpointAction->setLastHoverEnterItem(nullptr);
 		convertToViaAction->setLastHoverEnterConnectorItem(m_currentGraphicsView->lastHoverEnterConnectorItem());
-		convertToViaAction->setLastHoverEnterItem(NULL);
+		convertToViaAction->setLastHoverEnterItem(nullptr);
 		ctvEnabled = enabled = true;
 	}
 	else if (m_currentGraphicsView->lastHoverEnterItem()) {
 		bendpointAction->setText(tr("Add Bendpoint"));
 		bendpointAction->setLastHoverEnterItem(m_currentGraphicsView->lastHoverEnterItem());
-		bendpointAction->setLastHoverEnterConnectorItem(NULL);
-		convertToViaAction->setLastHoverEnterItem(NULL);
-		convertToViaAction->setLastHoverEnterConnectorItem(NULL);
+		bendpointAction->setLastHoverEnterConnectorItem(nullptr);
+		convertToViaAction->setLastHoverEnterItem(nullptr);
+		convertToViaAction->setLastHoverEnterConnectorItem(nullptr);
 		enabled = true;
 	}
 	else {
-		bendpointAction->setLastHoverEnterItem(NULL);
-		bendpointAction->setLastHoverEnterConnectorItem(NULL);
-		convertToViaAction->setLastHoverEnterItem(NULL);
-		convertToViaAction->setLastHoverEnterConnectorItem(NULL);
+		bendpointAction->setLastHoverEnterItem(nullptr);
+		bendpointAction->setLastHoverEnterConnectorItem(nullptr);
+		convertToViaAction->setLastHoverEnterItem(nullptr);
+		convertToViaAction->setLastHoverEnterConnectorItem(nullptr);
 	}
 
 	m_addBendpointAct->setEnabled(enabled);
@@ -3136,7 +3231,7 @@ void MainWindow::enableAddBendpointAct(QGraphicsItem * graphicsItem) {
 
 void MainWindow::addBendpoint()
 {
-	BendpointAction * bendpointAction = qobject_cast<BendpointAction *>(m_addBendpointAct);
+	auto * bendpointAction = qobject_cast<BendpointAction *>(m_addBendpointAct);
 
 	m_currentGraphicsView->addBendpoint(bendpointAction->lastHoverEnterItem(),
 	                                    bendpointAction->lastHoverEnterConnectorItem(),
@@ -3145,7 +3240,7 @@ void MainWindow::addBendpoint()
 
 void MainWindow::convertToVia()
 {
-	BendpointAction * bendpointAction = qobject_cast<BendpointAction *>(m_convertToViaAct);
+	auto * bendpointAction = qobject_cast<BendpointAction *>(m_convertToViaAct);
 
 	m_pcbGraphicsView->convertToVia(bendpointAction->lastHoverEnterConnectorItem());
 }
@@ -3157,49 +3252,52 @@ void MainWindow::convertToBendpoint()
 
 void MainWindow::flattenCurve()
 {
-	BendpointAction * bendpointAction = qobject_cast<BendpointAction *>(m_addBendpointAct);
+	auto * bendpointAction = qobject_cast<BendpointAction *>(m_addBendpointAct);
 
 	m_currentGraphicsView->flattenCurve(bendpointAction->lastHoverEnterItem(),
 	                                    bendpointAction->lastHoverEnterConnectorItem(),
 	                                    bendpointAction->lastLocation());
 }
 
-void MainWindow::tidyWires() {
-	m_currentGraphicsView->tidyWires();
+void MainWindow::tidyWires()
+{
+#ifndef QT_NO_DEBUG
+	m_debugConnectors->onRepairErrors();
+#endif
 }
 
 void MainWindow::copperFill() {
-	groundFillAux2(false);
+	groundFillAux2(false, false);
 }
 
 void MainWindow::groundFill()
 {
-	groundFillAux2(true);
+	groundFillAux2(true, false);
 }
 
-void MainWindow::groundFillAux2(bool fillGroundTraces) {
+void MainWindow::copperFillOld() {
+	groundFillAux2(false, true);
+}
+
+void MainWindow::groundFillOld()
+{
+	groundFillAux2(true, true);
+}
+
+void MainWindow::groundFillAux2(bool fillGroundTraces, bool useOldVersion) {
 
 	if (m_pcbGraphicsView->layerIsActive(ViewLayer::Copper0) && m_pcbGraphicsView->layerIsActive(ViewLayer::Copper1)) {
-		groundFillAux(fillGroundTraces, ViewLayer::UnknownLayer);
+		groundFillAux(fillGroundTraces, ViewLayer::UnknownLayer, useOldVersion);
 	}
 	else if (m_pcbGraphicsView->layerIsActive(ViewLayer::Copper0)) {
-		groundFillAux(fillGroundTraces, ViewLayer::GroundPlane0);
+		groundFillAux(fillGroundTraces, ViewLayer::GroundPlane0, useOldVersion);
 	}
 	else {
-		groundFillAux(fillGroundTraces, ViewLayer::GroundPlane1);
+		groundFillAux(fillGroundTraces, ViewLayer::GroundPlane1, useOldVersion);
 	}
 }
 
-void MainWindow::copperFill(ViewLayer::ViewLayerID viewLayerID) {
-	groundFillAux(false, viewLayerID);
-}
-
-void MainWindow::groundFill(ViewLayer::ViewLayerID viewLayerID)
-{
-	groundFillAux(true, viewLayerID);
-}
-
-void MainWindow::groundFillAux(bool fillGroundTraces, ViewLayer::ViewLayerID viewLayerID)
+void MainWindow::groundFillAux(bool fillGroundTraces, ViewLayer::ViewLayerID viewLayerID, bool useOldVersion)
 {
 	// TODO:
 	//		what about leftover temp files from crashes?
@@ -3207,7 +3305,7 @@ void MainWindow::groundFillAux(bool fillGroundTraces, ViewLayer::ViewLayerID vie
 	//		some polygons can be combined
 	//		remove old ground plane modules from paletteModel and database
 
-	if (m_pcbGraphicsView == NULL) return;
+	if (m_pcbGraphicsView == nullptr) return;
 
 	int boardCount;
 	ItemBase * board = m_pcbGraphicsView->findSelectedBoard(boardCount);
@@ -3216,7 +3314,7 @@ void MainWindow::groundFillAux(bool fillGroundTraces, ViewLayer::ViewLayerID vie
 		                      tr("Your sketch does not have a board yet!  Please add a PCB in order to use ground or copper fill."));
 		return;
 	}
-	if (board == NULL) {
+	if (board == nullptr) {
 		QMessageBox::critical(this, tr("Fritzing"),
 		                      tr("Please select a PCB--copper fill only works for one board at a time."));
 		return;
@@ -3225,10 +3323,16 @@ void MainWindow::groundFillAux(bool fillGroundTraces, ViewLayer::ViewLayerID vie
 
 	FileProgressDialog fileProgress(tr("Generating %1 fill...").arg(fillGroundTraces ? tr("ground") : tr("copper")), 0, this);
 	fileProgress.setIndeterminate();
-	QUndoCommand * parentCommand = new QUndoCommand(fillGroundTraces ? tr("Ground Fill") : tr("Copper Fill"));
+	auto * parentCommand = new QUndoCommand(fillGroundTraces ? tr("Ground Fill") : tr("Copper Fill"));
 	m_pcbGraphicsView->blockUI(true);
 	removeGroundFill(viewLayerID, parentCommand);
-	if (m_pcbGraphicsView->groundFill(fillGroundTraces, viewLayerID, parentCommand)) {
+	bool success = false;
+	if (useOldVersion) {
+		success = m_pcbGraphicsView->groundFillOld(fillGroundTraces, viewLayerID, parentCommand);
+	} else {
+		success = m_pcbGraphicsView->groundFill(fillGroundTraces, viewLayerID, parentCommand);
+	}
+	if (success) {
 		m_undoStack->push(parentCommand);
 	}
 	else {
@@ -3238,7 +3342,7 @@ void MainWindow::groundFillAux(bool fillGroundTraces, ViewLayer::ViewLayerID vie
 }
 
 void MainWindow::removeGroundFill() {
-	removeGroundFill(ViewLayer::UnknownLayer, NULL);
+	removeGroundFill(ViewLayer::UnknownLayer, nullptr);
 }
 
 void MainWindow::removeGroundFill(ViewLayer::ViewLayerID viewLayerID, QUndoCommand * parentCommand) {
@@ -3250,15 +3354,15 @@ void MainWindow::removeGroundFill(ViewLayer::ViewLayerID viewLayerID, QUndoComma
 		                      tr("Your sketch does not have a board yet!  Please add a PCB in order to remove copper fill."));
 		return;
 	}
-	if (board == NULL) {
+	if (board == nullptr) {
 		QMessageBox::critical(this, tr("Fritzing"),
 		                      tr("Please select a PCB--ground fill operations only work on a one board at a time."));
 		return;
 	}
 
-	foreach (QGraphicsItem * item, m_pcbGraphicsView->scene()->collidingItems(board)) {
-		ItemBase * itemBase = dynamic_cast<ItemBase *>(item);
-		if (itemBase == NULL) continue;
+	Q_FOREACH (QGraphicsItem * item, m_pcbGraphicsView->scene()->collidingItems(board)) {
+		auto * itemBase = dynamic_cast<ItemBase *>(item);
+		if (itemBase == nullptr) continue;
 		if (itemBase->moveLock()) continue;
 		if (!isGroundFill(itemBase)) continue;
 
@@ -3272,7 +3376,7 @@ void MainWindow::removeGroundFill(ViewLayer::ViewLayerID viewLayerID, QUndoComma
 	if (toDelete.count() == 0) return;
 
 
-	bool push = (parentCommand == NULL);
+	bool push = (parentCommand == nullptr);
 
 	if (push) {
 		parentCommand = new QUndoCommand(tr("Remove copper fill"));
@@ -3282,7 +3386,7 @@ void MainWindow::removeGroundFill(ViewLayer::ViewLayerID viewLayerID, QUndoComma
 	new CleanUpRatsnestsCommand(m_pcbGraphicsView, CleanUpWiresCommand::UndoOnly, parentCommand);
 
 	m_pcbGraphicsView->deleteMiddle(toDelete, parentCommand);
-	foreach (ItemBase * itemBase, toDelete) {
+	Q_FOREACH (ItemBase * itemBase, toDelete) {
 		itemBase->saveGeometry();
 		m_pcbGraphicsView->makeDeleteItemCommand(itemBase, BaseCommand::CrossView, parentCommand);
 	}
@@ -3294,7 +3398,7 @@ void MainWindow::removeGroundFill(ViewLayer::ViewLayerID viewLayerID, QUndoComma
 		m_undoStack->push(parentCommand);
 	}
 	else {
-		foreach (ItemBase * itemBase, toDelete) {
+		Q_FOREACH (ItemBase * itemBase, toDelete) {
 			// move them out of the way because they are about to be deleted anyhow
 			itemBase->setPos(itemBase->pos() + board->sceneBoundingRect().bottomRight() + QPointF(10000, 10000));
 		}
@@ -3307,21 +3411,26 @@ bool MainWindow::isGroundFill(ItemBase * itemBase) {
 
 
 QMenu *MainWindow::breadboardItemMenu() {
-	QMenu *menu = new QMenu(QObject::tr("Part"), this);
+	auto *menu = new QMenu(QObject::tr("Part"), this);
 	createRotateSubmenu(menu);
-	return viewItemMenuAux(menu);
+	viewItemMenuAux(menu);
+	auto * probe = new FProbeActions("BreadboardItem", menu);
+	return menu;
 }
 
 QMenu *MainWindow::schematicItemMenu() {
-	QMenu *menu = new QMenu(QObject::tr("Part"), this);
+	auto *menu = new QMenu(QObject::tr("Part"), this);
 	createRotateSubmenu(menu);
 	menu->addAction(m_flipHorizontalAct);
 	menu->addAction(m_flipVerticalAct);
-	return viewItemMenuAux(menu);
+	viewItemMenuAux(menu);
+	auto * probe = new FProbeActions("SchematicItem", menu);
+	return menu;
+
 }
 
 QMenu *MainWindow::pcbItemMenu() {
-	QMenu *menu = new QMenu(QObject::tr("Part"), this);
+	auto *menu = new QMenu(QObject::tr("Part"), this);
 	createRotateSubmenu(menu);
 	menu = viewItemMenuAux(menu);
 	menu->addAction(m_hidePartSilkscreenAct);
@@ -3330,18 +3439,19 @@ QMenu *MainWindow::pcbItemMenu() {
 	m_convertToBendpointSeparator = menu->addSeparator();
 	menu->addAction(m_setOneGroundFillSeedAct);
 	menu->addAction(m_clearGroundFillSeedsAct);
+	auto * probe = new FProbeActions("PCBItem", menu);
 	return menu;
 }
 
 QMenu *MainWindow::breadboardWireMenu() {
-	QMenu *menu = new QMenu(QObject::tr("Wire"), this);
+	auto *menu = new QMenu(QObject::tr("Wire"), this);
 //   createZOrderWireSubmenu(menu);
 	createZOrderSubmenu(menu);
 	menu->addSeparator();
 	m_breadboardWireColorMenu = menu->addMenu(tr("&Wire Color"));
-	foreach(QString colorName, Wire::colorNames) {
+	Q_FOREACH(QString colorName, Wire::colorNames) {
 		QString colorValue = Wire::colorTrans.value(colorName);
-		QAction * action = new QAction(colorName, this);
+		auto * action = new QAction(colorName, this);
 		m_breadboardWireColorMenu->addAction(action);
 		action->setData(colorValue);
 		action->setCheckable(true);
@@ -3362,12 +3472,12 @@ QMenu *MainWindow::breadboardWireMenu() {
 #endif
 
 	connect( menu, SIGNAL(aboutToShow()), this, SLOT(updateWireMenu()));
-
+	auto * probe = new FProbeActions("BreadboardWire", menu);
 	return menu;
 }
 
 QMenu *MainWindow::pcbWireMenu() {
-	QMenu *menu = new QMenu(QObject::tr("Wire"), this);
+	auto *menu = new QMenu(QObject::tr("Wire"), this);
 	// createZOrderWireSubmenu(menu);
 	createZOrderSubmenu(menu);
 	menu->addSeparator();
@@ -3388,20 +3498,20 @@ QMenu *MainWindow::pcbWireMenu() {
 #endif
 
 	connect(menu, SIGNAL(aboutToShow()), this, SLOT(updateWireMenu()));
-
+	auto * probe = new FProbeActions("PCBWire", menu);
 	return menu;
 }
 
 QMenu *MainWindow::schematicWireMenu() {
-	QMenu *menu = new QMenu(QObject::tr("Wire"), this);
+	auto *menu = new QMenu(QObject::tr("Wire"), this);
 	// createZOrderWireSubmenu(menu);
 	createZOrderSubmenu(menu);
 	menu->addSeparator();
 	m_schematicWireColorMenu = menu->addMenu(tr("&Wire Color"));
-	foreach(QString colorName, Wire::colorNames) {
+	Q_FOREACH(QString colorName, Wire::colorNames) {
 		QString colorValue = Wire::colorTrans.value(colorName);
 		if (colorValue == "white") continue;
-		QAction * action = new QAction(colorName, this);
+		auto * action = new QAction(colorName, this);
 		m_schematicWireColorMenu->addAction(action);
 		action->setData(colorValue);
 		action->setCheckable(true);
@@ -3420,7 +3530,7 @@ QMenu *MainWindow::schematicWireMenu() {
 #endif
 
 	connect( menu, SIGNAL(aboutToShow()), this, SLOT(updateWireMenu()));
-
+	auto * probe = new FProbeActions("SchematicWire", menu);
 	return menu;
 }
 
@@ -3434,10 +3544,7 @@ QMenu *MainWindow::viewItemMenuAux(QMenu* menu) {
 	menu->addAction(m_duplicateAct);
 	menu->addAction(m_deleteAct);
 	menu->addAction(m_deleteMinusAct);
-#ifndef QT_NO_DEBUG
-	menu->addSeparator();
-	menu->addAction(m_disconnectAllAct);
-#endif
+
 	menu->addSeparator();
 	menu->addAction(m_openInPartsEditorNewAct);
 	createAddToBinSubmenu(menu);
@@ -3448,8 +3555,12 @@ QMenu *MainWindow::viewItemMenuAux(QMenu* menu) {
 	menu->addAction(m_infoViewOnHoverAction);
 	menu->addAction(m_exportNormalizedSvgAction);
 	menu->addAction(m_exportNormalizedFlattenedSvgAction);
-	menu->addAction(m_testConnectorsAction);
 #endif
+	if (DebugDialog::enabled()) {
+		menu->addSeparator();
+		menu->addAction(m_testConnectorsAction);
+		menu->addAction(m_disconnectAllAct);
+	}
 
 	connect(
 	    menu,
@@ -3467,8 +3578,8 @@ void MainWindow::changeWireColor(bool checked) {
 		return;
 	}
 
-	QAction * action = qobject_cast<QAction *>(sender());
-	if (action == NULL) return;
+	auto * action = qobject_cast<QAction *>(sender());
+	if (action == nullptr) return;
 
 	QString colorName = action->data().toString();
 	if (colorName.isEmpty()) return;
@@ -3483,11 +3594,13 @@ void MainWindow::startSaveInstancesSlot(const QString & fileName, ModelPart *, Q
 		streamWriter.writeTextElement("originalFileName", m_fwFilename);
 	}
 
+	m_projectProperties->saveProperties(streamWriter);
+
 	if (m_pcbGraphicsView) {
 		QList<ItemBase *> boards = m_pcbGraphicsView->findBoard();
 		if (boards.count()) {
 			streamWriter.writeStartElement("boards");
-			foreach (ItemBase * board, boards) {
+			Q_FOREACH (ItemBase * board, boards) {
 				QRectF r = board->sceneBoundingRect();
 				double w = 2.54 * r.width() / GraphicsUtils::SVGDPI;
 				double h = 2.54 * r.height() / GraphicsUtils::SVGDPI;
@@ -3510,7 +3623,7 @@ void MainWindow::startSaveInstancesSlot(const QString & fileName, ModelPart *, Q
 		streamWriter.writeStartElement("programs");
 		QSettings settings;
 		streamWriter.writeAttribute("pid", settings.value("pid").toString());
-		foreach (LinkedFile * linkedFile, m_linkedProgramFiles) {
+		Q_FOREACH (LinkedFile * linkedFile, m_linkedProgramFiles) {
 			streamWriter.writeStartElement("program");
 			streamWriter.writeAttribute("language", linkedFile->platform);
 			streamWriter.writeCharacters(linkedFile->linkedFilename);
@@ -3522,7 +3635,7 @@ void MainWindow::startSaveInstancesSlot(const QString & fileName, ModelPart *, Q
 	streamWriter.writeStartElement("views");
 	QList<SketchWidget *> views;
 	views << m_breadboardGraphicsView << m_schematicGraphicsView << m_pcbGraphicsView;
-	foreach  (SketchWidget * sketchWidget, views) {
+	Q_FOREACH  (SketchWidget * sketchWidget, views) {
 		streamWriter.writeStartElement("view");
 		streamWriter.writeAttribute("name", ViewLayer::viewIDXmlName(sketchWidget->viewID()));
 		streamWriter.writeAttribute("backgroundColor", sketchWidget->background().name());
@@ -3531,7 +3644,7 @@ void MainWindow::startSaveInstancesSlot(const QString & fileName, ModelPart *, Q
 		streamWriter.writeAttribute("alignToGrid", sketchWidget->alignedToGrid() ? "1" : "0");
 		streamWriter.writeAttribute("viewFromBelow", sketchWidget->viewFromBelow() ? "1" : "0");
 		QHash<QString, QString> autorouterSettings = sketchWidget->getAutorouterSettings();
-		foreach (QString key, autorouterSettings.keys()) {
+		Q_FOREACH (QString key, autorouterSettings.keys()) {
 			streamWriter.writeAttribute(key, autorouterSettings.value(key));
 		}
 		if (sketchWidget == m_breadboardGraphicsView) {
@@ -3568,7 +3681,7 @@ void MainWindow::oldSchematicsSlot(const QString &filename, bool & useOldSchemat
 QMessageBox::StandardButton MainWindow::oldSchematicMessage(const QString & filename)
 {
 	QFileInfo info(filename);
-	FMessageBox messageBox(NULL);
+	FMessageBox messageBox;
 	messageBox.setWindowTitle(tr("Schematic view update"));
 	messageBox.setText(tr("There is a new graphics standard for schematic-view part images, beginning with version 0.8.6.\n\n") +
 	                   tr("Would you like to convert '%1' to the new standard now or open the file read-only?\n").arg(info.fileName())
@@ -3581,12 +3694,10 @@ QMessageBox::StandardButton MainWindow::oldSchematicMessage(const QString & file
 	                              tr("Note that any custom parts will not be converted. A tool for converting 'rectangular' schematic images is available in the Parts Editor.") +
 	                              + "</li></ul>"
 	                             );
-	messageBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-	messageBox.setDefaultButton(QMessageBox::Yes);
+	messageBox.setDefaultButton(messageBox.addButton(tr("Convert"), QMessageBox::YesRole));
+	messageBox.addButton(tr("Read-only"), QMessageBox::NoRole);
 	messageBox.setIcon(QMessageBox::Question);
 	messageBox.setWindowModality(Qt::WindowModal);
-	messageBox.setButtonText(QMessageBox::Yes, tr("Convert"));
-	messageBox.setButtonText(QMessageBox::No, tr("Read-only"));
 	return (QMessageBox::StandardButton) messageBox.exec();
 }
 
@@ -3624,7 +3735,7 @@ void MainWindow::loadedRootSlot(const QString & fname, ModelBase *, QDomElement 
 				path = text;
 			}
 
-			LinkedFile * linkedFile = new LinkedFile;
+			auto * linkedFile = new LinkedFile;
 			QFileInfo info(path);
 			if (!(sameMachine && info.exists())) {
 				inBundle = true;
@@ -3652,7 +3763,7 @@ void MainWindow::loadedViewsSlot(ModelBase *, QDomElement & views) {
 	while (!view.isNull()) {
 		QString name = view.attribute("name");
 		ViewLayer::ViewID viewID = ViewLayer::idFromXmlName(name);
-		SketchWidget * sketchWidget = NULL;
+		SketchWidget * sketchWidget = nullptr;
 		switch (viewID) {
 		case ViewLayer::BreadboardView:
 			sketchWidget = m_breadboardGraphicsView;
@@ -3721,12 +3832,16 @@ void MainWindow::loadedViewsSlot(ModelBase *, QDomElement & views) {
 	}
 }
 
+void MainWindow::loadedProjectPropertiesSlot(const QDomElement & projectProperties) {
+	   m_projectProperties->load(projectProperties);
+}
+
 void MainWindow::disconnectAll() {
 	m_currentGraphicsView->disconnectAll();
 }
 
 bool MainWindow::externalProcess(QString & name, QString & path, QStringList & args) {
-	emit externalProcessSignal(name, path, args);
+	Q_EMIT externalProcessSignal(name, path, args);
 
 	if (path.isEmpty()) return false;
 
@@ -3748,7 +3863,7 @@ void MainWindow::launchExternalProcess() {
 	m_externalProcessOutput.clear();
 
 	QFileInfo f = QFileInfo(path);
-	QProcess * process = new QProcess(this);
+	auto * process = new QProcess(this);
 	process->setWorkingDirectory(f.dir().absolutePath());
 	process->setProcessChannelMode(QProcess::MergedChannels);
 	process->setReadChannel(QProcess::StandardOutput);
@@ -3799,9 +3914,23 @@ void MainWindow::processStateChanged(QProcess::ProcessState newState) {
 }
 
 void MainWindow::shareOnline() {
-	QDesktopServices::openUrl(QString("http://fritzing.org/projects/create/"));
+	QUrl new_url(QString("https://fritzing.org/projects/create/"));
+	QNetworkRequest request(new_url);
+
+	QNetworkReply *reply = m_manager.get(request);
+	connect(reply, SIGNAL(finished()), this, SLOT(onShareOnlineFinished()));
 }
 
+void MainWindow::onShareOnlineFinished() {
+	auto *reply = qobject_cast<QNetworkReply*>(sender());
+
+	if (reply->error() == QNetworkReply::NoError) {
+		QDesktopServices::openUrl(QString("https://fritzing.org/projects/create/"));
+	} else {
+		FMessageBox::critical(this, tr("Fritzing"), QString("Online sharing is currently not available."));
+	}
+	reply->deleteLater();
+}
 
 void MainWindow::selectAllObsolete() {
 	selectAllObsolete(true);
@@ -3848,13 +3977,13 @@ ModelPart * MainWindow::findReplacedby(ModelPart * originalModelPart) {
 	while (true) {
 		QString newModuleID = newModelPart->replacedby();
 		if (newModuleID.isEmpty()) {
-			return ((newModelPart == originalModelPart) ? NULL : newModelPart);
+			return ((newModelPart == originalModelPart) ? nullptr : newModelPart);
 		}
 
 		ModelPart * tempModelPart = this->m_referenceModel->retrieveModelPart(newModuleID);
-		if (tempModelPart == NULL) {
+		if (tempModelPart == nullptr) {
 			// something's screwy
-			return NULL;
+			return nullptr;
 		}
 
 		newModelPart = tempModelPart;
@@ -3870,9 +3999,9 @@ void MainWindow::swapObsolete(bool displayFeedback, QList<ItemBase *> & items) {
 	QSet<ItemBase *> itemBases;
 
 	if (items.count() == 0) {
-		foreach (QGraphicsItem * item, m_pcbGraphicsView->scene()->selectedItems()) {
-			ItemBase * itemBase = dynamic_cast<ItemBase *>(item);
-			if (itemBase == NULL) continue;
+		Q_FOREACH (QGraphicsItem * item, m_pcbGraphicsView->scene()->selectedItems()) {
+			auto * itemBase = dynamic_cast<ItemBase *>(item);
+			if (itemBase == nullptr) continue;
 			if (!itemBase->isObsolete()) continue;
 
 			itemBase = itemBase->layerKinChief();
@@ -3882,15 +4011,15 @@ void MainWindow::swapObsolete(bool displayFeedback, QList<ItemBase *> & items) {
 		if (itemBases.count() <= 0) return;
 	}
 	else {
-		foreach (ItemBase * itemBase, items) itemBases.insert(itemBase);
+		Q_FOREACH (ItemBase * itemBase, items) itemBases.insert(itemBase);
 	}
 
-	QUndoCommand* parentCommand = new QUndoCommand();
+	auto* parentCommand = new QUndoCommand();
 	int count = 0;
 	QMap<QString, QString> propsMap;
-	foreach (ItemBase * itemBase, itemBases) {
+	Q_FOREACH (ItemBase * itemBase, itemBases) {
 		ModelPart * newModelPart = findReplacedby(itemBase->modelPart());
-		if (newModelPart == NULL) {
+		if (newModelPart == nullptr) {
 			FMessageBox::information(
 			    this,
 			    tr("Sorry!"),
@@ -3966,14 +4095,14 @@ void MainWindow::throwFakeException() {
 }
 
 void MainWindow::alignToGrid() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->alignToGrid(m_alignToGridAct->isChecked());
 	setWindowModified(true);
 }
 
 void MainWindow::showGrid() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->showGrid(m_showGridAct->isChecked());
 	setWindowModified(true);
@@ -3989,11 +4118,11 @@ void MainWindow::setGridSize()
 	GridSizeDialog dialog(&gridSizeThing);
 	dialog.setWindowTitle(QObject::tr("Set Grid Size"));
 
-	QVBoxLayout * vLayout = new QVBoxLayout(&dialog);
+	auto * vLayout = new QVBoxLayout(&dialog);
 
 	vLayout->addWidget(createGridSizeForm(&gridSizeThing));
 
-	QDialogButtonBox * buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+	auto * buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
 	buttonBox->button(QDialogButtonBox::Cancel)->setText(tr("Cancel"));
 	buttonBox->button(QDialogButtonBox::Ok)->setText(tr("OK"));
 
@@ -4014,18 +4143,18 @@ void MainWindow::setGridSize()
 QWidget * MainWindow::createGridSizeForm(GridSizeThing * gridSizeThing)
 {
 	this->setObjectName("gridSizeDia");
-	QGroupBox * over = new QGroupBox("", this);
+	auto * over = new QGroupBox("", this);
 
-	QVBoxLayout * vLayout = new QVBoxLayout();
+	auto * vLayout = new QVBoxLayout();
 
-	QLabel * explain = new QLabel(tr("Set the grid size for %1.").arg(gridSizeThing->viewName));
+	auto * explain = new QLabel(tr("Set the grid size for %1.").arg(gridSizeThing->viewName));
 	vLayout->addWidget(explain);
 
-	QGroupBox * groupBox = new QGroupBox(this);
+	auto * groupBox = new QGroupBox(this);
 
-	QHBoxLayout * hLayout = new QHBoxLayout();
+	auto * hLayout = new QHBoxLayout();
 
-	QLabel * label = new QLabel(tr("Grid Size:"));
+	auto * label = new QLabel(tr("Grid Size:"));
 	hLayout->addWidget(label);
 
 	gridSizeThing->lineEdit = new QLineEdit();
@@ -4051,7 +4180,7 @@ QWidget * MainWindow::createGridSizeForm(GridSizeThing * gridSizeThing)
 	vLayout->addWidget(groupBox);
 	vLayout->addSpacing(5);
 
-	QPushButton * pushButton = new QPushButton(this);
+	auto * pushButton = new QPushButton(this);
 	pushButton->setText(tr("Restore Default"));
 	pushButton->setMaximumWidth(150);
 	vLayout->addWidget(pushButton);
@@ -4084,7 +4213,7 @@ QWidget * MainWindow::createGridSizeForm(GridSizeThing * gridSizeThing)
 }
 
 void MainWindow::colorWiresByLength() {
-	if (m_breadboardGraphicsView == NULL) return;
+	if (m_breadboardGraphicsView == nullptr) return;
 
 	m_breadboardGraphicsView->colorWiresByLength(m_colorWiresByLengthAct->isChecked());
 	setWindowModified(true);
@@ -4119,7 +4248,7 @@ void MainWindow::linkToProgramFile(const QString & filename, Platform * platform
 
 	if (addLink && strong) {
 		bool gotOne = false;
-		foreach (LinkedFile * linkedFile, m_linkedProgramFiles) {
+		Q_FOREACH (LinkedFile * linkedFile, m_linkedProgramFiles) {
 			if (linkedFile->linkedFilename.compare(filename, sensitivity) == 0) {
 				if (linkedFile->platform != platform->getName()) {
 					linkedFile->platform = platform->getName();
@@ -4130,7 +4259,7 @@ void MainWindow::linkToProgramFile(const QString & filename, Platform * platform
 			}
 		}
 		if (!gotOne) {
-			LinkedFile * linkedFile = new LinkedFile;
+			auto * linkedFile = new LinkedFile;
 			linkedFile->linkedFilename = filename;
 			linkedFile->platform = platform->getName();
 			m_linkedProgramFiles.append(linkedFile);
@@ -4167,12 +4296,12 @@ QStringList MainWindow::newDesignRulesCheck(bool showOkMessage)
 {
 	QStringList results;
 
-	if (m_currentGraphicsView == NULL) return results;
+	if (m_currentGraphicsView == nullptr) return results;
 
-	PCBSketchWidget * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
-	if (pcbSketchWidget == NULL) return results;
+	auto * pcbSketchWidget = qobject_cast<PCBSketchWidget *>(m_currentGraphicsView);
+	if (pcbSketchWidget == nullptr) return results;
 
-	ItemBase * board = NULL;
+	ItemBase * board = nullptr;
 	if (pcbSketchWidget->autorouteTypePCB()) {
 		int boardCount;
 		board = pcbSketchWidget->findSelectedBoard(boardCount);
@@ -4182,7 +4311,7 @@ QStringList MainWindow::newDesignRulesCheck(bool showOkMessage)
 			FMessageBox::critical(this, tr("Fritzing"), message);
 			return results;
 		}
-		if (board == NULL) {
+		if (board == nullptr) {
 			QString message = tr("Please select a PCB. DRC only works on one board at a time.");
 			results << message;
 			FMessageBox::critical(this, tr("Fritzing"), message);
@@ -4228,23 +4357,23 @@ QStringList MainWindow::newDesignRulesCheck(bool showOkMessage)
 }
 
 void MainWindow::changeTraceLayer() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 	if (m_currentGraphicsView != m_pcbGraphicsView) return;
 
 	Wire * wire = retrieveWire();
-	m_pcbGraphicsView->changeTraceLayer(wire, false, NULL);
+	m_pcbGraphicsView->changeTraceLayer(wire, false, nullptr);
 }
 
 Wire * MainWindow::retrieveWire() {
-	WireAction * wireAction = qobject_cast<WireAction *>(sender());
-	if (wireAction == NULL) return NULL;
+	auto * wireAction = qobject_cast<WireAction *>(sender());
+	if (wireAction == nullptr) return nullptr;
 
 	return wireAction->wire();
 }
 
 ConnectorItem * MainWindow::retrieveConnectorItem() {
-	ConnectorItemAction * connectorItemAction = qobject_cast<ConnectorItemAction *>(sender());
-	if (connectorItemAction == NULL) return NULL;
+	auto * connectorItemAction = qobject_cast<ConnectorItemAction *>(sender());
+	if (connectorItemAction == nullptr) return nullptr;
 
 	return connectorItemAction->connectorItem();
 }
@@ -4254,8 +4383,8 @@ void MainWindow::setSticky()
 	QList<QGraphicsItem *> items = m_currentGraphicsView->scene()->selectedItems();
 	if (items.count() < 1) return;
 
-	ItemBase * itemBase = dynamic_cast<ItemBase *>(items.at(0));
-	if (itemBase == NULL) return;
+	auto * itemBase = dynamic_cast<ItemBase *>(items.at(0));
+	if (itemBase == nullptr) return;
 
 	if (!itemBase->isBaseSticky()) return;
 
@@ -4266,9 +4395,9 @@ void MainWindow::moveLock()
 {
 	bool moveLock = true;
 
-	foreach (QGraphicsItem  * item, m_currentGraphicsView->scene()->selectedItems()) {
+	Q_FOREACH (QGraphicsItem  * item, m_currentGraphicsView->scene()->selectedItems()) {
 		ItemBase * itemBase = ItemBase::extractTopLevelItemBase(item);
-		if (itemBase == NULL) continue;
+		if (itemBase == nullptr) continue;
 		if (itemBase->itemType() == ModelPart::Wire) continue;
 
 		if (itemBase->moveLock()) {
@@ -4278,9 +4407,9 @@ void MainWindow::moveLock()
 	}
 
 	ItemBase * viewedItem = m_infoView->currentItem();
-	foreach (QGraphicsItem  * item, m_currentGraphicsView->scene()->selectedItems()) {
+	Q_FOREACH (QGraphicsItem  * item, m_currentGraphicsView->scene()->selectedItems()) {
 		ItemBase * itemBase = ItemBase::extractTopLevelItemBase(item);
-		if (itemBase == NULL) continue;
+		if (itemBase == nullptr) continue;
 		if (itemBase->itemType() == ModelPart::Wire) continue;
 
 		itemBase->setMoveLock(moveLock);
@@ -4301,9 +4430,66 @@ void MainWindow::autorouterSettings() {
 	m_pcbGraphicsView->autorouterSettings();
 }
 
+bool MainWindow::hasCopperFill() {
+	Q_FOREACH(QGraphicsItem* item, m_pcbGraphicsView->scene()->items()) {
+	    auto * base = dynamic_cast<GroundPlane *>(item);
+	    if (base) {
+		return true;
+	    }
+	}
+	return false;
+}
+
 void MainWindow::orderFab()
 {
-	QDesktopServices::openUrl(QString("http://fab.fritzing.org/"));
+	// save project if not cleanMainWindow::
+	if (MainWindow::save()) {
+		if (!hasCopperFill()) {
+			const QString notShowAgain = QString("UploadCopperFillnotShowAgain");
+			QSettings settings;
+
+			QCheckBox *notAgain = new QCheckBox(tr("Don't show this again."));
+
+			QMessageBox box(this);
+			box.setWindowTitle(tr("Missing copper fill"));
+			box.setText(tr("It is recommended to add copper/ground fill to your circuit to reduce acid usage during production.\n\nContinue upload?"));
+			box.setIcon(QMessageBox::Icon::Question);
+			QPushButton* cancelButton = box.addButton(QMessageBox::Cancel);
+			box.addButton(QMessageBox::Ok);
+			box.setDefaultButton(QMessageBox::Cancel);
+			box.setCheckBox(notAgain);
+
+			// Load the setting
+			notAgain->setChecked(settings.value(notShowAgain, false).toBool());
+
+			// If the checkbox is checked, don't show the message box
+			if (!notAgain->isChecked()) {
+				QObject::connect(notAgain, &QCheckBox::stateChanged, [&cancelButton](int state){
+				    cancelButton->setEnabled(state == Qt::Unchecked);
+				});
+
+				int ret = box.exec();
+
+				// Save the setting
+				settings.setValue(notShowAgain, notAgain->isChecked());
+
+				if (ret != QMessageBox::Ok) {
+				    return;
+				}
+			}
+		}
+		// upload
+		auto* manager = new QNetworkAccessManager();
+		int boardCount;
+		double width, height;
+		QString boardTitle;
+		m_pcbGraphicsView->calcBoardDimensions(boardCount, width, height, boardTitle);
+		FabUploadDialog upload(manager, m_fwFilename, width, height, boardCount, boardTitle, this);
+		upload.exec();
+		delete manager;
+	} else {
+		FMessageBox::information(this, tr("Fritzing Fab Upload"), tr("Please first save your project in order to upload it."));
+	}
 }
 
 void MainWindow::setGroundFillSeeds() {
@@ -4314,7 +4500,7 @@ void MainWindow::setGroundFillSeeds() {
 		                      tr("Your sketch does not have a board yet! Please add a PCB in order to use copper fill operations."));
 		return;
 	}
-	if (board == NULL) {
+	if (board == nullptr) {
 		QMessageBox::critical(this, tr("Fritzing"),
 		                      tr("Please select a PCB. Copper fill operations only work on one board at a time."));
 		return;
@@ -4331,7 +4517,7 @@ void MainWindow::clearGroundFillSeeds() {
 		                      tr("Your sketch does not have a board yet! Please add a PCB in order to use copper fill operations."));
 		return;
 	}
-	if (board == NULL) {
+	if (board == nullptr) {
 		QMessageBox::critical(this, tr("Fritzing"),
 		                      tr("Please select a PCB. Copper fill operations only work on one board at a time."));
 		return;
@@ -4341,13 +4527,13 @@ void MainWindow::clearGroundFillSeeds() {
 }
 
 void MainWindow::setOneGroundFillSeed() {
-	ConnectorItemAction * action = qobject_cast<ConnectorItemAction *>(sender());
-	if (action == NULL) return;
+	auto * action = qobject_cast<ConnectorItemAction *>(sender());
+	if (action == nullptr) return;
 
 	ConnectorItem * connectorItem = action->connectorItem();
-	if (connectorItem == NULL) return;
+	if (connectorItem == nullptr) return;
 
-	GroundFillSeedCommand * command = new GroundFillSeedCommand(m_pcbGraphicsView, NULL);
+	auto * command = new GroundFillSeedCommand(m_pcbGraphicsView, nullptr);
 	command->addItem(connectorItem->attachedToID(), connectorItem->connectorSharedID(), action->isChecked());
 
 	m_undoStack->push(command);
@@ -4355,10 +4541,10 @@ void MainWindow::setOneGroundFillSeed() {
 
 void MainWindow::gridUnits(bool checked) {
 	QWidget * widget = qobject_cast<QWidget *>(sender());
-	if (widget == NULL) return;
+	if (widget == nullptr) return;
 
-	GridSizeDialog * dialog = qobject_cast<GridSizeDialog *>(widget->window());
-	if (dialog == NULL) return;
+	auto * dialog = qobject_cast<GridSizeDialog *>(widget->window());
+	if (dialog == nullptr) return;
 
 	GridSizeThing * gridSizeThing = dialog->gridSizeThing();
 
@@ -4383,10 +4569,10 @@ void MainWindow::gridUnits(bool checked) {
 
 void MainWindow::restoreDefaultGrid() {
 	QWidget * widget = qobject_cast<QWidget *>(sender());
-	if (widget == NULL) return;
+	if (widget == nullptr) return;
 
-	GridSizeDialog * dialog = qobject_cast<GridSizeDialog *>(widget->window());
-	if (dialog == NULL) return;
+	auto * dialog = qobject_cast<GridSizeDialog *>(widget->window());
+	if (dialog == nullptr) return;
 
 	GridSizeThing * gridSizeThing = dialog->gridSizeThing();
 
@@ -4430,7 +4616,7 @@ void MainWindow::fabQuote() {
 void MainWindow::findPartInSketch() {
 	static QString lastSearchText;
 
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	bool ok;
 	QString text = QInputDialog::getText(this, tr("Enter Text"),
@@ -4440,79 +4626,88 @@ void MainWindow::findPartInSketch() {
 
 	lastSearchText = text;
 	QSet<ItemBase *> itemBases;
-	foreach (QGraphicsItem * item, m_currentGraphicsView->scene()->items()) {
-		ItemBase * itemBase = dynamic_cast<ItemBase *>(item);
-		if (itemBase == NULL) continue;
+	Q_FOREACH (QGraphicsItem * item, m_currentGraphicsView->scene()->items()) {
+		auto * itemBase = dynamic_cast<ItemBase *>(item);
+		if (itemBase == nullptr) continue;
 
 		itemBases.insert(itemBase->layerKinChief());
 	}
 
 	QStringList strings;
 	strings << text;
-	QList<ItemBase *> matched;
-	foreach (ItemBase * itemBase, itemBases) {
+	QList<ItemBase *> exactMatched;
+	QList<ItemBase *> partialMatched;
 
-#ifndef QT_NO_DEBUG
-		if (QString::number(itemBase->id()).contains(text)) {
-			matched << itemBase;
-			continue;
+	// Iterate through all item bases to find matches.
+	Q_FOREACH (ItemBase *itemBase, itemBases) {
+		if (DebugDialog::enabled()) {
+			if (QString::number(itemBase->id()).contains(text)) {
+				partialMatched << itemBase;
+				continue;
+			}
 		}
-#endif
 
-		if (itemBase->instanceTitle().contains(text, Qt::CaseInsensitive)) {
-			matched << itemBase;
+		// Prioritize exact matches on title
+		if (itemBase->instanceTitle().compare(text, Qt::CaseInsensitive) == 0) {
+			exactMatched << itemBase;
+			continue;
+		} else if (itemBase->instanceTitle().contains(text, Qt::CaseInsensitive)) {
+			partialMatched << itemBase;
 			continue;
 		}
 
 		QList<ModelPart *> modelParts;
 		m_referenceModel->search(itemBase->modelPart(), strings, modelParts, true);
-		if (modelParts.count() > 0) {
-			matched << itemBase;
+		if (!modelParts.isEmpty()) {
+			partialMatched << itemBase;
 		}
 	}
 
-	if (matched.count() == 0) {
+	QList<ItemBase *> matched = partialMatched + exactMatched;
+
+	if (matched.isEmpty()) {
 		QMessageBox::information(this, tr("Search"), tr("No parts matched search term '%1'.").arg(text));
 		return;
 	}
 
 	m_currentGraphicsView->selectItems(matched);
+	m_currentGraphicsView->setFocus();
 }
 
 void MainWindow::setGroundFillKeepout() {
-	if (m_pcbGraphicsView != NULL) m_pcbGraphicsView->setGroundFillKeepout();
+	if (m_pcbGraphicsView) m_pcbGraphicsView->setGroundFillKeepout();
 }
 
 void MainWindow::setViewFromBelowToggle() {
-	if (m_pcbGraphicsView != NULL) {
+	if (m_pcbGraphicsView) {
 		m_pcbGraphicsView->setViewFromBelow(m_viewFromBelowToggleAct->isChecked());
 		updateActiveLayerButtons();
 	}
 }
 
 void MainWindow::setViewFromBelow() {
-	if (m_pcbGraphicsView != NULL) {
+	if (m_pcbGraphicsView) {
 		m_pcbGraphicsView->setViewFromBelow(true);
 		updateActiveLayerButtons();
 	}
 }
 
 void MainWindow::setViewFromAbove() {
-	if (m_pcbGraphicsView != NULL) {
+	if (m_pcbGraphicsView) {
 		m_pcbGraphicsView->setViewFromBelow(false);
 		updateActiveLayerButtons();
 	}
 }
 
 void MainWindow::updateExportMenu() {
-	bool enabled = m_currentGraphicsView != NULL;
-	foreach (QAction * action, m_exportMenu->actions()) {
+	bool enabled = m_currentGraphicsView;
+	Q_FOREACH (QAction * action, m_exportMenu->actions()) {
 		action->setEnabled(enabled);
 	}
 }
 
 void MainWindow::testConnectors() {
-	if (m_currentGraphicsView == NULL) return;
+	if (m_currentGraphicsView == nullptr) return;
 
 	m_currentGraphicsView->testConnectors();
 }

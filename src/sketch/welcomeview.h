@@ -33,6 +33,33 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QListWidget>
 #include <QPainter>
 #include <QAbstractItemDelegate>
+#include <QPushButton>
+#include <QHBoxLayout>
+
+class CustomListItem : public QWidget {
+	Q_OBJECT
+
+public:
+	explicit CustomListItem(const QString &leftText, const QIcon &leftIcon, const QString &leftData,
+				const QString &rightText, const QIcon &rightIcon, const QString &rightData,
+				int listWidgetWidth, QWidget *parent = nullptr);
+	QSize sizeHint() const;
+
+signals:
+	void leftItemClicked(const QString &data);
+	void rightItemClicked(const QString &data);
+
+private slots:
+	void onLeftButtonClicked();
+	void onRightButtonClicked();
+
+private:
+	QPushButton *leftButton;
+	QPushButton *rightButton;
+	QString leftData;
+	QString rightData;
+	QSize m_iconSize;
+};
 
 class BlogListWidget : public QListWidget
 {
@@ -82,7 +109,7 @@ public:
 
 	QStringList & imageRequestList();
 
-public slots:
+public Q_SLOTS:
 	void itemEnteredSlot(QListWidgetItem *);
 
 protected:
@@ -109,7 +136,7 @@ class WelcomeView : public QFrame
 
 public:
 	WelcomeView(QWidget * parent = 0);
-	~WelcomeView();
+	~WelcomeView() = default;
 
 	void showEvent(QShowEvent * event);
 	void dragEnterEvent(QDragEnterEvent *event);
@@ -132,35 +159,34 @@ protected:
     QFrame * createHeaderFrame(const QString & url1, const QString & urlText1, const QString & url2, const QString & urlText2, const QString & inactiveColor, const QString & activeColor, QLabel * & label1, QLabel * & label2);
 
 
-signals:
+Q_SIGNALS:
 	void newSketch();
 	void openSketch();
 	void recentSketch(const QString & filename, const QString & actionText);
 
-protected slots:
+protected Q_SLOTS:
 	void clickRecent(const QString &);
 	void gotBlogSnippet(QNetworkReply *);
 	void gotBlogImage(QNetworkReply *);
 	void clickBlog(const QString &);
-	void recentItemClicked(QListWidgetItem *);
+	void recentSketchClicked(const QString &data);
+	void uploadLinkClicked(const QString &data);
 	void blogItemClicked(QListWidgetItem *);
 	void nextTip();
 
 protected:
-	BlogListWidget * m_blogListWidget;
-	BlogListWidget * m_projectListWidget;
-	QWidget * m_blogUberFrame;
-	QWidget * m_projectsUberFrame;
-	QLabel * m_tip;
-	QListWidget * m_recentListWidget;
-	QWidget * m_fabUberFrame;
-	QWidget * m_shopUberFrame;
-    QWidget * m_donateUberFrame;
-	QLabel * m_projectsLabel;
-	QLabel * m_blogLabel;
-	QLabel * m_fabLabel;
-	QLabel * m_shopLabel;
-    QLabel * m_donateLabel;
+	BlogListWidget * m_blogListWidget = nullptr;
+	BlogListWidget * m_projectListWidget = nullptr;
+	QWidget * m_blogUberFrame = nullptr;
+	QWidget * m_projectsUberFrame = nullptr;
+	QLabel * m_tip = nullptr;
+	QListWidget * m_recentListWidget = nullptr;
+	QWidget * m_fabUberFrame = nullptr;
+	QWidget * m_shopUberFrame = nullptr;
+	QLabel * m_projectsLabel = nullptr;
+	QLabel * m_blogLabel = nullptr;
+	QLabel * m_fabLabel = nullptr;
+	QLabel * m_shopLabel = nullptr;
 
 	static QString m_activeHeaderLabelColor;
 	static QString m_inactiveHeaderLabelColor;
@@ -169,6 +195,7 @@ protected:
 
 class BlogListDelegate : public QAbstractItemDelegate
 {
+	Q_OBJECT
 public:
 	BlogListDelegate(QObject *parent = 0);
 	virtual ~BlogListDelegate();

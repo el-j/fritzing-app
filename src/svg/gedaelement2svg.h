@@ -42,10 +42,10 @@ protected:
 	void fixQuad(int quad, double & px, double & py);
 	int reflectQuad(int angle, int & quad);
 	QString getPinID(QString & number, QString & name, bool isPad);
-	QString makeCopper(QStringList ids, QHash<QString, QString> &, const QString & filename);
+	QString makeCopper(QStringList ids, QMultiHash<QString, QString> &, const QString & filename);
 
 protected:
-	int m_nonConnectorNumber;
+	int m_nonConnectorNumber = 0;
 
 };
 

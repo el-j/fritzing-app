@@ -13,6 +13,7 @@
 # along with Fritzing. If not, see <http://www.gnu.org/licenses/>.
 # ********************************************************************/
 HEADERS += \
+	src/sketch/renderthing.h \
     src/sketch/fgraphicsscene.h \
     src/sketch/breadboardsketchwidget.h \
     src/sketch/infographicsview.h \
@@ -21,9 +22,12 @@ HEADERS += \
     src/sketch/sketchwidget.h \
     src/sketch/welcomeview.h \
     src/sketch/zoomablegraphicsview.h \
+    src/sketch/subpartswapmanager.h \
+	src/sketch/swapthing.h \
 
 
 SOURCES += \
+	src/sketch/renderthing.cpp \
     src/sketch/fgraphicsscene.cpp \
     src/sketch/breadboardsketchwidget.cpp \
     src/sketch/infographicsview.cpp \
@@ -32,3 +36,5 @@ SOURCES += \
     src/sketch/sketchwidget.cpp \
     src/sketch/welcomeview.cpp \
     src/sketch/zoomablegraphicsview.cpp \
+    src/sketch/subpartswapmanager.cpp \
+	src/sketch/swapthing.cpp \

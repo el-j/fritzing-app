@@ -21,6 +21,7 @@ HEADERS += src/svg/svgfilesplitter.h \
     src/svg/svgflattener.h \
     src/svg/gerbergenerator.h \
     src/svg/groundplanegenerator.h \
+    src/svg/groundplanegeneratorold.h \
     src/svg/x2svg.h \
     src/svg/kicad2svg.h \
     src/svg/kicadmodule2svg.h \
@@ -28,7 +29,9 @@ HEADERS += src/svg/svgfilesplitter.h \
     src/svg/gedaelement2svg.h \
     src/svg/gedaelementparser.h \
     src/svg/gedaelementgrammar_p.h \
-    src/svg/gedaelementlexer.h
+    src/svg/gedaelementlexer.h \
+    src/svg/clipperhelpers.h \
+    $$PWD/../src/svg/svgtext.h
 
 SOURCES += src/svg/svgfilesplitter.cpp \
     src/svg/svgpathparser.cpp \
@@ -39,6 +42,7 @@ SOURCES += src/svg/svgfilesplitter.cpp \
     src/svg/svgflattener.cpp \
     src/svg/gerbergenerator.cpp \
     src/svg/groundplanegenerator.cpp \
+    src/svg/groundplanegeneratorold.cpp \
     src/svg/x2svg.cpp \
     src/svg/kicad2svg.cpp \
     src/svg/kicadmodule2svg.cpp \
@@ -46,4 +50,5 @@ SOURCES += src/svg/svgfilesplitter.cpp \
     src/svg/gedaelement2svg.cpp \
     src/svg/gedaelementparser.cpp \
     src/svg/gedaelementgrammar.cpp \
-    src/svg/gedaelementlexer.cpp
+    src/svg/gedaelementlexer.cpp \
+    $$PWD/../src/svg/svgtext.cpp

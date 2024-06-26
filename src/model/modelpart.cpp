@@ -19,15 +19,14 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 ********************************************************************/
 
 #include "modelpart.h"
-#include "../debugdialog.h"
-#include "../connectors/connectorshared.h"
-#include "../connectors/busshared.h"
-#include "../connectors/bus.h"
-#include "../version/version.h"
-#include "../utils/folderutils.h"
-#include "../utils/textutils.h"
-#include "../items/itembase.h"
-#include "../items/partfactory.h"
+#include "connectors/connectorshared.h"
+#include "connectors/busshared.h"
+#include "connectors/bus.h"
+#include "utils/misc.h"
+#include "version/version.h"
+#include "utils/textutils.h"
+#include "items/itembase.h"
+#include "items/partfactory.h"
 
 #include <QDomElement>
 #include <QBitArray>
@@ -40,7 +39,7 @@ typedef QHash<QString, ModelPartList*> InstanceTitleIncrementHash;
 static QHash<QObject *, InstanceTitleIncrementHash *> AllInstanceTitleIncrements;
 InstanceTitleIncrementHash NullInstanceTitleIncrements;
 
-static const QRegExp InstanceTitleRegExp("^(.*[^\\d])(\\d+)$");
+static const QRegularExpression InstanceTitleRegExp("^(.*[^\\d])(\\d+)$");
 
 static const QList<ViewImage *> EmptyViewImages;
 
@@ -50,7 +49,7 @@ ModelPart::ModelPart(ItemType type)
 	: QObject()
 {
 	commonInit(type);
-	m_modelPartShared = NULL;
+	m_modelPartShared = nullptr;
 	m_index = m_nextIndex++;
 }
 
@@ -64,7 +63,7 @@ ModelPart::ModelPart(QDomDocument & domDocument, const QString & path, ItemType 
 
 void ModelPart::commonInit(ItemType type) {
 	m_type = type;
-	m_locationFlags = 0;
+	m_locationFlags = QFlags<LocationFlag>();
 	m_indexSynched = false;
 }
 
@@ -76,13 +75,13 @@ ModelPart::~ModelPart() {
 	InstanceTitleIncrementHash * itih = AllInstanceTitleIncrements.value(this);
 	if (itih) {
 		AllInstanceTitleIncrements.remove(this);
-		foreach (ModelPartList * list, itih->values()) {
+		Q_FOREACH (ModelPartList * list, itih->values()) {
 			delete list;
 		}
 		delete itih;
 	}
 
-	foreach (Connector * connector, m_connectorHash.values()) {
+	Q_FOREACH (Connector * connector, m_connectorHash.values()) {
 		delete connector;
 	}
 	m_connectorHash.clear();
@@ -91,37 +90,37 @@ ModelPart::~ModelPart() {
 }
 
 const QString & ModelPart::moduleID() const {
-	if (m_modelPartShared != NULL) return m_modelPartShared->moduleID();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->moduleID();
 
 	return ___emptyString___;
 }
 
 const QString & ModelPart::label() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->label();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->label();
 
 	return ___emptyString___;
 }
 
 const QString & ModelPart::author() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->author();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->author();
 
 	return ___emptyString___;
 }
 
 const QString & ModelPart::taxonomy() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->taxonomy();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->taxonomy();
 
 	return ___emptyString___;
 }
 
 const QString & ModelPart::uri() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->uri();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->uri();
 
 	return ___emptyString___;
 }
 
 const QDate & ModelPart::date() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->date();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->date();
 
 	static QDate tempDate;
 	tempDate = QDate::currentDate();
@@ -133,7 +132,7 @@ void ModelPart::setItemType(ItemType t) {
 }
 
 void ModelPart::copy(ModelPart * modelPart) {
-	if (modelPart == NULL) return;
+	if (modelPart == nullptr) return;
 
 	m_type = modelPart->itemType();
 	m_modelPartShared = modelPart->modelPartShared();
@@ -175,22 +174,22 @@ void ModelPart::removeViewItem(ItemBase * item) {
 }
 
 ItemBase * ModelPart::viewItem(QGraphicsScene * scene) {
-	foreach (ItemBase * itemBase, m_viewItems) {
+	Q_FOREACH (ItemBase * itemBase, m_viewItems) {
 		if (itemBase->scene() == scene) return itemBase;
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 ItemBase * ModelPart::viewItem(ViewLayer::ViewID viewID) {
-	foreach (ItemBase * itemBase, m_viewItems) {
+	Q_FOREACH (ItemBase * itemBase, m_viewItems) {
 		if (itemBase->viewID() == viewID) return itemBase;
 	}
 
-	return NULL;
+	return nullptr;
 }
 
-void ModelPart::saveInstances(const QString & fileName, QXmlStreamWriter & streamWriter, bool startDocument) {
+void ModelPart::saveInstances(const QString & fileName, QXmlStreamWriter & streamWriter, bool startDocument, bool flipAware) {
 	if (startDocument) {
 		streamWriter.writeStartDocument();
 		streamWriter.writeStartElement("module");
@@ -209,13 +208,13 @@ void ModelPart::saveInstances(const QString & fileName, QXmlStreamWriter & strea
 			streamWriter.writeTextElement("title",title);
 		}
 
-		emit startSaveInstances(fileName, this, streamWriter);
+		Q_EMIT startSaveInstances(fileName, this, streamWriter);
 
 		streamWriter.writeStartElement("instances");
 	}
 
-	if (parent() != NULL) {  // m_viewItems.size() > 0
-		saveInstance(streamWriter);
+	if (parent() != nullptr) {  // m_viewItems.size() > 0
+		saveInstance(streamWriter, flipAware);
 	}
 
 	QList<QObject *> children = this->children();
@@ -225,10 +224,10 @@ void ModelPart::saveInstances(const QString & fileName, QXmlStreamWriter & strea
 
 	QList<QObject *>::const_iterator i;
 	for (i = children.constBegin(); i != children.constEnd(); ++i) {
-		ModelPart* mp = qobject_cast<ModelPart *>(*i);
-		if (mp == NULL) continue;
+		auto* mp = qobject_cast<ModelPart *>(*i);
+		if (mp == nullptr) continue;
 
-		mp->saveInstances(fileName, streamWriter, false);
+		mp->saveInstances(fileName, streamWriter, false, flipAware);
 	}
 
 
@@ -239,14 +238,14 @@ void ModelPart::saveInstances(const QString & fileName, QXmlStreamWriter & strea
 	}
 }
 
-void ModelPart::saveInstance(QXmlStreamWriter & streamWriter)
+void ModelPart::saveInstance(QXmlStreamWriter & streamWriter, bool flipAware)
 {
 	if (localProp("ratsnest").toBool()) {
 		return;				// don't save virtual wires
 	}
 
 	streamWriter.writeStartElement("instance");
-	if (m_modelPartShared != NULL) {
+	if (m_modelPartShared != nullptr) {
 		QString moduleIdRef = m_modelPartShared->moduleID();
 		moduleIdRef.remove(PartFactory::OldSchematicPrefix);
 		streamWriter.writeAttribute("moduleIdRef", moduleIdRef);
@@ -258,7 +257,7 @@ void ModelPart::saveInstance(QXmlStreamWriter & streamWriter)
 	}
 
 	bool writeLocal = false;
-	foreach (Connector * connector, this->connectors()) {
+	Q_FOREACH (Connector * connector, this->connectors()) {
 		if (!connector->connectorLocalName().isEmpty()) {
 			writeLocal = true;
 			break;
@@ -267,18 +266,18 @@ void ModelPart::saveInstance(QXmlStreamWriter & streamWriter)
 
 	if (writeLocal) {
 		streamWriter.writeStartElement("localConnectors");
-		foreach (Connector * connector, this->connectors()) {
+		Q_FOREACH (Connector * connector, this->connectors()) {
 			if (!connector->connectorLocalName().isEmpty()) {
 				streamWriter.writeStartElement("localConnector");
 				streamWriter.writeAttribute("id", connector->connectorSharedID());
-				streamWriter.writeAttribute("name", TextUtils::stripNonValidXMLCharacters(TextUtils::escapeAnd(connector->connectorLocalName())));
+				streamWriter.writeAttribute("name", TextUtils::stripNonValidXMLCharacters(connector->connectorLocalName()));
 				streamWriter.writeEndElement();
 			}
 		}
 		streamWriter.writeEndElement();
 	}
 
-	foreach (QByteArray byteArray, dynamicPropertyNames()) {
+	Q_FOREACH (QByteArray byteArray, dynamicPropertyNames()) {
 		streamWriter.writeStartElement("property");
 		streamWriter.writeAttribute("name",  byteArray.data());
 		streamWriter.writeAttribute("value", property(byteArray.data()).toString());
@@ -299,8 +298,8 @@ void ModelPart::saveInstance(QXmlStreamWriter & streamWriter)
 
 	// tell the views to write themselves out
 	streamWriter.writeStartElement("views");
-	foreach (ItemBase * itemBase, m_viewItems) {
-		itemBase->saveInstance(streamWriter);
+	Q_FOREACH (ItemBase * itemBase, m_viewItems) {
+		itemBase->saveInstance(streamWriter, flipAware);
 	}
 	streamWriter.writeEndElement();		// views
 	streamWriter.writeEndElement();		//instance
@@ -357,14 +356,14 @@ void ModelPart::saveAsPart(QXmlStreamWriter & streamWriter, bool startDocument) 
 		QString spice = m_modelPartShared->spice();
 		if (!spice.isEmpty()) {
 			streamWriter.writeStartElement("spice");
-			QStringList lines = spice.split("\r",QString::SkipEmptyParts);
-			foreach (QString line, lines) {
+			QStringList lines = spice.split("\r",Qt::SkipEmptyParts);
+			Q_FOREACH (QString line, lines) {
 				writeTag(streamWriter, "line", line);
 			}
 			QString spiceModel = m_modelPartShared->spiceModel();
 			if (!spiceModel.isEmpty()) {
-				lines = spiceModel.split("\r",QString::SkipEmptyParts);
-				foreach (QString line, lines) {
+				lines = spiceModel.split("\r",Qt::SkipEmptyParts);
+				Q_FOREACH (QString line, lines) {
 					writeTag(streamWriter, "model", line);
 				}
 			}
@@ -380,8 +379,8 @@ void ModelPart::saveAsPart(QXmlStreamWriter & streamWriter, bool startDocument) 
 		if (startDocument) {
 			streamWriter.writeStartElement("views");
 		}
-		for (int i = 0; i < m_viewItems.size(); i++) {
-			ItemBase * item = m_viewItems[i];
+		for (auto & m_viewItem : m_viewItems) {
+			ItemBase * item = m_viewItem;
 			item->writeXml(streamWriter);
 		}
 
@@ -392,7 +391,7 @@ void ModelPart::saveAsPart(QXmlStreamWriter & streamWriter, bool startDocument) 
 		streamWriter.writeStartElement("connectors");
 		const QList< QPointer<ConnectorShared> > connectors = m_modelPartShared->connectorsShared();
 		for (int i = 0; i < connectors.count(); i++) {
-			Connector * connector = new Connector(connectors[i], this);
+			auto * connector = new Connector(connectors[i], this);
 			connector->saveAsPart(streamWriter);
 			delete connector;
 		}
@@ -401,8 +400,8 @@ void ModelPart::saveAsPart(QXmlStreamWriter & streamWriter, bool startDocument) 
 
 	QList<QObject *>::const_iterator i;
 	for (i = children().constBegin(); i != children().constEnd(); ++i) {
-		ModelPart * mp = qobject_cast<ModelPart *>(*i);
-		if (mp == NULL) continue;
+		auto * mp = qobject_cast<ModelPart *>(*i);
+		if (mp == nullptr) continue;
 
 		mp->saveAsPart(streamWriter, false);
 	}
@@ -415,10 +414,10 @@ void ModelPart::saveAsPart(QXmlStreamWriter & streamWriter, bool startDocument) 
 }
 
 void ModelPart::initConnectors(bool force) {
-	if(m_modelPartShared == NULL) return;
+	if(m_modelPartShared == nullptr) return;
 
 	if(force) {
-		foreach (Connector * connector, m_connectorHash.values()) {
+		Q_FOREACH (Connector * connector, m_connectorHash.values()) {
 			// due to craziness in the parts editor
 			// m_deletedConnectors.append(connector);
 			delete connector;
@@ -429,26 +428,26 @@ void ModelPart::initConnectors(bool force) {
 	if(m_connectorHash.count() > 0) return;		// already done
 
 	m_modelPartShared->initConnectors();
-	foreach (ConnectorShared * connectorShared, m_modelPartShared->connectorsShared()) {
-		Connector * connector = new Connector(connectorShared, this);
+	Q_FOREACH (ConnectorShared * connectorShared, m_modelPartShared->connectorsShared()) {
+		auto * connector = new Connector(connectorShared, this);
 		m_connectorHash.insert(connectorShared->id(), connector);
 	}
 	initBuses();
 }
 
 void ModelPart::clearBuses() {
-	foreach (Bus * bus, m_busHash.values()) {
+	Q_FOREACH (Bus * bus, m_busHash.values()) {
 		delete bus;
 	}
 	m_busHash.clear();
 }
 
 void ModelPart::initBuses() {
-	foreach (Connector * connector, m_connectorHash.values()) {
+	Q_FOREACH (Connector * connector, m_connectorHash.values()) {
 		BusShared * busShared = connector->connectorShared()->bus();
-		if (busShared != NULL) {
+		if (busShared != nullptr) {
 			Bus * bus = m_busHash.value(busShared->id());
-			if (bus == NULL) {
+			if (bus == nullptr) {
 				bus = new Bus(busShared, this);
 				m_busHash.insert(busShared->id(), bus);
 			}
@@ -509,7 +508,7 @@ const QDomElement & ModelPart::instanceDomElement() {
 
 const QString & ModelPart::fritzingVersion() {
 
-	if (m_modelPartShared != NULL) return m_modelPartShared->fritzingVersion();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->fritzingVersion();
 
 	return ___emptyString___;
 }
@@ -517,7 +516,7 @@ const QString & ModelPart::fritzingVersion() {
 const QString & ModelPart::title() {
 	if (!m_localTitle.isEmpty()) return m_localTitle;
 
-	if (m_modelPartShared != NULL) return m_modelPartShared->title();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->title();
 
 	return m_localTitle;
 }
@@ -527,49 +526,49 @@ void ModelPart::setLocalTitle(const QString & localTitle) {
 }
 
 const QString & ModelPart::version() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->version();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->version();
 
 	return ___emptyString___;
 }
 
 const QString & ModelPart::path() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->path();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->path();
 
 	return ___emptyString___;
 }
 
 const QString & ModelPart::description() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->description();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->description();
 
 	return ___emptyString___;
 }
 
 const QString & ModelPart::spice() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->spice();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->spice();
 
 	return ___emptyString___;
 }
 
 const QString & ModelPart::spiceModel() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->spiceModel();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->spiceModel();
 
 	return ___emptyString___;
 }
 
 const QString & ModelPart::url() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->url();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->url();
 
 	return ___emptyString___;
 }
 
 const QStringList & ModelPart::tags() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->tags();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->tags();
 
 	return ___emptyStringList___;
 }
 
 const QHash<QString,QString> & ModelPart::properties() const {
-	if (m_modelPartShared != NULL) return m_modelPartShared->properties();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->properties();
 
 	return ___emptyStringHash___;
 }
@@ -587,7 +586,7 @@ Bus * ModelPart::bus(const QString & busID) {
 }
 
 bool ModelPart::ignoreTerminalPoints() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->ignoreTerminalPoints();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->ignoreTerminalPoints();
 
 	return true;
 }
@@ -689,8 +688,8 @@ QList<ModelPart*> ModelPart::getAllParts() {
 	QList<ModelPart*> retval;
 	QList<QObject *>::const_iterator i;
 	for (i = children().constBegin(); i != children().constEnd(); ++i) {
-		ModelPart* mp = qobject_cast<ModelPart *>(*i);
-		if (mp == NULL) continue;
+		auto* mp = qobject_cast<ModelPart *>(*i);
+		if (mp == nullptr) continue;
 		retval << mp;
 	}
 
@@ -701,8 +700,8 @@ QList<ModelPart*> ModelPart::getAllNonCoreParts() {
 	QList<ModelPart*> retval;
 	QList<QObject *>::const_iterator i;
 	for (i = children().constBegin(); i != children().constEnd(); ++i) {
-		ModelPart* mp = qobject_cast<ModelPart *>(*i);
-		if (mp == NULL) continue;
+		auto* mp = qobject_cast<ModelPart *>(*i);
+		if (mp == nullptr) continue;
 
 		if(!mp->isCore()) {
 			retval << mp;
@@ -713,7 +712,7 @@ QList<ModelPart*> ModelPart::getAllNonCoreParts() {
 }
 
 bool ModelPart::hasViewID(long id) {
-	foreach (ItemBase * item, m_viewItems) {
+	Q_FOREACH (ItemBase * item, m_viewItems) {
 		if (item->id() == id) return true;
 	}
 
@@ -734,23 +733,23 @@ void ModelPart::setInstanceText(QString text) {
 
 void ModelPart::clearOldInstanceTitle(const QString & title)
 {
-	InstanceTitleIncrementHash * itih = NULL;
-	if (parent() == NULL) {
+	InstanceTitleIncrementHash * itih = nullptr;
+	if (parent() == nullptr) {
 		itih = &NullInstanceTitleIncrements;
 	}
 	else {
-		itih = AllInstanceTitleIncrements.value(parent(), NULL);
+		itih = AllInstanceTitleIncrements.value(parent(), nullptr);
 	}
 
-	if (itih == NULL) return;
+	if (itih == nullptr) return;
 
 	//DebugDialog::debug(QString("clearing title:%1 ix:%2").arg(title).arg(modelPart->modelIndex()));
 	QString prefix = title;
-	int ix = InstanceTitleRegExp.indexIn(title);
-	if (ix >= 0) {
-		prefix = InstanceTitleRegExp.cap(1);
+	QRegularExpressionMatch match;
+	if (title.contains(InstanceTitleRegExp, &match)) {
+		prefix = match.captured(1);
 	}
-	ModelPartList * modelParts = itih->value(prefix, NULL);
+	ModelPartList * modelParts = itih->value(prefix, nullptr);
 	if (modelParts) {
 		modelParts->removeOne(this);
 		//DebugDialog::debug(QString("\tc:%1").arg(modelParts->count()));
@@ -759,20 +758,20 @@ void ModelPart::clearOldInstanceTitle(const QString & title)
 
 ModelPartList * ModelPart::ensureInstanceTitleIncrements(const QString & prefix)
 {
-	InstanceTitleIncrementHash * itih = NULL;
-	if (parent() == NULL) {
+	InstanceTitleIncrementHash * itih = nullptr;
+	if (parent() == nullptr) {
 		itih = &NullInstanceTitleIncrements;
 	}
 	else {
-		itih = AllInstanceTitleIncrements.value(parent(), NULL);
-		if (itih == NULL) {
+		itih = AllInstanceTitleIncrements.value(parent(), nullptr);
+		if (itih == nullptr) {
 			itih = new InstanceTitleIncrementHash;
 			AllInstanceTitleIncrements.insert(parent(), itih);
 		}
 	}
 
-	ModelPartList * modelParts = itih->value(prefix, NULL);
-	if (modelParts == NULL) {
+	ModelPartList * modelParts = itih->value(prefix, nullptr);
+	if (modelParts == nullptr) {
 		modelParts =  new ModelPartList;
 		itih->insert(prefix, modelParts);
 	}
@@ -791,9 +790,10 @@ void ModelPart::setInstanceTitle(QString title, bool initial) {
 	m_instanceTitle = title;
 
 	QString prefix = title;
-	int ix = InstanceTitleRegExp.indexIn(title);
-	if (ix >= 0) {
-		prefix = InstanceTitleRegExp.cap(1);
+
+	QRegularExpressionMatch match;
+	if (title.contains(InstanceTitleRegExp, &match)) {
+		prefix = match.captured(1);
 		ModelPartList * modelParts = ensureInstanceTitleIncrements(prefix);
 		modelParts->append(this);
 	}
@@ -803,7 +803,7 @@ void ModelPart::setInstanceTitle(QString title, bool initial) {
 		if (m_viewItems.count() > 0) {
 			ItemBase * itemBase = m_viewItems.last();
 			if (itemBase) {
-				foreach (ItemBase * subpart, itemBase->subparts()) {
+				Q_FOREACH (ItemBase * subpart, itemBase->subparts()) {
 					subpart->setInstanceTitle("", true);   // will end up calling setSubpartInstanceTitle()
 				}
 			}
@@ -812,15 +812,15 @@ void ModelPart::setInstanceTitle(QString title, bool initial) {
 }
 
 bool ModelPart::setSubpartInstanceTitle() {
-	if (m_modelPartShared == NULL) return false;
-	if (m_modelPartShared->superpart() == NULL) return false;
+	if (m_modelPartShared == nullptr) return false;
+	if (m_modelPartShared->superpart() == nullptr) return false;
 	if (m_viewItems.count() <= 0) return false;
 
 	ItemBase * itemBase = m_viewItems.last();
-	if (itemBase == NULL) return false;
+	if (itemBase == nullptr) return false;
 
 	itemBase = itemBase->superpart();
-	if (itemBase == NULL) return false;
+	if (itemBase == nullptr) return false;
 
 	QString superTitle = itemBase->instanceTitle();
 	if (superTitle.isEmpty()) return false;
@@ -834,13 +834,14 @@ bool ModelPart::setSubpartInstanceTitle() {
 
 QString ModelPart::getNextTitle(const QString & title) {
 	QString prefix = title;
-	int ix = InstanceTitleRegExp.indexIn(title);
-	if (ix >= 0) {
-		prefix = InstanceTitleRegExp.cap(1);
+
+	QRegularExpressionMatch match;
+	if (title.contains(InstanceTitleRegExp, &match)) {
+		prefix = match.captured(1);
 	}
 	else {
 		bool allDigits = true;
-		foreach (QChar c, title) {
+		Q_FOREACH (QChar c, title) {
 			if (!c.isDigit()) {
 				allDigits = false;
 				break;
@@ -855,8 +856,8 @@ QString ModelPart::getNextTitle(const QString & title) {
 	ModelPartList * modelParts = ensureInstanceTitleIncrements(prefix);
 	int highestSoFar = 0;
 	bool gotNull = false;
-	foreach (ModelPart * modelPart, *modelParts) {
-		if (modelPart == NULL) {
+	Q_FOREACH (ModelPart * modelPart, *modelParts) {
+		if (modelPart == nullptr) {
 			gotNull = true;
 			continue;
 		}
@@ -870,7 +871,7 @@ QString ModelPart::getNextTitle(const QString & title) {
 	}
 
 	if (gotNull) {
-		modelParts->removeAll(NULL);
+		modelParts->removeAll(nullptr);
 	}
 
 	//DebugDialog::debug(QString("returning increment %1, %2").arg(prefix).arg(highestSoFar + 1));
@@ -909,19 +910,19 @@ const QStringList & ModelPart::possibleFolders() {
 }
 
 const QString & ModelPart::replacedby() {
-	if (m_modelPartShared != NULL) return m_modelPartShared->replacedby();
+	if (m_modelPartShared != nullptr) return m_modelPartShared->replacedby();
 
 	return ___emptyString___;
 }
 
 bool ModelPart::isObsolete() {
-	if (m_modelPartShared != NULL) return !m_modelPartShared->replacedby().isEmpty();
+	if (m_modelPartShared != nullptr) return !m_modelPartShared->replacedby().isEmpty();
 
 	return false;
 }
 
 bool ModelPart::flippedSMD() {
-	if (m_modelPartShared != NULL) {
+	if (m_modelPartShared != nullptr) {
 		return m_modelPartShared->flippedSMD();
 	}
 
@@ -929,7 +930,7 @@ bool ModelPart::flippedSMD() {
 }
 
 bool ModelPart::needsCopper1() {
-	if (m_modelPartShared != NULL) {
+	if (m_modelPartShared != nullptr) {
 		return m_modelPartShared->needsCopper1();
 	}
 
@@ -937,25 +938,25 @@ bool ModelPart::needsCopper1() {
 }
 
 bool ModelPart::hasViewFor(ViewLayer::ViewID viewID) {
-	if (m_modelPartShared == NULL) return false;
+	if (m_modelPartShared == nullptr) return false;
 
 	return m_modelPartShared->hasViewFor(viewID);
 }
 
 bool ModelPart::hasViewFor(ViewLayer::ViewID viewID, ViewLayer::ViewLayerID viewLayerID) {
-	if (m_modelPartShared == NULL) return false;
+	if (m_modelPartShared == nullptr) return false;
 
 	return m_modelPartShared->hasViewFor(viewID, viewLayerID);
 }
 
 QString ModelPart::hasBaseNameFor(ViewLayer::ViewID viewID) {
-	if (m_modelPartShared == NULL) return ___emptyString___;
+	if (m_modelPartShared == nullptr) return ___emptyString___;
 
 	return m_modelPartShared->hasBaseNameFor(viewID);
 }
 
 const QStringList & ModelPart::displayKeys() {
-	if (m_modelPartShared == NULL) return ___emptyStringList___;
+	if (m_modelPartShared == nullptr) return ___emptyStringList___;
 
 	return m_modelPartShared->displayKeys();
 }
@@ -968,7 +969,7 @@ ModelPart::ItemType ModelPart::itemType() const
 void ModelPart::setConnectorLocalName(const QString & id, const QString & name)
 {
 	if (id.isEmpty()) return;
-	Connector * connector = m_connectorHash.value(id, NULL);
+	Connector * connector = m_connectorHash.value(id, nullptr);
 	if (connector) {
 		connector->setConnectorLocalName(name);
 	}
@@ -978,7 +979,7 @@ QString ModelPart::connectorLocalName(const QString & id)
 {
 	if (id.isEmpty()) return "";
 
-	Connector * connector = m_connectorHash.value(id, NULL);
+	Connector * connector = m_connectorHash.value(id, nullptr);
 	if (connector) {
 		return connector->connectorLocalName();
 	}
@@ -1046,18 +1047,8 @@ void ModelPart::setImageFileName(ViewLayer::ViewID viewID, const QString & filen
 	if (m_modelPartShared) m_modelPartShared->setImageFileName(viewID, filename);
 }
 
-void ModelPart::lookForZeroConnector() {
-	if (m_modelPartShared) m_modelPartShared->lookForZeroConnector();
-}
-
-bool ModelPart::hasZeroConnector() {
-	if (m_modelPartShared) return m_modelPartShared->hasZeroConnector();
-
-	return false;
-}
-
 void ModelPart::killViewItems() {
-	foreach (ItemBase * itemBase, m_viewItems) {
+	Q_FOREACH (ItemBase * itemBase, m_viewItems) {
 		if (itemBase) delete itemBase;
 	}
 
@@ -1072,4 +1063,9 @@ bool ModelPart::hasSubparts() {
 
 void ModelPart::setSubpartID(const QString & id) {
 	if (m_modelPartShared) m_modelPartShared->setSubpartID(id);
+}
+
+QString ModelPart::subpartID() const {
+	if (m_modelPartShared) return m_modelPartShared->subpartID();
+	return QString();
 }

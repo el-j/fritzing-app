@@ -50,7 +50,7 @@ public:
 		HOVER
 	};
 
-signals:
+Q_SIGNALS:
 	void clicked();
 
 protected:
@@ -70,7 +70,7 @@ public:
 	void setText();
 
 public:
-	static void setArea(double area, int boardCount);
+	static void setDimensions(double width, double height, int boardCount, const QString & boardTitle);
 	static void setCountCost(int index, int count, double cost);
 	static QString countArgs();
 	static void setQuoteSucceeded(bool);
@@ -80,9 +80,9 @@ protected:
 	static void initCounts();
 
 public:
-	static const int MessageCount = 4;
+	static constexpr int MessageCount = 4;
 
-protected slots:
+protected Q_SLOTS:
 	void visitFritzingFab();
 
 protected:

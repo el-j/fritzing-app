@@ -23,7 +23,8 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "nonconnectoritem.h"
 #include "connector.h"
-#include "../utils/cursormaster.h"
+#include "utils/cursormaster.h"
+#include "utils/bezier.h"
 
 #include <QThread>
 #include <QGraphicsLineItem>
@@ -43,7 +44,7 @@ public:
 protected:
 	ConnectorItem * m_connectorItem;
 };
-
+class ItemBase;
 class ConnectorItem : public NonConnectorItem, public CursorKeyListener
 {
 	Q_OBJECT
@@ -52,13 +53,14 @@ public:
 	ConnectorItem(Connector *, ItemBase* attachedTo);
 	~ConnectorItem();
 
+	void detach();
 	Connector * connector();
-	void connectorHover(class ItemBase *, bool hovering);
+	void connectorHover(ItemBase *, bool hovering);
 	bool connectorHovering();
 	void clearConnectorHover();
 	void connectTo(ConnectorItem *);
 	int connectionsCount();
-	void attachedMoved(bool includeRatsnest, QList<ConnectorItem *> & already);
+	void attachedMoved(bool includeRatsnest, bool includeOnlyRatsnest, QList<ConnectorItem *> & already);
 	ConnectorItem * removeConnection(ItemBase *);
 	void removeConnection(ConnectorItem *, bool emitChange);
 	ConnectorItem * firstConnectedToIsh();
@@ -125,6 +127,9 @@ public:
 	void setLeg(const QPolygonF &, bool relative, const QString & why);
 	void resetLeg(const QPolygonF &, bool relative, bool active, const QString & why);
 	const QPolygonF & leg();
+	QString pathMoveTo(QPointF p, QPointF offset, double dpi, double printerScale);
+	QString pathCubicTo(Bezier * bezier, QPointF p, QPointF offset, double dpi, double printerScale);
+	QString makePathSvg(QString color, double strokeWidth, double opacity, QString path);
 	QString makeLegSvg(QPointF offset, double dpi, double printerScale, bool blackOnly);
 	QPolygonF sceneAdjustedLeg();
 	void prepareToStretch(bool activeStretch);
@@ -204,29 +209,29 @@ protected:
 	QList< QPointer<ConnectorItem> > m_connectedTo;
 	QPointF m_terminalPoint;
 	QPointer<ConnectorItem> m_overConnectorItem;
-	bool m_connectorHovering;
-	bool m_spaceBarWasPressed;
-	bool m_hoverEnterSpaceBarWasPressed;
-	bool m_hybrid;
-	bool m_bigDot;
-	bool m_rubberBandLeg;
+	bool m_connectorHovering = false;
+	bool m_spaceBarWasPressed = false;
+	bool m_hoverEnterSpaceBarWasPressed = false;
+	bool m_hybrid = false;
+	bool m_bigDot = false;
+	bool m_rubberBandLeg = false;
 	QPolygonF m_oldPolygon;
-	bool m_draggingLeg;
-	bool m_draggingCurve;
-	int m_draggingLegIndex;
-	bool m_activeStretch;
+	bool m_draggingLeg = false;
+	bool m_draggingCurve = false;
+	int m_draggingLegIndex = 0;
+	bool m_activeStretch = false;
 	QPointF m_holdPos;
 	QPolygonF m_legPolygon;
 	QVector<class Bezier *> m_legCurves;
-	double m_legStrokeWidth;
+	double m_legStrokeWidth = 0.0;
 	QColor m_legColor;
-	bool m_insertBendpointPossible;
+	bool m_insertBendpointPossible = false;
 	QPointF m_connectorDetectEnd;
 	QPointF m_connectorDrawEnd;
-	double m_connectorDrawT;
-	double m_connectorDetectT;
-	bool m_groundFillSeed;
-	int m_moveCount;
+	double m_connectorDrawT = 0.0;
+	double m_connectorDetectT = 0.0;
+	bool m_groundFillSeed = false;
+	int m_moveCount = 0;
 
 protected:
 	static QList<ConnectorItem *>  m_equalPotentialDisplayItems;
@@ -235,7 +240,7 @@ protected:
 	static void collectPart(ConnectorItem * connectorItem, QList<ConnectorItem *> & partsConnectors, ViewLayer::ViewLayerPlacement);
 
 public:
-	static void collectEqualPotential(QList<ConnectorItem *> & connectorItems, bool crossLayers, ViewGeometry::WireFlags skipFlags);
+	static void collectEqualPotential(QList<ConnectorItem *> & connectorItems, bool crossLayers, ViewGeometry::WireFlags skipFlags, bool skipBuses = false);
 	static void collectParts(QList<ConnectorItem *> & connectorItems, QList<ConnectorItem *> & partsConnectors, bool includeSymbols, ViewLayer::ViewLayerPlacement);
 	static void clearEqualPotentialDisplay();
 	static bool isGrounded(ConnectorItem * c1, ConnectorItem * c2);

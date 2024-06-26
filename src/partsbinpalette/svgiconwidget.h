@@ -29,19 +29,20 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QPointer>
 #include <QPixmap>
 
-#include "../model/modelpart.h"
-#include "../items/itembase.h"
+#include "viewlayer.h"
 
+class ItemBase;
+class ModelPart;
 
 class SvgIconPixmapItem : public QGraphicsPixmapItem {
 
 public:
-	SvgIconPixmapItem(const QPixmap & pixmap, QGraphicsItem * parent = 0);
+	SvgIconPixmapItem(const QPixmap & pixmap, QGraphicsItem * parent = nullptr);
+	SvgIconPixmapItem(const QPixmap & pixmap, QGraphicsItem * parent, bool plural);
 	void setPlural(bool);
 	void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
-
 protected:
-	bool m_plural;
+	bool m_plural = false;
 };
 
 class SvgIconWidget : public QGraphicsWidget
@@ -49,10 +50,10 @@ class SvgIconWidget : public QGraphicsWidget
 	Q_OBJECT
 public:
 	SvgIconWidget(ModelPart *, ViewLayer::ViewID, ItemBase *, bool plural);
-	~SvgIconWidget();
-	ItemBase * itemBase() const;
-	ModelPart * modelPart() const;
-	const QString &moduleID() const;
+	~SvgIconWidget() = default;
+	ItemBase * itemBase() const noexcept;
+	ModelPart * modelPart() const noexcept;
+	constexpr const QString &moduleID() const noexcept { return m_moduleId; }
 	void setItemBase(ItemBase *, bool plural);
 
 	static void initNames();
@@ -66,7 +67,7 @@ protected:
 
 protected:
 	QPointer<ItemBase> m_itemBase;
-	SvgIconPixmapItem * m_pixmapItem;
+	SvgIconPixmapItem * m_pixmapItem = nullptr;
 	QString m_moduleId;
 };
 

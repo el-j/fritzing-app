@@ -51,6 +51,9 @@ public:
 
 	QString partTitle(const QString & moduleID);
 	QStringList propValues(const QString &family, const QString &propName, bool distinct);
+	QList<QPair<QString, QString> > allPartsOfFamilyWithProp(const QString &family,
+																		 const QString &propName);
+
 	QMultiHash<QString, QString> allPropValues(const QString &family, const QString &propName);
 	void recordProperty(const QString &name, const QString &value);
 	QString retrieveModuleIdWith(const QString &family, const QString &propertyName, bool closestMatch);
@@ -58,6 +61,12 @@ public:
 	bool lastWasExactMatch();
 	void setSha(const QString & sha);
 	const QString & sha() const;
+	const QString error() const;
+
+	QPixmap retrieveIcon(const QString &name);
+	bool insertIcon(const QString &name, const QPixmap &icon);
+	QStringList getAllServiceIconNames() const;
+
 
 protected:
 	void initParts(bool dbExists);
@@ -80,6 +89,7 @@ protected:
 	bool insertConnectorLayer(const class SvgIdLayer *, qulonglong id);  // connector db id
 	bool insertBus(const Bus *, qulonglong id);
 	bool insertBusMember(const Connector *, qulonglong id);
+
 	qulonglong partId(QString moduleID);
 	bool removePart(qulonglong partId);
 	bool removeProperties(qulonglong partId);
@@ -100,10 +110,10 @@ protected:
 	bool removePartFromDataBase(const QString & moduleId);
 
 protected:
-	volatile bool m_swappingEnabled;
-	volatile bool m_lastWasExactMatch;
-	volatile bool m_keepGoing;
-	bool m_init;
+	volatile bool m_swappingEnabled = false;
+	volatile bool m_lastWasExactMatch = true;
+	volatile bool m_keepGoing = false;
+	bool m_init = false;
 	QSqlDatabase m_database;
 	QMultiHash<QString /*name*/, QString /*value*/> m_recordedProperties;
 	QString m_sha;

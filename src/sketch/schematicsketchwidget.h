@@ -69,7 +69,7 @@ public:
 	Wire * createTempWireForDragging(Wire * fromWire, ModelPart * wireModel, ConnectorItem * connectorItem, ViewGeometry & viewGeometry, ViewLayer::ViewLayerPlacement);
 	void rotatePartLabels(double degrees, QTransform &, QPointF center, QUndoCommand * parentCommand);
 	void loadFromModelParts(QList<ModelPart *> & modelParts, BaseCommand::CrossViewType, QUndoCommand * parentCommand,
-	                        bool offsetPaste, const QRectF * boundingRect, bool seekOutsideConnections, QList<long> & newIDs);
+				bool offsetPaste, const QRectF * boundingRect, bool seekOutsideConnections, QList<long> & newIDs, bool pasteInPlace = false);
 	LayerList routingLayers(ViewLayer::ViewLayerPlacement);
 	bool attachedToTopLayer(ConnectorItem *);
 	bool attachedToBottomLayer(ConnectorItem *);
@@ -83,12 +83,12 @@ public:
 	void resizeWires();
 	void resizeLabels();
 
-public slots:
+public Q_SLOTS:
 	void setVoltage(double voltage, bool doEmit);
 	void setProp(ItemBase *, const QString & propName, const QString & translatedPropName, const QString & oldValue, const QString & newValue, bool redraw);
-	void setInstanceTitle(long id, const QString & oldTitle, const QString & newTitle, bool isUndoable, bool doEmit);
+	void setInstanceTitleForCommand(long id, const QString & oldTitle, const QString & newTitle, bool isUndoable, bool doEmit);
 
-protected slots:
+protected Q_SLOTS:
 	void updateBigDots();
 	void getDroppedItemViewLayerPlacement(ModelPart * modelPart, ViewLayer::ViewLayerPlacement &);
 

@@ -93,7 +93,7 @@ QString GedaElement2Svg::convert(const QString & filename, bool allowPadsAndPins
 
 	for (int ix = 0; ix < stack.size(); ) {
 		QVariant var = stack[ix];
-		if (var.type() == QVariant::String) {
+		if (var.typeId() == QMetaType::QString) {
 			QString thing = var.toString();
 			int argCount = countArgs(stack, ix);
 			bool mils = stack[ix + argCount + 1].toChar() == ')';
@@ -133,7 +133,7 @@ QString GedaElement2Svg::convert(const QString & filename, bool allowPadsAndPins
 			}
 			ix += argCount + 2;
 		}
-		else if (var.type() == QVariant::Char) {
+		else if (var.typeId() == QMetaType::QChar) {
 			// will arrive here at the end of the element
 			// TODO: shouldn't happen otherwise
 			ix++;
@@ -147,7 +147,7 @@ QString GedaElement2Svg::convert(const QString & filename, bool allowPadsAndPins
 		throw QObject::tr("Sorry, Fritzing can't yet handle both pins and pads together (in %1)").arg(filename);
 	}
 
-	foreach (QString c, lexer.comments()) {
+	Q_FOREACH (QString c, lexer.comments()) {
 		metadata += m_comment.arg(TextUtils::stripNonValidXMLCharacters(TextUtils::escapeAnd(c)));
 	}
 
@@ -185,7 +185,7 @@ int GedaElement2Svg::countArgs(QVector<QVariant> & stack, int ix) {
 	int argCount = 0;
 	for (int i = ix + 1; i < stack.size(); i++) {
 		QVariant var = stack[i];
-		if (var.type() == QVariant::Char) {
+		if (var.typeId() == QMetaType::QChar) {
 			QChar ch = var.toChar();
 			if (ch == ']' || ch == ')') {
 				break;
@@ -497,13 +497,13 @@ QString GedaElement2Svg::getPinID(QString & number, QString & name, bool isPad) 
 }
 
 
-QString GedaElement2Svg::makeCopper(QStringList ids, QHash<QString, QString> & strings, const QString & filename) {
+QString GedaElement2Svg::makeCopper(QStringList ids, QMultiHash<QString, QString> & strings, const QString & filename) {
 	QString copper;
-	foreach (QString id, ids) {
+	Q_FOREACH (QString id, ids) {
 		QStringList values = strings.values(id);
 		if (id.isEmpty()) {
 			DebugDialog::debug(QString("geda empty id %1").arg(filename));
-			foreach(QString string, values) {
+			Q_FOREACH(QString string, values) {
 				copper.append(string);
 			}
 			continue;
@@ -523,7 +523,7 @@ QString GedaElement2Svg::makeCopper(QStringList ids, QHash<QString, QString> & s
 
 
 		QString xml = "<g>";
-		foreach (QString string, values) {
+		Q_FOREACH (QString string, values) {
 			xml.append(string);
 		}
 		xml.append("</g>");

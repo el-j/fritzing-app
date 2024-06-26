@@ -21,7 +21,8 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef PARTLABEL_H
 #define PARTLABEL_H
 
-#include <QGraphicsSvgItem>
+#include <QtGlobal>
+#include <QtSvgWidgets/QGraphicsSvgItem>
 #include <QPainter>
 #include <QStyleOptionGraphicsItem>
 #include <QWidget>
@@ -33,29 +34,33 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QTimer>
 #include <QMenu>
 
-#include "../viewlayer.h"
+#include "viewlayer.h"
 
+class ItemBase;
 class PartLabel : public QGraphicsSvgItem
 {
 	Q_OBJECT
 public:
-	PartLabel(class ItemBase * owner, QGraphicsItem * parent = 0 );   // itembase is not the parent
+	explicit PartLabel(ItemBase * owner, QWidget *parentWidget, QGraphicsItem * parent = 0 );   // itembase is not the parent
 	~PartLabel();
 
 	void setPlainText(const QString & text);
 	void showLabel(bool showIt, ViewLayer *);
 	QPainterPath shape() const;
-	bool initialized();
+	constexpr bool initialized() const noexcept { return m_initialized; }
 	void ownerMoved(QPointF newPos);
 	void setHidden(bool hide);
-	bool hidden();
+	constexpr bool hidden() const noexcept { return m_hidden; }
 	void setInactive(bool inactivate);
-	bool inactive();
-	ViewLayer::ViewLayerID viewLayerID();
-	void saveInstance(QXmlStreamWriter & streamWriter);
-	void restoreLabel(QDomElement & labelGeometry, ViewLayer::ViewLayerID);
+	constexpr bool inactive() const noexcept { return m_inactive; }
+	constexpr ViewLayer::ViewLayerID viewLayerID() const noexcept { return m_viewLayerID; }
+	bool isFlipped(ViewLayer::ViewLayerID viewLayerID);
+	void saveInstance(QXmlStreamWriter & streamWriter, bool flipAware);
+	void getLabelGeometry(QDomElement & labelGeometry);
+	void restoreLabel(QDomElement & labelGeometry, ViewLayer::ViewLayerID, bool flipAware);
 	void moveLabel(QPointF newPos, QPointF newOffset);
-	class ItemBase * owner();
+	QPointF getOffset();
+	ItemBase * owner();
 	void rotateFlipLabel(double degrees, Qt::Orientations orientation);
 	QVariant itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant & value);
 	void ownerSelected(bool selected);
@@ -64,6 +69,7 @@ public:
 	QString makeSvg(bool blackOnly, double dpi, double printerScale, bool includeTransform);
 	void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
 	void setFontPointSize(double pointSize);
+	bool migrateLabelOffset();
 
 protected:
 	void mousePressEvent(QGraphicsSceneMouseEvent *event);
@@ -84,29 +90,31 @@ protected:
 	QString makeSvgAux(bool blackOnly, double dpi, double printerScale, double & w, double & h);
 
 protected:
-	QPointer<class ItemBase> m_owner;
-	bool m_initialized;
-	bool m_spaceBarWasPressed;
-	bool m_doDrag;
+	QPointer<ItemBase> m_owner;
+	QWidget *m_parentWidget;
+	bool m_initialized = false;
+	bool m_initializedPos = false;
+	bool m_spaceBarWasPressed = false;
+	bool m_doDrag = false;
 	QPointF m_initialPosition;
 	QPointF m_initialOffset;
 	QPointF m_offset;
-	ViewLayer::ViewLayerID m_viewLayerID;
-	bool m_hidden;
-	bool m_inactive;
-	QMenu m_menu;
+	ViewLayer::ViewLayerID m_viewLayerID = ViewLayer::UnknownLayer;
+	bool m_hidden = false;
+	bool m_inactive = false;
+	QMenu * m_menu = nullptr;
 	QString m_text;
 	QString m_displayText;
 	QStringList m_displayKeys;
-	QAction * m_tinyAct;
-	QAction * m_smallAct;
-	QAction * m_mediumAct;
-	QAction * m_largeAct;
-	QAction * m_labelAct;
+	QAction * m_tinyAct = nullptr;
+	QAction * m_smallAct = nullptr;
+	QAction * m_mediumAct = nullptr;
+	QAction * m_largeAct = nullptr;
+	QAction * m_labelAct = nullptr;
 	QList<QAction *> m_displayActs;
 	QColor m_color;
 	QFont m_font;
-	QSvgRenderer * m_renderer;
+	QSvgRenderer * m_renderer = nullptr;
 };
 
 #endif

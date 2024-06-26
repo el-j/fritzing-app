@@ -44,7 +44,7 @@ public:
 	void selectAllExcludedTraces();
 	void selectAllIncludedTraces();
 	bool hasAnyNets();
-	void forwardRoutingStatus(const RoutingStatus &);
+	void forwardRoutingStatusForCommand(const RoutingStatus &);
 	void addDefaultParts();
 	void showEvent(QShowEvent * event);
 	void initWire(Wire *, int penWidth);
@@ -72,12 +72,12 @@ public:
 	void setBoardLayers(int, bool redraw);
 	void swapLayers(ItemBase * itemBase, int newLayers, QUndoCommand * parentCommand);
 	void loadFromModelParts(QList<ModelPart *> & modelParts, BaseCommand::CrossViewType, QUndoCommand * parentCommand,
-	                        bool offsetPaste, const QRectF * boundingRect, bool seekOutsideConnections, QList<long> & newIDs);
+				bool offsetPaste, const QRectF * boundingRect, bool seekOutsideConnections, QList<long> & newIDs, bool pasteInPlace = false);
 	virtual bool isInLayers(ConnectorItem *, ViewLayer::ViewLayerPlacement);
 	bool routeBothSides();
 	bool sameElectricalLayer2(ViewLayer::ViewLayerID, ViewLayer::ViewLayerID);
 	void changeTraceLayer(ItemBase *, bool force, QUndoCommand * parentCommand);
-	void changeLayer(long id, double z, ViewLayer::ViewLayerID viewLayerID);
+	void changeLayerForCommand(long id, double z, ViewLayer::ViewLayerID viewLayerID);
 	bool acceptsTrace(const ViewGeometry & viewGeometry);
 	ItemBase * placePartDroppedInOtherView(ModelPart *, ViewLayer::ViewLayerPlacement, const ViewGeometry & viewGeometry, long id, SketchWidget * dropOrigin);
 	void autorouterSettings();
@@ -88,6 +88,7 @@ public:
 	void getBendpointWidths(class Wire *, double w, double & w1, double & w2, bool & negativeOffsetRect);
 	double getSmallerTraceWidth(double minDim);
 	bool groundFill(bool fillGroundTraces, ViewLayer::ViewLayerID, QUndoCommand * parentCommand);
+	bool groundFillOld(bool fillGroundTraces, ViewLayer::ViewLayerID, QUndoCommand * parentCommand);
 	void setGroundFillSeeds();
 	void clearGroundFillSeeds();
 	QString generateCopperFillUnit(ItemBase * itemBase, QPointF whereToStart);
@@ -96,7 +97,7 @@ public:
 	QString characterizeGroundFill(ViewLayer::ViewLayerID);
 	ViewGeometry::WireFlag getTraceFlag();
 	void hideCopperLogoItems(QList<ItemBase *> &);
-	void restoreCopperLogoItems(QList<ItemBase *> &);
+	void restoreItemVisibility(QList<ItemBase *> &);
 	void hideHoles(QList<ItemBase *> &);
 	QString makePasteMask(const QString & svgMask, ItemBase * board, double dpi, const LayerList & maskLayerIDs);
 	int selectAllItemType(ModelPart::ItemType, const QString & typeName);
@@ -119,10 +120,14 @@ public:
 	void setViewFromBelow(bool);
 	bool dropOnBottom();
 	ViewLayer::ViewLayerPlacement defaultViewLayerPlacement(ModelPart *);
+	void setPartLabelFont(QString fontFamily);
+	QString getPartLabelFont();
+	void requestQuote();
+	void calcBoardDimensions(int & boardCount, double & width, double & height, QString & boardTitle);
 
-public slots:
+public Q_SLOTS:
 	void resizeBoard(double w, double h, bool doEmit);
-	void showLabelFirstTime(long itemID, bool show, bool doEmit);
+	void showLabelFirstTimeForCommand(long itemID, bool show, bool doEmit);
 	void changeBoardLayers(int layers, bool doEmit);
 	ItemBase * resizeBoard(long id, double w, double h);
 
@@ -148,7 +153,6 @@ protected:
 	bool canCreateWire(Wire * dragWire, ConnectorItem * from, ConnectorItem * to);
 	bool bothEndsConnected(Wire * wire, ViewGeometry::WireFlags, ConnectorItem * oneEnd, QList<Wire *> & wires, QList<ConnectorItem *> & partConnectorItems);
 	void setUpColor(ConnectorItem * fromConnectorItem, ConnectorItem * toConnectorItem, Wire * wire, QUndoCommand * parentCommand);
-	ConnectorItem * findNearestPartConnectorItem(ConnectorItem * fromConnectorItem);
 	bool bothEndsConnectedAux(Wire * wire, ViewGeometry::WireFlags flag, ConnectorItem * oneEnd, QList<Wire *> & wires, QList<ConnectorItem *> & partConnectorItems, QList<Wire *> & visited);
 	void getLabelFont(QFont &, QColor &, ItemBase *);
 	double defaultGridSizeInches();
@@ -163,7 +167,12 @@ protected:
 	Wire * createTempWireForDragging(Wire * fromWire, ModelPart * wireModel, ConnectorItem * connectorItem, ViewGeometry & viewGeometry, ViewLayer::ViewLayerPlacement);
 	void prereleaseTempWireForDragging(Wire*);
 	void rotatePartLabels(double degrees, QTransform &, QPointF center, QUndoCommand * parentCommand);
-	bool hasNeighbor(ConnectorItem * connectorItem, ViewLayer::ViewLayerID viewLayerID, const QRectF & r);
+	bool hasNeighbor(ConnectorItem * connectorItem, ViewLayer::ViewLayerID viewLayerID, const QRectF & r);	
+	bool canConnectSeed(QRectF boardRect,
+					 QImage * copperImage,
+					 ConnectorItem * connectorItem,
+					 ViewLayer::ViewLayerID viewLayerID,
+					 QRectF s);
 	void setGroundFillSeeds(const QString & intro);
 	bool collectGroundFillSeeds(QList<ConnectorItem *> & seeds, bool includePotential);
 	void shiftHoles();
@@ -174,31 +183,25 @@ protected:
 	bool canConnect(Wire * from, ItemBase * to);
 	void collectThroughHole(QList<ConnectorItem *> & th, QList<ConnectorItem *> & pads, const LayerList &);
 	ViewLayer::ViewLayerPlacement getViewLayerPlacement(ModelPart *, QDomElement & instance, QDomElement & view, ViewGeometry &);
-	void requestQuote(bool byUser);
-	double calcBoardArea(int & boardCount);
 	PaletteItem* addPartItem(ModelPart * modelPart, ViewLayer::ViewLayerPlacement, PaletteItem * paletteItem, bool doConnectors, bool & ok, ViewLayer::ViewID, bool temporary);
-	void requestQuoteSoon();
 	double getKeepoutMils();
 	bool updateOK(ConnectorItem *, ConnectorItem *);
+	QList<QGraphicsItem *> getCollidingItems(QGraphicsItem *target, QGraphicsItem *other);
 
-signals:
+Q_SIGNALS:
 	void subSwapSignal(SketchWidget *, ItemBase *, const QString & newModuleID, ViewLayer::ViewLayerPlacement, long & newID, QUndoCommand * parentCommand);
 	void boardDeletedSignal();
 	void groundFillSignal();
 	void copperFillSignal();
+	void groundFillOldSignal();
+	void copperFillOldSignal();
+	void fabQuoteFinishedSignal();
 
-protected:
-	static void calcDistances(Wire * wire, QList<ConnectorItem *> & ends);
-	static void clearDistances();
-	static int calcDistance(Wire * wire, ConnectorItem * end, int distance, QList<Wire *> & distanceWires, bool & fromConnector0);
-	static int calcDistanceAux(ConnectorItem * from, ConnectorItem * to, int distance, QList<Wire *> & distanceWires);
-
-protected slots:
+protected Q_SLOTS:
 	void alignJumperItem(class JumperItem *, QPointF &);
 	void wireSplitSlot(class Wire*, QPointF newPos, QPointF oldPos, const QLineF & oldLine);
-	void postImageSlot(class GroundPlaneGenerator *, QImage * copperImage, QImage * boardImage, QGraphicsItem * board, QList<QRectF> *);
+	void postImageSlot(class GroundPlaneGeneratorOld *, QImage * copperImage, QImage * boardImage, QGraphicsItem * board, QList<QRectF> *);
 	void gotFabQuote(QNetworkReply *);
-	void requestQuoteNow();
 	void getDroppedItemViewLayerPlacement(ModelPart * modelPart, ViewLayer::ViewLayerPlacement &);
 
 
@@ -210,7 +213,7 @@ protected:
 	QHash<QString, QString> m_autorouterSettings;
 	QPointer<class QuoteDialog> m_quoteDialog;
 	QPointer<class QuoteDialog> m_rolloverQuoteDialog;
-	QTimer m_requestQuoteTimer;
+	QString m_partLabelFontFamily;
 
 protected:
 	static QSizeF m_jumperItemSize;

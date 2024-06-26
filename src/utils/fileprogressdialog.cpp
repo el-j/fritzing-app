@@ -32,28 +32,27 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QGroupBox>
 #include <QCloseEvent>
 #include <QApplication>
-#include <QDesktopWidget>
 #include <QSplashScreen>
+#include <QScreen>
 
 /////////////////////////////////////
 
-FileProgressDialog::FileProgressDialog(const QString & title, int initialMaximum, QWidget * parent) : QDialog(parent)
+FileProgressDialog::FileProgressDialog(const QString & title, int initialMaximum, QWidget * parent) : QDialog(parent),
+    m_incValueMod(2)
 {
-	m_incValueMod = 2;
-
-	QSplashScreen *splash = NULL;
-	foreach (QWidget *widget, QApplication::topLevelWidgets()) {
+	QSplashScreen *splash = nullptr;
+	Q_FOREACH (QWidget *widget, QApplication::topLevelWidgets()) {
 		splash = qobject_cast<QSplashScreen *>(widget);
-		if (splash) {
+		if (splash != nullptr) {
 			break;
 		}
 	}
 
 	init(title, initialMaximum);
-	setModal(splash == NULL);			// OS X Lion doesn't seem to like modal dialogs during splash time
+	setModal(splash == nullptr);			// OS X Lion doesn't seem to like modal dialogs during splash time
 
 	show();
-	if (splash) {
+	if (splash != nullptr) {
 		QRect sr = splash->geometry();
 		QRect r = this->geometry();
 		QRect fr = this->frameGeometry();
@@ -86,7 +85,7 @@ void FileProgressDialog::init(const QString & title, int initialMaximum)
 
 	this->setWindowTitle(title);
 
-	QVBoxLayout * vLayout = new QVBoxLayout(this);
+	auto * vLayout = new QVBoxLayout(this);
 
 	m_message = new QLabel(this);
 	m_message->setMinimumWidth(300);
@@ -139,7 +138,7 @@ int FileProgressDialog::value() {
 }
 
 void FileProgressDialog::sendCancel() {
-	emit cancel();
+	Q_EMIT cancel();
 }
 
 void FileProgressDialog::closeEvent(QCloseEvent *event)
@@ -197,7 +196,7 @@ void FileProgressDialog::settingItemSlot()
 void FileProgressDialog::resizeEvent(QResizeEvent * event)
 {
 	QDialog::resizeEvent(event);
-	QRect scr = QApplication::desktop()->screenGeometry();
+	QRect scr = QApplication::primaryScreen()->geometry();
 	move( scr.center() - rect().center() );
 }
 
@@ -214,7 +213,7 @@ void FileProgressDialog::setIndeterminate() {
 }
 
 void FileProgressDialog::updateIndeterminate() {
-	if (m_progressBar) {
+	if (m_progressBar != nullptr) {
 		m_progressBar->setValue(0);
 	}
 }

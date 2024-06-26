@@ -24,13 +24,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "gedaelementparser.h"
 #include "gedaelementlexer.h"
 
-GedaElementParser::GedaElementParser()
-{
-}
-
-GedaElementParser::~GedaElementParser()
-{
-}
+GedaElementParser::GedaElementParser() : m_tos(0) { }
 
 QVector<QVariant> & GedaElementParser::symStack() {
 	return m_symStack;
@@ -47,19 +41,19 @@ void GedaElementParser::reallocateStack()
 	m_stateStack.resize(size);
 }
 
-QString GedaElementParser::errorMessage() const
+QString GedaElementParser::errorMessage() const noexcept
 {
 	return m_errorMessage;
 }
 
-QVariant GedaElementParser::result() const
+QVariant GedaElementParser::result() const noexcept
 {
 	return m_result;
 }
 
 bool GedaElementParser::parse(GedaElementLexer *lexer)
 {
-	const int INITIAL_STATE = 0;
+	constexpr int INITIAL_STATE = 0;
 
 	int yytoken = -1;
 
@@ -385,7 +379,7 @@ bool GedaElementParser::parse(GedaElementLexer *lexer)
 					continue;
 				else if (k < 0)
 					++reduces;
-				else if (spell[tk]) {
+				else if (spell[tk] != nullptr) {
 					if (shifts < 3)
 						expected_tokens[shifts] = tk;
 					++shifts;
@@ -393,7 +387,7 @@ bool GedaElementParser::parse(GedaElementLexer *lexer)
 			}
 
 			m_errorMessage.clear();
-			if (shifts && shifts < 3) {
+			if ((shifts != 0) && shifts < 3) {
 				bool first = true;
 
 				for (int s = 0; s < shifts; ++s) {

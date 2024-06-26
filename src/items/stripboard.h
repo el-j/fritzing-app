@@ -32,7 +32,7 @@ class ConnectorItem;
 class Stripbit : public QGraphicsPathItem
 {
 public:
-	Stripbit(const QPainterPath & path, int x, int y, bool horizontal, QGraphicsItem * parent);
+	explicit Stripbit(const QPainterPath & path, int x, int y, bool horizontal, QGraphicsItem * parent);
 	~Stripbit();
 
 	bool horizontal();
@@ -88,6 +88,9 @@ public:
 	void swapEntry(const QString & text);
 	QStringList collectValues(const QString & family, const QString & prop, QString & value);
 
+protected Q_SLOTS:
+	void changeBoardSize();
+
 protected:
 	void nextBus(QList<ConnectorItem *> & soFar);
 	QString getRowLabel();
@@ -97,6 +100,7 @@ protected:
 	StripConnector * getStripConnector(int x, int y);
 	void collectTo(QSet<ConnectorItem *> &);
 	void initStripLayouts();
+	QString getNewBuses(bool vertical);
 
 public:
 	static QString genFZP(const QString & moduleID);
@@ -106,8 +110,8 @@ protected:
 	QList<StripConnector *> m_strips;
 	QList<class BusShared *> m_buses;
 	QString m_beforeCut;
-	int m_x;
-	int m_y;
+	int m_x = 0;
+	int m_y = 0;
 	QString m_layout;
 };
 

@@ -19,18 +19,17 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 ********************************************************************/
 
 #include "resizableboard.h"
-#include "../utils/resizehandle.h"
 #include "../utils/graphicsutils.h"
 #include "../utils/folderutils.h"
 #include "../utils/textutils.h"
-#include "../fsvgrenderer.h"
 #include "../sketch/infographicsview.h"
 #include "../svg/svgfilesplitter.h"
-#include "../commands.h"
+#include "../svg/svgpathregex.h"
 #include "moduleidnames.h"
 #include "../layerattributes.h"
 #include "../debugdialog.h"
 #include "../svg/gerbergenerator.h"
+#include "utils/misc.h"
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -40,7 +39,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QPushButton>
 #include <QImageReader>
 #include <QMessageBox>
-#include <QRegExp>
+#include <QRegularExpression>
 #include <qmath.h>
 #include <qnumeric.h>
 
@@ -53,8 +52,7 @@ static QHash<QString, QString> XmlNamesToNames;
 static QHash<QString, QString> BoardLayerTemplates;
 static QHash<QString, QString> SilkscreenLayerTemplates;
 static QHash<QString, QString> Silkscreen0LayerTemplates;
-static const int LineThickness = 8;
-static const QRegExp HeightExpr("height=\\'\\d*px");
+static const QRegularExpression HeightExpr("height=\\'\\d*px");
 static QString StandardCustomBoardExplanation;
 
 QStringList Board::BoardImageNames;
@@ -62,7 +60,7 @@ QStringList Board::NewBoardImageNames;
 
 const double ResizableBoard::CornerHandleSize = 7.0;
 
-static const double JND = (double) 0.01;
+static constexpr double JND = (double) 0.01;
 
 QString Board::OneLayerTranslated;
 QString Board::TwoLayersTranslated;
@@ -71,7 +69,7 @@ Board::Board( ModelPart * modelPart, ViewLayer::ViewID viewID, const ViewGeometr
 	: PaletteItem(modelPart, viewID, viewGeometry, id, itemMenu, doLabel)
 {
 	m_svgOnly = true;
-	m_fileNameComboBox = NULL;
+	m_fileNameComboBox = nullptr;
 	if (isBoard(modelPart)) {
 		if (modelPart->localProp("layers").isNull()) {
 			modelPart->setLocalProp("layers", modelPart->properties().value("layers"));
@@ -92,7 +90,7 @@ Board::Board( ModelPart * modelPart, ViewLayer::ViewID viewID, const ViewGeometr
 		NamesToXmlNames.insert("copper top", "copper1");
 		NamesToXmlNames.insert("silkscreen bottom", "silkscreen0");
 		NamesToXmlNames.insert("silkscreen top", "silkscreen");
-		foreach (QString key, NamesToXmlNames.keys()) {
+		Q_FOREACH (QString key, NamesToXmlNames.keys()) {
 			XmlNamesToNames.insert(NamesToXmlNames.value(key), key);
 		}
 	}
@@ -183,7 +181,7 @@ bool Board::isBoard(ItemBase * itemBase) {
 }
 
 bool Board::isBoard(ModelPart * modelPart) {
-	if (modelPart == NULL) return false;
+	if (modelPart == nullptr) return false;
 
 	switch (modelPart->itemType()) {
 	case ModelPart::Board:
@@ -207,14 +205,14 @@ void Board::setupLoadImage(QWidget * parent, const QString & family, const QStri
 
 	returnProp = tr("image file");
 
-	QFrame * frame = new QFrame();
+	auto * frame = new QFrame();
 	frame->setObjectName("infoViewPartFrame");
-	QVBoxLayout * vboxLayout = new QVBoxLayout();
+	auto * vboxLayout = new QVBoxLayout();
 	vboxLayout->setContentsMargins(0, 0, 0, 0);
 	vboxLayout->setSpacing(0);
-	vboxLayout->setMargin(0);
+	vboxLayout->setContentsMargins(0, 0, 0, 0);
 
-	QComboBox * comboBox = new QComboBox();
+	auto * comboBox = new QComboBox();
 	comboBox->setObjectName("infoViewComboBox");
 	comboBox->setEditable(false);
 	comboBox->setEnabled(swappingEnabled);
@@ -222,9 +220,9 @@ void Board::setupLoadImage(QWidget * parent, const QString & family, const QStri
 
 	setFileNameItems();
 
-	connect(comboBox, SIGNAL(currentIndexChanged(const QString &)), this, SLOT(fileNameEntry(const QString &)));
+	connect(comboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(fileNameEntry(int)));
 
-	QPushButton * button = new QPushButton (tr("load image file"));
+	auto * button = new QPushButton (tr("load image file"));
 	button->setObjectName("infoViewButton");
 	connect(button, SIGNAL(pressed()), this, SLOT(prepLoadImage()));
 	button->setEnabled(swappingEnabled);
@@ -239,13 +237,13 @@ void Board::setupLoadImage(QWidget * parent, const QString & family, const QStri
 }
 
 void Board::setFileNameItems() {
-	if (m_fileNameComboBox == NULL) return;
+	if (m_fileNameComboBox == nullptr) return;
 
 	m_fileNameComboBox->addItems(getImageNames());
 	m_fileNameComboBox->addItems(getNewImageNames());
 
 	int ix = 0;
-	foreach (QString name, getImageNames()) {
+	Q_FOREACH (QString name, getImageNames()) {
 		if (prop("lastfilename").contains(name)) {
 			m_fileNameComboBox->setCurrentIndex(ix);
 			return;
@@ -253,7 +251,7 @@ void Board::setFileNameItems() {
 		ix++;
 	}
 
-	foreach (QString name, getNewImageNames()) {
+	Q_FOREACH (QString name, getNewImageNames()) {
 		if (prop("lastfilename").contains(name)) {
 			m_fileNameComboBox->setCurrentIndex(ix);
 			return;
@@ -270,8 +268,12 @@ QStringList & Board::getNewImageNames() {
 	return NewBoardImageNames;
 }
 
-void Board::fileNameEntry(const QString & filename) {
-	foreach (QString name, getImageNames()) {
+void Board::fileNameEntry(int index) {
+	auto * comboBox = qobject_cast<QComboBox *>(sender());
+	if (comboBox == nullptr) return;
+
+	QString filename = comboBox->itemText(index);
+	Q_FOREACH (QString name, getImageNames()) {
 		if (filename.compare(name) == 0) {
 			QString f = FolderUtils::getAppPartsSubFolderPath("") + "/svg/core/pcb/" + filename + ".svg";
 			prepLoadImageAux(f, false);
@@ -287,7 +289,7 @@ void Board::prepLoadImage() {
 	imagesStr += " (";
 	if (!m_svgOnly) {
 		QList<QByteArray> supportedImageFormats = QImageReader::supportedImageFormats();
-		foreach (QByteArray ba, supportedImageFormats) {
+		Q_FOREACH (QByteArray ba, supportedImageFormats) {
 			imagesStr += "*." + QString(ba) + " ";
 		}
 	}
@@ -296,7 +298,7 @@ void Board::prepLoadImage() {
 	}
 	imagesStr += ")";
 	QString fileName = FolderUtils::getOpenFileName(
-	                       NULL,
+	                       nullptr,
 	                       tr("Select an image file to load"),
 	                       "",
 	                       imagesStr
@@ -311,7 +313,9 @@ void Board::prepLoadImage() {
 
 bool Board::checkImage(const QString & filename) {
 	QFile file(filename);
-
+	if (!file.open(QIODevice::ReadOnly)) {
+		DebugDialog::debug(QString("Unable to open :%1").arg(filename));
+	}
 	QString errorStr;
 	int errorLine;
 	int errorColumn;
@@ -336,7 +340,7 @@ bool Board::checkImage(const QString & filename) {
 	int silk0Layers = 0;
 	int silk1Layers = 0;
 	bool boardHasChildren = false;
-	foreach (QDomElement element, elements) {
+	Q_FOREACH (QDomElement element, elements) {
 		QString id = element.attribute("id");
 		ViewLayer::ViewLayerID viewLayerID = ViewLayer::viewLayerIDFromXmlString(id);
 		if (viewLayerID != ViewLayer::UnknownLayer) {
@@ -420,10 +424,10 @@ void Board::moreCheckImage(const QString & filename) {
 	int mCount = 0;
 	if (element.tagName() == "path") {
 		QString originalPath = element.attribute("d", "").trimmed();
-		if (GerberGenerator::MultipleZs.indexIn(originalPath) >= 0) {
-			QStringList ds = element.attribute("d").split("z", QString::SkipEmptyParts);
+		if (originalPath.contains(MultipleZs)) {
+			QStringList ds = element.attribute("d").split("z", Qt::SkipEmptyParts, Qt::CaseInsensitive);
 			subpaths = ds.count();
-			foreach (QString d, ds) {
+			Q_FOREACH (QString d, ds) {
 				if (d.trimmed().startsWith("m", Qt::CaseInsensitive)) mCount++;
 			}
 		}
@@ -446,7 +450,7 @@ void Board::moreCheckImage(const QString & filename) {
 	}
 	msg +=  tr("<br/><br/>If you intended your custom shape to have cutouts and you did not get the expected result, ");
 	msg += tr("it is because Fritzing requires that you make cutouts using a shape 'subtraction' or 'difference' operation in your vector graphics editor.");
-	QMessageBox::information(NULL, "Custom Shape", msg);
+	QMessageBox::information(nullptr, "Custom Shape", msg);
 }
 
 QString Board::setBoardOutline(const QString & svg) {
@@ -480,7 +484,7 @@ QString Board::setBoardOutline(const QString & svg) {
 
 	int ix = 0;
 	QStringList ids;
-	foreach (QDomElement leaf, leaves) {
+	Q_FOREACH (QDomElement leaf, leaves) {
 		ids.append(leaf.attribute("id", ""));
 		leaf.setAttribute("id", QString("____%1____").arg(ix++));
 	}
@@ -488,7 +492,7 @@ QString Board::setBoardOutline(const QString & svg) {
 	QSvgRenderer renderer(domDocument.toByteArray());
 
 	ix = 0;
-	foreach (QDomElement leaf, leaves) {
+	Q_FOREACH (QDomElement leaf, leaves) {
 		leaf.setAttribute("id", ids.at(ix++));
 	}
 
@@ -512,7 +516,7 @@ QString Board::setBoardOutline(const QString & svg) {
 }
 void Board::unableToLoad(const QString & fileName, const QString & reason) {
 	QMessageBox::information(
-	    NULL,
+	    nullptr,
 	    tr("Unable to load"),
 	    tr("Unable to load image from %1 %2").arg(fileName).arg(reason)
 	);
@@ -520,7 +524,7 @@ void Board::unableToLoad(const QString & fileName, const QString & reason) {
 
 bool Board::canLoad(const QString & fileName, const QString & reason) {
 	QMessageBox::StandardButton answer = QMessageBox::question(
-	        NULL,
+	        nullptr,
 	        tr("Can load, but"),
 	        tr("The image from %1 can be loaded, but %2\nUse the file?").arg(fileName).arg(reason),
 	        QMessageBox::Yes | QMessageBox::No,
@@ -532,7 +536,7 @@ bool Board::canLoad(const QString & fileName, const QString & reason) {
 void Board::prepLoadImageAux(const QString & fileName, bool addName)
 {
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView != NULL) {
+	if (infoGraphicsView != nullptr) {
 		infoGraphicsView->loadLogoImage(this, "", QSizeF(0,0), "", fileName, addName);
 	}
 }
@@ -547,7 +551,7 @@ ViewLayer::ViewID Board::useViewIDForPixmap(ViewLayer::ViewID vid, bool)
 }
 
 QString Board::convertToXmlName(const QString & name) {
-	foreach (QString key, ItemBase::TranslatedPropertyNames.keys()) {
+	Q_FOREACH (QString key, ItemBase::TranslatedPropertyNames.keys()) {
 		if (name.compare(ItemBase::TranslatedPropertyNames.value(key), Qt::CaseInsensitive) == 0) {
 			return NamesToXmlNames.value(key);
 		}
@@ -570,15 +574,15 @@ ResizableBoard::ResizableBoard( ModelPart * modelPart, ViewLayer::ViewID viewID,
 	fixWH();
 
 	m_keepAspectRatio = false;
-	m_widthEditor = m_heightEditor = NULL;
-	m_aspectRatioCheck = NULL;
-	m_aspectRatioLabel = NULL;
-	m_revertButton = NULL;
-	m_paperSizeComboBox = NULL;
+	m_widthEditor = m_heightEditor = nullptr;
+	m_aspectRatioCheck = nullptr;
+	m_aspectRatioLabel = nullptr;
+	m_revertButton = nullptr;
+	m_paperSizeComboBox = nullptr;
 
 	m_corner = ResizableBoard::NO_CORNER;
 	m_currentScale = 1.0;
-	m_decimalsAfter = 1;
+	m_decimalsAfter = kDefaultDecimalsAfter;
 }
 
 ResizableBoard::~ResizableBoard() {
@@ -587,7 +591,7 @@ ResizableBoard::~ResizableBoard() {
 void ResizableBoard::addedToScene(bool temporary) {
 
 	loadTemplates();
-	if (this->scene()) {
+	if (this->scene() != nullptr) {
 		setInitialSize();
 	}
 
@@ -646,7 +650,7 @@ void ResizableBoard::mousePressEvent(QGraphicsSceneMouseEvent * event)
 	}
 
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView) {
+	if (infoGraphicsView != nullptr) {
 		setInitialSize();
 		infoGraphicsView->viewItemInfo(this);
 	}
@@ -660,7 +664,6 @@ void ResizableBoard::mouseMoveEvent(QGraphicsSceneMouseEvent * event) {
 
 	QPointF zero = mapToScene(0, 0);
 	QPointF ds = mapFromScene(zero + event->scenePos() - m_resizeMousePos);
-	QPointF newPos;
 	QSizeF size = m_resizeStartSize;
 
 	switch (m_corner) {
@@ -736,16 +739,16 @@ void ResizableBoard::mouseMoveEvent(QGraphicsSceneMouseEvent * event) {
 
 			double sw = size.width() / 2;
 			double sh = size.height() / 2;
-			QMatrix m(oldT.m11(), oldT.m12(), oldT.m21(), oldT.m22(), 0, 0);
+			QTransform m(oldT.m11(), oldT.m12(), oldT.m21(), oldT.m22(), 0, 0);
 			ds = m.inverted().map(ds);
 			QTransform newT = QTransform().translate(-sw, -sh) * QTransform(m) * QTransform().translate(sw, sh);
 
 			QList<ItemBase *> kin;
 			kin << this->layerKinChief();
-			foreach (ItemBase * lk, this->layerKinChief()->layerKin()) {
+			Q_FOREACH (ItemBase * lk, this->layerKinChief()->layerKin()) {
 				kin << lk;
 			}
-			foreach (ItemBase * itemBase, kin) {
+			Q_FOREACH (ItemBase * itemBase, kin) {
 				itemBase->getViewGeometry().setTransform(newT);
 				itemBase->setTransform(newT);
 			}
@@ -791,7 +794,7 @@ void ResizableBoard::mouseReleaseEvent(QGraphicsSceneMouseEvent * event) {
 	setKinCursor(Qt::ArrowCursor);
 
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView) {
+	if (infoGraphicsView != nullptr) {
 		infoGraphicsView->viewItemInfo(this);
 	}
 }
@@ -840,12 +843,14 @@ void ResizableBoard::resizeMMAux(double mmW, double mmH)
 		modelPart()->setLocalProp("width", mmW);
 		modelPart()->setLocalProp("height", mmH);
 
-		double tens = pow(10.0, m_decimalsAfter);
-		setWidthAndHeight(qRound(mmW * tens) / tens, qRound(mmH * tens) / tens);
+		setWidthAndHeight(
+			TextUtils::roundDecimal(mmW, m_decimalsAfter),
+			TextUtils::roundDecimal(mmH, m_decimalsAfter)
+		);
 	}
 	//	DebugDialog::debug(QString("fast load result %1 %2").arg(result).arg(s));
 
-	foreach (ItemBase * itemBase, m_layerKin) {
+	Q_FOREACH (ItemBase * itemBase, m_layerKin) {
 		QString s = makeNextLayerSvg(itemBase->viewLayerID(), mmW, mmH, milsW, milsH);
 		if (!s.isEmpty()) {
 			result = itemBase->resetRenderer(s);
@@ -999,28 +1004,26 @@ bool ResizableBoard::collectExtraInfo(QWidget * parent, const QString & family, 
 
 		if (!m_modelPart->localProp("height").isValid()) {
 			// display uneditable width and height
-			QFrame * frame = new QFrame();
+			auto * frame = new QFrame();
 			frame->setObjectName("infoViewPartFrame");
 
-			QVBoxLayout * vboxLayout = new QVBoxLayout();
+			auto * vboxLayout = new QVBoxLayout();
 			vboxLayout->setAlignment(Qt::AlignLeft);
 			vboxLayout->setSpacing(0);
-			vboxLayout->setMargin(0);
+			vboxLayout->setContentsMargins(0, 0, 0, 0);
 			vboxLayout->setContentsMargins(0, 3, 0, 0);
 
-			double tens = pow(10.0, m_decimalsAfter);
 			QRectF r = this->boundingRect();
-			double w = qRound(GraphicsUtils::pixels2mm(r.width(), GraphicsUtils::SVGDPI) * tens) / tens;
-			QLabel * l1 = new QLabel(tr("width: %1mm").arg(w));
-			l1->setMargin(0);
+			double w = TextUtils::roundDecimal(GraphicsUtils::pixels2mm(r.width(), GraphicsUtils::SVGDPI), m_decimalsAfter);
+			auto * l1 = new QLabel(tr("width: %1mm").arg(w));
+			l1->setContentsMargins(0, 0, 0, 0);
 			l1->setObjectName("infoViewLabel");
-
-			double h = qRound(GraphicsUtils::pixels2mm(r.height(), GraphicsUtils::SVGDPI) * tens) / tens;
-			QLabel * l2 = new QLabel(tr("height: %1mm").arg(h));
-			l2->setMargin(0);
+			double h = TextUtils::roundDecimal(GraphicsUtils::pixels2mm(r.height(), GraphicsUtils::SVGDPI), m_decimalsAfter);
+			auto * l2 = new QLabel(tr("height: %1mm").arg(h));
+			l2->setContentsMargins(0, 0, 0, 0);
 			l2->setObjectName("infoViewLabel");
 
-			if (returnWidget) vboxLayout->addWidget(qobject_cast<QWidget *>(returnWidget));
+			if (returnWidget != nullptr) vboxLayout->addWidget(qobject_cast<QWidget *>(returnWidget));
 			vboxLayout->addWidget(l1);
 			vboxLayout->addWidget(l2);
 
@@ -1044,20 +1047,20 @@ QStringList ResizableBoard::collectValues(const QString & family, const QString 
 }
 
 void ResizableBoard::paperSizeChanged(int index) {
-	QComboBox * comboBox = qobject_cast<QComboBox *>(sender());
-	if (comboBox == NULL) return;
+	auto * comboBox = qobject_cast<QComboBox *>(sender());
+	if (comboBox == nullptr) return;
 
 	QModelIndex modelIndex = comboBox->model()->index(index,0);
 	QSizeF size = comboBox->model()->data(modelIndex, Qt::UserRole).toSizeF();
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView != NULL) {
+	if (infoGraphicsView != nullptr) {
 		infoGraphicsView->resizeBoard(size.width(), size.height(), true);
 	}
 }
 
 void ResizableBoard::widthEntry() {
-	QLineEdit * edit = qobject_cast<QLineEdit *>(sender());
-	if (edit == NULL) return;
+	auto * edit = qobject_cast<QLineEdit *>(sender());
+	if (edit == nullptr) return;
 
 	double w = edit->text().toDouble();
 	double oldW = m_modelPart->localProp("width").toDouble();
@@ -1066,14 +1069,14 @@ void ResizableBoard::widthEntry() {
 	double h =  m_modelPart->localProp("height").toDouble();
 
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView != NULL) {
+	if (infoGraphicsView != nullptr) {
 		infoGraphicsView->resizeBoard(w, h, true);
 	}
 }
 
 void ResizableBoard::heightEntry() {
-	QLineEdit * edit = qobject_cast<QLineEdit *>(sender());
-	if (edit == NULL) return;
+	auto * edit = qobject_cast<QLineEdit *>(sender());
+	if (edit == nullptr) return;
 
 	double h = edit->text().toDouble();
 	double oldH =  m_modelPart->localProp("height").toDouble();
@@ -1082,7 +1085,7 @@ void ResizableBoard::heightEntry() {
 	double w =  m_modelPart->localProp("width").toDouble();
 
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView != NULL) {
+	if (infoGraphicsView != nullptr) {
 		infoGraphicsView->resizeBoard(w, h, true);
 	}
 }
@@ -1164,7 +1167,7 @@ bool ResizableBoard::inResize() {
 void ResizableBoard::figureHover() {
 	setAcceptHoverEvents(true);
 	setAcceptedMouseButtons(ALLMOUSEBUTTONS);
-	foreach(ItemBase * lkpi, m_layerKin) {
+	Q_FOREACH(ItemBase * lkpi, m_layerKin) {
 		lkpi->setAcceptHoverEvents(false);
 		lkpi->setAcceptedMouseButtons(Qt::NoButton);
 	}
@@ -1236,7 +1239,7 @@ ResizableBoard::Corner ResizableBoard::findCorner(QPointF scenePos, Qt::Keyboard
 void ResizableBoard::setKinCursor(QCursor & cursor) {
 	ItemBase * chief = this->layerKinChief();
 	chief->setCursor(cursor);
-	foreach (ItemBase * itemBase, chief->layerKin()) {
+	Q_FOREACH (ItemBase * itemBase, chief->layerKin()) {
 		itemBase->setCursor(cursor);
 	}
 }
@@ -1244,41 +1247,40 @@ void ResizableBoard::setKinCursor(QCursor & cursor) {
 void ResizableBoard::setKinCursor(Qt::CursorShape cursor) {
 	ItemBase * chief = this->layerKinChief();
 	chief->setCursor(cursor);
-	foreach (ItemBase * itemBase, chief->layerKin()) {
+	Q_FOREACH (ItemBase * itemBase, chief->layerKin()) {
 		itemBase->setCursor(cursor);
 	}
 }
 
 QFrame * ResizableBoard::setUpDimEntry(bool includeAspectRatio, bool includeRevert, bool includePaperSizes, QWidget * & returnWidget)
 {
-	double tens = pow(10.0, m_decimalsAfter);
-	double w = qRound(m_modelPart->localProp("width").toDouble() * tens) / tens;	// truncate to 1 decimal point
-	double h = qRound(m_modelPart->localProp("height").toDouble() * tens) / tens;  // truncate to 1 decimal point
+	double w = TextUtils::roundDecimal(m_modelPart->localProp("width").toDouble(), m_decimalsAfter);
+	double h = TextUtils::roundDecimal(m_modelPart->localProp("height").toDouble(), m_decimalsAfter);
 
-	QFrame * frame = new QFrame();
+	auto * frame = new QFrame();
 	frame->setObjectName("infoViewPartFrame");
-	QVBoxLayout * vboxLayout = new QVBoxLayout();
+	auto * vboxLayout = new QVBoxLayout();
 	vboxLayout->setAlignment(Qt::AlignLeft);
 	vboxLayout->setSpacing(1);
 	vboxLayout->setContentsMargins(0, 3, 0, 0);
 
-	QFrame * subframe1 = new QFrame();
-	QHBoxLayout * hboxLayout1 = new QHBoxLayout();
+	auto * subframe1 = new QFrame();
+	auto * hboxLayout1 = new QHBoxLayout();
 	hboxLayout1->setAlignment(Qt::AlignLeft);
 	hboxLayout1->setContentsMargins(0, 0, 0, 0);
 	hboxLayout1->setSpacing(2);
 
-	QFrame * subframe2 = new QFrame();
-	QHBoxLayout * hboxLayout2 = new QHBoxLayout();
+	auto * subframe2 = new QFrame();
+	auto * hboxLayout2 = new QHBoxLayout();
 	hboxLayout2->setAlignment(Qt::AlignLeft);
 	hboxLayout2->setContentsMargins(0, 0, 0, 0);
 	hboxLayout2->setSpacing(2);
 
-	QLabel * l1 = new QLabel(tr("width(mm)"));
-	l1->setMargin(0);
+	auto * l1 = new QLabel(tr("width(mm)"));
+	l1->setContentsMargins(0, 0, 0, 0);
 	l1->setObjectName("infoViewLabel");
-	QLineEdit * e1 = new QLineEdit();
-	QDoubleValidator * validator = new QDoubleValidator(e1);
+	auto * e1 = new QLineEdit();
+	auto * validator = new QDoubleValidator(e1);
 	validator->setRange(0.1, 999.9, m_decimalsAfter);
 	validator->setNotation(QDoubleValidator::StandardNotation);
 	validator->setLocale(QLocale::C);
@@ -1287,10 +1289,10 @@ QFrame * ResizableBoard::setUpDimEntry(bool includeAspectRatio, bool includeReve
 	e1->setMaxLength(4 + m_decimalsAfter);
 	e1->setText(QString::number(w));
 
-	QLabel * l2 = new QLabel(tr("height(mm)"));
-	l2->setMargin(0);
+	auto * l2 = new QLabel(tr("height(mm)"));
+	l2->setContentsMargins(0, 0, 0, 0);
 	l2->setObjectName("infoViewLabel");
-	QLineEdit * e2 = new QLineEdit();
+	auto * e2 = new QLineEdit();
 	validator = new QDoubleValidator(e1);
 	validator->setRange(0.1, 999.9, m_decimalsAfter);
 	validator->setNotation(QDoubleValidator::StandardNotation);
@@ -1307,7 +1309,7 @@ QFrame * ResizableBoard::setUpDimEntry(bool includeAspectRatio, bool includeReve
 
 	subframe1->setLayout(hboxLayout1);
 	subframe2->setLayout(hboxLayout2);
-	if (returnWidget != NULL) vboxLayout->addWidget(returnWidget);
+	if (returnWidget != nullptr) vboxLayout->addWidget(returnWidget);
 
 	connect(e1, SIGNAL(editingFinished()), this, SLOT(widthEntry()));
 	connect(e2, SIGNAL(editingFinished()), this, SLOT(heightEntry()));
@@ -1319,17 +1321,17 @@ QFrame * ResizableBoard::setUpDimEntry(bool includeAspectRatio, bool includeReve
 	vboxLayout->addWidget(subframe2);
 
 	if (includeAspectRatio || includeRevert || includePaperSizes) {
-		QFrame * subframe3 = new QFrame();
-		QHBoxLayout * hboxLayout3 = new QHBoxLayout();
+		auto * subframe3 = new QFrame();
+		auto * hboxLayout3 = new QHBoxLayout();
 		hboxLayout3->setAlignment(Qt::AlignLeft);
 		hboxLayout3->setContentsMargins(0, 0, 0, 0);
 		hboxLayout3->setSpacing(0);
 
 		if (includeAspectRatio) {
-			QLabel * l3 = new QLabel(tr("keep aspect ratio"));
-			l3->setMargin(0);
+			auto * l3 = new QLabel(tr("keep aspect ratio"));
+			l3->setContentsMargins(0, 0, 0, 0);
 			l3->setObjectName("infoViewLabel");
-			QCheckBox * checkBox = new QCheckBox();
+			auto * checkBox = new QCheckBox();
 			checkBox->setChecked(m_keepAspectRatio);
 			checkBox->setObjectName("infoViewCheckBox");
 
@@ -1340,7 +1342,7 @@ QFrame * ResizableBoard::setUpDimEntry(bool includeAspectRatio, bool includeReve
 			m_aspectRatioLabel = l3;
 		}
 		if (includeRevert) {
-			QPushButton * pb = new QPushButton(tr("Revert"));
+			auto * pb = new QPushButton(tr("Revert"));
 			pb->setObjectName("infoViewButton");
 			hboxLayout3->addWidget(pb);
 			connect(pb, SIGNAL(clicked(bool)), this, SLOT(revertSize(bool)));
@@ -1354,8 +1356,8 @@ QFrame * ResizableBoard::setUpDimEntry(bool includeAspectRatio, bool includeReve
 		if (includePaperSizes) {
 			initPaperSizes();
 
-			QLabel * l3 = new QLabel(tr("size"));
-			l3->setMargin(0);
+			auto * l3 = new QLabel(tr("size"));
+			l3->setContentsMargins(0, 0, 0, 0);
 			l3->setObjectName("infoViewLabel");
 
 			m_paperSizeComboBox = new QComboBox();
@@ -1411,10 +1413,10 @@ void ResizableBoard::fixWH() {
 
 void ResizableBoard::setWidthAndHeight(double w, double h)
 {
-	if (m_widthEditor) {
+	if (m_widthEditor != nullptr) {
 		m_widthEditor->setText(QString::number(w));
 	}
-	if (m_heightEditor) {
+	if (m_heightEditor != nullptr) {
 		m_heightEditor->setText(QString::number(h));
 	}
 	updatePaperSizes(w, h);
@@ -1456,14 +1458,14 @@ void ResizableBoard::revertSize(bool) {
 	double oh = modelPart()->localProp("originalHeight").toDouble();
 
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView != NULL) {
+	if (infoGraphicsView != nullptr) {
 		infoGraphicsView->resizeBoard(ow, oh, true);
 		m_revertButton->setEnabled(false);
 	}
 }
 
 void ResizableBoard::updatePaperSizes(double w, double h) {
-	if (m_paperSizeComboBox ==  NULL) return;
+	if (m_paperSizeComboBox ==  nullptr) return;
 
 	int currentIndex = 0;
 	for (int i = 0; i < PaperSizeNames.count(); i++) {

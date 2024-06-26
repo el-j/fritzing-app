@@ -36,9 +36,8 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QtSerialPort/qserialport.h>
 
 #include "platform.h"
-#include "syntaxer.h"
 
-#include "../mainwindow/fritzingwindow.h"
+#include "mainwindow/fritzingwindow.h"
 
 struct LinkedFile {
 	enum FileFlag {
@@ -59,7 +58,7 @@ class PTabWidget : public QTabWidget
 {
 	Q_OBJECT
 
-protected slots:
+protected Q_SLOTS:
 	void tabChanged(int index);
 
 protected:
@@ -96,15 +95,15 @@ public:
 	void createViewMenuActions(QList<QAction *> &);
 	void print();
 
-public slots:
+public Q_SLOTS:
 	void saveAll();
 
-signals:
+Q_SIGNALS:
 	void closed();
 	void changeActivationSignal(bool activate, QWidget * originator);
 	void linkToProgramFile(const QString & filename, Platform * platform, bool addlink, bool strong);
 
-protected slots:
+protected Q_SLOTS:
 	void loadProgramFile();
 	class ProgramTab * addTab();
 	void closeCurrentTab();
