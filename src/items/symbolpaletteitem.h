@@ -24,6 +24,9 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "paletteitem.h"
 
+#include <QPixmap>
+#include <QSize>
+
 /*
 #include <QTime>
 
@@ -51,11 +54,11 @@ class SymbolPaletteItem : public PaletteItem
 	Q_OBJECT
 
 public:
-	SymbolPaletteItem(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
+	explicit SymbolPaletteItem(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
 	~SymbolPaletteItem();
 
 	ConnectorItem* newConnectorItem(class Connector *connector);
-	void busConnectorItems(class Bus * bus, ConnectorItem *, QList<ConnectorItem *> & items);
+	bool busConnectorItems(ConnectorItem *, QList<ConnectorItem *> & items);
 	double voltage();
 	void setProp(const QString & prop, const QString & value);
 	void setVoltage(double);
@@ -68,19 +71,36 @@ public:
 	void addedToScene(bool temporary);
 	bool hasPartNumberProperty();
 	virtual bool isOnlyNetLabel();
+	bool inspectorRefreshOnTransform();
 	bool hasPartLabel();
 	bool getAutoroutable();
 	void setAutoroutable(bool);
 	void setLabel(const QString &);
 	QString getLabel();
 	QString getDirection();
+	void setStyle(const QString &);
+	QString effectiveAlign();
+	void refreshNetLabelStyleFromDefault();
 
 public:
 	static double DefaultVoltage;
+	static QString defaultNetLabelStyle();
+	static void refreshDefaultNetLabelStyle();
+	// Map between the orientation-independent policy ("outside"/"connector") and the stored
+	// local alignment ("left"/"right"), given the label's arrow side (goLeft).
+	static QString alignForPolicy(const QString & policy, bool goLeft);
+	static QString policyForAlign(const QString & align, bool goLeft);
+	// Resolve a net label's target for an Inspector style choice ("left"/"right"/"legacy"
+	// single, "outside"/"connector" group): returns the moduleID to swap to (empty => no
+	// swap), and sets newStyle to the alignment local-prop to apply. Used by MainWindow.
+	static QString resolveStyleSwap(ItemBase * item, const QString & picked, QString & newStyle);
 
-public slots:
-	void voltageEntry(const QString & text);
+public Q_SLOTS:
+	void voltageEntry(int index);
 	void labelEntry();
+	void styleEntry(int index);
+	void groupStyleEntry(int index);
+	void swapEntry(int index);
 
 protected:
 	void removeMeFromBus(double voltage);
@@ -89,6 +109,8 @@ protected:
 	QString replaceTextElement(QString svg);
 	ViewLayer::ViewID useViewIDForPixmap(ViewLayer::ViewID, bool swappingEnabled);
 	void resetLayerKin();
+	// Route a net-label style choice to the swap machinery (see MainWindow::swapSelectedMap).
+	void requestNetLabelStyle(const QString & picked);
 
 protected:
 	double m_voltage;
@@ -96,6 +118,7 @@ protected:
 	QPointer<ConnectorItem> m_connector1;
 	bool m_voltageReference;
 	bool m_isNetLabel;
+	QString m_label;
 };
 
 
@@ -113,6 +136,11 @@ public:
 	bool isOnlyNetLabel();
 	QString getInspectorTitle();
 	void setInspectorTitle(const QString & oldText, const QString & newText);
+	QString getVersion(); // Only used in NetLabel currenty, but a candiate for PartBase or similar, to support future migrations
+
+	// Renders a small preview of a net label for the given orientation-independent policy
+	// ("outside"/"connector") and orientation (goLeft), used by the Schematic preferences.
+	static QPixmap stylePreviewPixmap(const QString & policy, bool goLeft, const QSize & size);
 
 protected:
 	QString makeSvg(ViewLayer::ViewLayerID);

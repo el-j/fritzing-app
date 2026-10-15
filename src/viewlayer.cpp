@@ -19,7 +19,8 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 ********************************************************************/
 
 #include "viewlayer.h"
-#include "debugdialog.h"
+#include "utils/misc.h"
+#include "utils/misc.h"
 #include <qmath.h>
 
 double ViewLayer::zIncrement = 0.00001;  // 0.000000001;
@@ -90,10 +91,10 @@ ViewLayer::ViewLayer(ViewLayerID viewLayerID, bool visible, double initialZ)
 	m_fromBelow = false;
 	m_viewLayerID = viewLayerID;
 	m_visible = visible;
-	m_action = NULL;
+	m_action = nullptr;
 	m_initialZFromBelow = m_initialZ = initialZ;
 	m_nextZ = 0;
-	m_parentLayer = NULL;
+	m_parentLayer = nullptr;
 	m_active = true;
 	m_includeChildLayers = true;
 }
@@ -153,7 +154,7 @@ void ViewLayer::initNames() {
 		names.insert(ViewLayer::PcbNote,  new NamePair("pcbNote", QObject::tr("Notes")));
 		names.insert(ViewLayer::PcbRuler,  new NamePair("pcbRuler", QObject::tr("Rulers")));
 
-		foreach (ViewLayerID key, names.keys()) {
+		Q_FOREACH (ViewLayerID key, names.keys()) {
 			xmlHash.insert(names.value(key)->xmlName, key);
 		}
 
@@ -165,8 +166,8 @@ void ViewLayer::initNames() {
 		LayerList l0, l1;
 		l0 << ViewLayer::Copper0 << ViewLayer::Copper0Trace << ViewLayer::GroundPlane0;
 		l1 << ViewLayer::Copper1 << ViewLayer::Copper1Trace << ViewLayer::GroundPlane1;
-		foreach (ViewLayer::ViewLayerID viewLayerID0, l0) {
-			foreach (ViewLayer::ViewLayerID viewLayerID1, l1) {
+		Q_FOREACH (ViewLayer::ViewLayerID viewLayerID0, l0) {
+			Q_FOREACH (ViewLayer::ViewLayerID viewLayerID1, l1) {
 				unconnectables.insert(viewLayerID0, viewLayerID1);
 				unconnectables.insert(viewLayerID1, viewLayerID0);
 			}
@@ -231,7 +232,7 @@ bool ViewLayer::visible() {
 
 void ViewLayer::setVisible(bool visible) {
 	m_visible = visible;
-	if (m_action) {
+	if (m_action != nullptr) {
 		m_action->setChecked(visible);
 	}
 }
@@ -260,14 +261,14 @@ double ViewLayer::getZIncrement() {
 
 const QString & ViewLayer::viewLayerNameFromID(ViewLayerID viewLayerID) {
 	NamePair * sp = names.value(viewLayerID);
-	if (sp == NULL) return ___emptyString___;
+	if (sp == nullptr) return ___emptyString___;
 
 	return sp->displayName;
 }
 
 const QString & ViewLayer::viewLayerXmlNameFromID(ViewLayerID viewLayerID) {
 	NamePair * sp = names.value(viewLayerID);
-	if (sp == NULL) return ___emptyString___;
+	if (sp == nullptr) return ___emptyString___;
 
 	return sp->xmlName;
 }
@@ -278,7 +279,7 @@ ViewLayer * ViewLayer::parentLayer() {
 
 void ViewLayer::setParentLayer(ViewLayer * parent) {
 	m_parentLayer = parent;
-	if (parent) {
+	if (parent != nullptr) {
 		parent->m_childLayers.append(this);
 	}
 }
@@ -296,12 +297,12 @@ bool ViewLayer::alreadyInLayer(double z) {
 }
 
 void ViewLayer::cleanup() {
-	foreach (NamePair * sp, names.values()) {
+	Q_FOREACH (NamePair * sp, names.values()) {
 		delete sp;
 	}
 	names.clear();
 
-	foreach (NameTriple * nameTriple, ViewIDNames) {
+	Q_FOREACH (NameTriple * nameTriple, ViewIDNames) {
 		delete nameTriple;
 	}
 	ViewIDNames.clear();
@@ -479,7 +480,7 @@ QString & ViewLayer::viewIDNaturalName(ViewLayer::ViewID viewID) {
 }
 
 ViewLayer::ViewID ViewLayer::idFromXmlName(const QString & name) {
-	foreach (ViewID id, ViewIDNames.keys()) {
+	Q_FOREACH (ViewID id, ViewIDNames.keys()) {
 		NameTriple * nameTriple = ViewIDNames.value(id);
 		if (name.compare(nameTriple->xmlName()) == 0) return id;
 	}

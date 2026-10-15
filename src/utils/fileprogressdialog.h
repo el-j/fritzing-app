@@ -33,7 +33,7 @@ class FileProgressDialog : public QDialog
 	Q_OBJECT
 
 public:
-	FileProgressDialog(QWidget *parent = 0);
+	FileProgressDialog(QWidget *parent = nullptr);
 	FileProgressDialog(const QString & title, int initialMaximum, QWidget *parent);
 	~FileProgressDialog();
 
@@ -47,7 +47,7 @@ protected:
 	void closeEvent(QCloseEvent *);
 	void resizeEvent(QResizeEvent *);
 
-public slots:
+public Q_SLOTS:
 	void setMinimum(int);
 	void setMaximum(int);
 	void addMaximum(int);
@@ -60,27 +60,27 @@ public slots:
 	void loadingInstanceSlot(class ModelBase *, QDomElement & instance);
 	void settingItemSlot();
 
-protected slots:
+protected Q_SLOTS:
 	void updateIndeterminate();
 
 
-signals:
+Q_SIGNALS:
 	void cancel();
 
 protected:
 	void init(const QString & title, int initialMaximum);
 
 protected:
-	QProgressBar * m_progressBar;
-	QLabel * m_message;
+	QProgressBar * m_progressBar = nullptr;
+	QLabel * m_message = nullptr;
 
-	int m_binLoadingCount;
-	int m_binLoadingIndex;
-	int m_binLoadingStart;
-	int m_binLoadingChunk;
-	int m_incValueMod;
-	double m_binLoadingInc;
-	double m_binLoadingValue;
+	int m_binLoadingCount = 0;
+	int m_binLoadingIndex = 0;
+	int m_binLoadingStart = 0;
+	int m_binLoadingChunk = 0;
+	int m_incValueMod = 0;
+	double m_binLoadingInc = 0.0;
+	double m_binLoadingValue = 0.0;
 	QTimer m_timer;
 };
 

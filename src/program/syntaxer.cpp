@@ -21,18 +21,18 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "syntaxer.h"
 #include "../debugdialog.h"
 #include "../utils/textutils.h"
+#include "utils/misc.h"
 
-#include <QRegExp>
 #include <QXmlStreamReader>
 
 QHash<QString, QString> Syntaxer::m_listsToFormats;
 
 Syntaxer::Syntaxer() : QObject() {
-	m_trieRoot = NULL;
+	m_trieRoot = nullptr;
 }
 
 Syntaxer::~Syntaxer() {
-	if (m_trieRoot) {
+	if (m_trieRoot != nullptr) {
 		delete m_trieRoot;
 	}
 }
@@ -40,13 +40,13 @@ Syntaxer::~Syntaxer() {
 bool Syntaxer::loadSyntax(const QString &filename)
 {
 	QFile file(filename);
-
-	QString errorStr;
-	int errorLine;
-	int errorColumn;
+	if (!file.open(QIODevice::ReadOnly)) {
+		DebugDialog::debug(QString("Unable to open :%1").arg(filename));
+	}
 
 	QDomDocument domDocument;
-	if (!domDocument.setContent(&file, true, &errorStr, &errorLine, &errorColumn)) {
+	QDomDocument::ParseResult parseResult = domDocument.setContent(&file, QDomDocument::ParseOption::UseNamespaceProcessing);
+	if (!parseResult) {
 		return false;
 	}
 
@@ -81,10 +81,10 @@ bool Syntaxer::loadSyntax(const QString &filename)
 
 	m_canProgram = root.attribute("canProgram", "").compare("true", Qt::CaseInsensitive) == 0;
 	m_name = root.attribute("name");
-	QStringList extensions = root.attribute("extensions").split(";", QString::SkipEmptyParts);
+	QStringList extensions = root.attribute("extensions").split(";", Qt::SkipEmptyParts);
 	if (extensions.count() > 0) {
-		m_extensionString = m_name + " " + QObject::tr("files") + " (";
-		foreach (QString ext, extensions) {
+		m_extensionString = QObject::tr("%1 files (", "file type filter, e.g. 'Arduino files ('").arg(m_name);
+		Q_FOREACH (QString ext, extensions) {
 			m_extensionString += ext + " ";
 			int ix = ext.indexOf(".");
 			if (ix > 0) {
@@ -109,7 +109,7 @@ bool Syntaxer::loadSyntax(const QString &filename)
 		Qt::CaseSensitivity caseSensitivity = comments.attribute("casesensitive").compare("1") == 0 ? Qt::CaseSensitive : Qt::CaseInsensitive;
 		QDomElement comment = comments.firstChildElement("comment");
 		while (!comment.isNull()) {
-			CommentInfo * commentInfo = new CommentInfo(comment.attribute("start"), comment.attribute("end"), caseSensitivity);
+			auto * commentInfo = new CommentInfo(comment.attribute("start"), comment.attribute("end"), caseSensitivity);
 			commentInfo->m_index = m_commentInfo.count();
 			m_commentInfo.append(commentInfo);
 			comment = comment.nextSiblingElement("comment");
@@ -143,7 +143,7 @@ QString Syntaxer::parseForName(const QString & filename)
 
 void Syntaxer::loadList(QDomElement & list) {
 	QString name = list.attribute("name");
-	SyntaxerTrieLeaf * stf = new SyntaxerTrieLeaf(name);
+	auto * stf = new SyntaxerTrieLeaf(name);
 	QDomElement item = list.firstChildElement("item");
 	while (!item.isNull()) {
 		QString text;
@@ -156,7 +156,7 @@ void Syntaxer::loadList(QDomElement & list) {
 }
 
 bool Syntaxer::matches(const QString & string, TrieLeaf * & leaf) {
-	if (m_trieRoot == NULL) return false;
+	if (m_trieRoot == nullptr) return false;
 
 	QString temp = string;
 	return m_trieRoot->matches(temp, leaf);
@@ -168,7 +168,7 @@ const CommentInfo * Syntaxer::getCommentInfo(int ix) {
 
 bool Syntaxer::matchCommentStart(const QString & text, int offset, int & result, const CommentInfo * & resultCommentInfo) {
 	result = -1;
-	foreach (CommentInfo * commentInfo, m_commentInfo) {
+	Q_FOREACH (CommentInfo * commentInfo, m_commentInfo) {
 		int si = text.indexOf(commentInfo->m_start, offset, commentInfo->m_caseSensitive);
 		if (si >= 0 && (result < 0 || si < result)) {
 			result = si;

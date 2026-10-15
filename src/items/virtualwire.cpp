@@ -22,12 +22,12 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "../connectors/connectoritem.h"
 #include "../model/modelpart.h"
 
-const double VirtualWire::ShapeWidthExtra = 4;
+ const double VirtualWire::ShapeWidthExtra = 3.0;
 
 VirtualWire::VirtualWire( ModelPart * modelPart, ViewLayer::ViewID viewID,  const ViewGeometry & viewGeometry, long id, QMenu * itemMenu  )
 	: ClipableWire(modelPart, viewID,  viewGeometry,  id, itemMenu, false)
 {
-	// note: at this point in fritzing development, the VirtualWire class is only ever used for ratsnest wires
+	// note: at this point in fritzing development, the VirtualWire class is only ever used for ratsnest lines
 	modelPart->setLocalProp("ratsnest", "true");
 	m_colorWasNamed = false;
 	setFlag(QGraphicsItem::ItemIsSelectable, false);
@@ -36,11 +36,64 @@ VirtualWire::VirtualWire( ModelPart * modelPart, ViewLayer::ViewID viewID,  cons
 VirtualWire::~VirtualWire() {
 }
 
+void VirtualWire::setWireWidth(double width,
+							   InfoGraphicsView *infoGraphicsView,
+							   double hoverStrokeWidth)
+{
+	m_wireWidth = width;
+	Wire::setWireWidth(m_wireWidth, infoGraphicsView, hoverStrokeWidth);
+}
+
 void VirtualWire::paint (QPainter * painter, const QStyleOptionGraphicsItem * option, QWidget * widget ) {
 	if (m_hidden) return;
 
-	m_hoverCount = m_connectorHoverCount = 0;			// kills any highlighting
+	qreal currentScale = painter->worldTransform().m11();
+	double minScale = qMax(currentScale, 6.0);
+	m_adjustedHoverStrokeWidth = m_hoverStrokeWidth / minScale;
+	m_adjustedWidth = m_wireWidth / minScale;
+	m_pen.setWidthF(m_adjustedWidth);
 	Wire::paint(painter, option, widget);
+}
+
+QString VirtualWire::makeWireSVG(QPointF offset, double dpi, double printerScale, bool blackOnly)
+{
+	return makeWireSVGAux(offset, dpi, printerScale, blackOnly, 0.1);
+}
+
+double VirtualWire::wireWidth()
+{
+	return m_wireWidth;
+}
+
+void VirtualWire::paintHover(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+{
+	Q_UNUSED(widget);
+	Q_UNUSED(option);
+
+	painter->save();
+	painter->setOpacity(HoverOpacity);
+	painter->fillPath(this->shape(), QBrush(HoverColor));
+
+	painter->restore();
+}
+
+QPainterPath VirtualWire::shape() const
+{
+	QPainterPath path;
+	// if (m_squashShape) return path;
+	if (m_line == QLineF()) {
+		return path;
+	}
+
+	path.moveTo(m_line.p1());
+	path.lineTo(m_line.p2());
+
+	QPainterPathStroker ps(m_pen);
+	ps.setWidth(m_adjustedHoverStrokeWidth);
+	ps.setDashPattern(Qt::SolidLine);
+
+	QPainterPath p = ps.createStroke(path);
+	return p;
 }
 
 void VirtualWire::connectionChange(ConnectorItem * onMe, ConnectorItem * onIt, bool connect) {
@@ -55,14 +108,14 @@ FSvgRenderer * VirtualWire::setUpConnectors(ModelPart * modelPart, ViewLayer::Vi
 
 void VirtualWire::hideConnectors() {
 	// m_connector0 and m_connector1 may not yet be initialized
-	foreach (ConnectorItem * item, cachedConnectorItems()) {
+	Q_FOREACH (ConnectorItem * item, cachedConnectorItems()) {
 		item->setHidden(true);
 	}
 }
 
 void VirtualWire::inactivateConnectors() {
 	// m_connector0 and m_connector1 may not yet be initialized
-	foreach (ConnectorItem * item, cachedConnectorItems()) {
+	Q_FOREACH (ConnectorItem * item, cachedConnectorItems()) {
 		item->setInactive(true);
 	}
 }
@@ -121,7 +174,3 @@ bool VirtualWire::colorWasNamed() {
 	return m_colorWasNamed;
 }
 
-QPainterPath VirtualWire::shape() const
-{
-	return shapeAux(m_hoverStrokeWidth);
-}

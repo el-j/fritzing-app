@@ -19,32 +19,30 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 ********************************************************************/
 
 #include "folderutils.h"
+#include "sanitizeforpath.h"
 #include "lockmanager.h"
 #include "textutils.h"
-#include "fmessagebox.h"
 #include <QDesktopServices>
 #include <QCoreApplication>
 #include <QSettings>
 #include <QTextStream>
 #include <QUuid>
 #include <QCryptographicHash>
+#include <QDateTime>
 #include <QProcess>
 #include <QDesktopServices>
 #include <QUrl>
 #include <QFileInfo>
+#include <QStandardPaths>
 
 #include "../debugdialog.h"
-#ifdef QUAZIP_INSTALLED
+#include "utils/misc.h"
+#include "fmessagebox.h"
 #include <quazip/quazip.h>
 #include <quazip/quazipfile.h>
-#else
-#include "../lib/quazip/quazip.h"
-#include "../lib/quazip/quazipfile.h"
-#endif
-#include "../lib/qtsysteminfo/QtSystemInfo.h"
 
 
-FolderUtils* FolderUtils::singleton = NULL;
+FolderUtils* FolderUtils::singleton = nullptr;
 QString FolderUtils::m_openSaveFolder = "";
 
 FolderUtils::FolderUtils() {
@@ -52,12 +50,11 @@ FolderUtils::FolderUtils() {
 	m_userFolders
 	        << "partfactory"
 	        << "backup"
-	        << "fzz";
+	        << "history"
+	        << "fzz"
+	        << "local_parts";
 	m_documentFolders
-	        << "bins"
-	        << "parts/user" << "parts/contrib"
-	        << "parts/svg/user/icon" << "parts/svg/user/breadboard" << "parts/svg/user/schematic" << "parts/svg/user/pcb"
-	        << "parts/svg/contrib/icon" << "parts/svg/contrib/breadboard" << "parts/svg/contrib/schematic" << "parts/svg/contrib/pcb";
+	        << "bins";
 
 }
 
@@ -66,7 +63,7 @@ FolderUtils::~FolderUtils() {
 
 // finds a subfolder of the application directory searching backward up the tree
 QDir  FolderUtils::getApplicationSubFolder(QString search) {
-	if (singleton == NULL) {
+	if (singleton == nullptr) {
 		singleton = new FolderUtils();
 	}
 
@@ -79,7 +76,7 @@ QDir  FolderUtils::getApplicationSubFolder(QString search) {
 		dir.cdUp();
 		dir.cdUp();
 		if (dir.isRoot()) {
-			DebugDialog::debug(QObject::tr("Application folder %1 not found").arg(search));
+			DebugDialog::debug(QString("Application folder %1 not found").arg(search));
 			return QDir();   // didn't find the search folder
 		}
 
@@ -90,7 +87,7 @@ QDir  FolderUtils::getApplicationSubFolder(QString search) {
 }
 
 QString FolderUtils::getApplicationSubFolderPath(QString search) {
-	if (singleton == NULL) {
+	if (singleton == nullptr) {
 		singleton = new FolderUtils();
 	}
 
@@ -99,7 +96,7 @@ QString FolderUtils::getApplicationSubFolderPath(QString search) {
 }
 
 QString FolderUtils::getAppPartsSubFolderPath(QString search) {
-	if (singleton == NULL) {
+	if (singleton == nullptr) {
 		singleton = new FolderUtils();
 	}
 
@@ -108,7 +105,7 @@ QString FolderUtils::getAppPartsSubFolderPath(QString search) {
 }
 
 QDir FolderUtils::getAppPartsSubFolder(QString search) {
-	if (singleton == NULL) {
+	if (singleton == nullptr) {
 		singleton = new FolderUtils();
 	}
 
@@ -138,8 +135,8 @@ QDir FolderUtils::getAppPartsSubFolder2(QString search) {
 }
 
 QString FolderUtils::getTopLevelUserDataStorePath() {
-	QString path = QSettings(QSettings::IniFormat,QSettings::UserScope,"Fritzing","Fritzing").fileName();
-	return QFileInfo(path).dir().absolutePath();
+	QDir dir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
+	return dir.absolutePath();
 }
 
 QString FolderUtils::getTopLevelDocumentsPath() {
@@ -158,6 +155,11 @@ QString FolderUtils::getUserPartsPath() {
 	return dir.absoluteFilePath("parts");
 }
 
+QString FolderUtils::getLocalPartsPath() {
+	QDir dir(getTopLevelUserDataStorePath());
+	return dir.absoluteFilePath("local_parts");
+}
+
 bool FolderUtils::createFolderAndCdIntoIt(QDir &dir, QString newFolder) {
 	if(!dir.mkdir(newFolder)) return false;
 	if(!dir.cd(newFolder)) return false;
@@ -167,7 +169,7 @@ bool FolderUtils::createFolderAndCdIntoIt(QDir &dir, QString newFolder) {
 
 bool FolderUtils::setApplicationPath(const QString & path)
 {
-	if (singleton == NULL) {
+	if (singleton == nullptr) {
 		singleton = new FolderUtils();
 	}
 
@@ -176,7 +178,7 @@ bool FolderUtils::setApplicationPath(const QString & path)
 
 bool FolderUtils::setAppPartsPath(const QString & path)
 {
-	if (singleton == NULL) {
+	if (singleton == nullptr) {
 		singleton = new FolderUtils();
 	}
 
@@ -186,13 +188,13 @@ bool FolderUtils::setAppPartsPath(const QString & path)
 void FolderUtils::cleanup() {
 	if (singleton) {
 		delete singleton;
-		singleton = NULL;
+		singleton = nullptr;
 	}
 }
 
 const QString FolderUtils::getLibraryPath()
 {
-	if (singleton == NULL) {
+	if (singleton == nullptr) {
 		singleton = new FolderUtils();
 	}
 
@@ -202,7 +204,7 @@ const QString FolderUtils::getLibraryPath()
 
 const QString FolderUtils::libraryPath()
 {
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	// mac plugins are always in the bundle
 	return QDir::cleanPath(QCoreApplication::applicationDirPath() + "/../lib");
 #endif
@@ -211,49 +213,64 @@ const QString FolderUtils::libraryPath()
 }
 
 const QString FolderUtils::applicationDirPath() {
-	if (m_appPath.isEmpty()) {
+	if (!m_appPath.isEmpty()) {
+		return m_appPath;
+	}
+
+
 #ifdef Q_OS_WIN
-		m_appPath = QCoreApplication::applicationDirPath();
+	m_appPath = QCoreApplication::applicationDirPath();
 #else
-		// look in standard Fritzing location (applicationDirPath and parent folders) then in standard linux locations
-		QStringList candidates;
-		candidates.append(QCoreApplication::applicationDirPath());
-		QDir dir(QCoreApplication::applicationDirPath());
+	// look in standard Fritzing location (applicationDirPath and parent folders) then in standard linux locations
+	QStringList candidates;
+	candidates.append(QCoreApplication::applicationDirPath());
+
+	QDir dir(QCoreApplication::applicationDirPath());
+	if (dir.cdUp()) {
+
+#ifdef Q_OS_MACOS
+		candidates.append(dir.absolutePath() + "/Resources");
+#endif
+		candidates.append(dir.absolutePath());
 		if (dir.cdUp()) {
 			candidates.append(dir.absolutePath());
 			if (dir.cdUp()) {
 				candidates.append(dir.absolutePath());
-				if (dir.cdUp()) {
-					candidates.append(dir.absolutePath());
-				}
 			}
 		}
-
-#ifdef PKGDATADIR
-		candidates.append(QLatin1String(PKGDATADIR));
-#else
-		candidates.append("/usr/share/fritzing");
-		candidates.append("/usr/local/share/fritzing");
-#endif
-		candidates.append(QDir::homePath() + "/.local/share/fritzing");
-		foreach (QString candidate, candidates) {
-			//DebugDialog::debug(QString("candidate:%1").arg(candidate));
-			QDir dir(candidate);
-			if (!dir.exists("translations")) continue;
-
-			if (dir.exists("help")) {
-				m_appPath = candidate;
-				return m_appPath;
-			}
-
-		}
-
-		m_appPath = QCoreApplication::applicationDirPath();
-		DebugDialog::debug("data folders not found");
-
-#endif
 	}
 
+#ifdef PKGDATADIR
+	candidates.append(QLatin1String(PKGDATADIR));
+#else
+	candidates.append("/usr/share/fritzing");
+	candidates.append("/usr/local/share/fritzing");
+#endif
+	candidates.append(QDir::homePath() + "/.local/share/fritzing");
+	Q_FOREACH (QString candidate, candidates) {
+		QDir dir(candidate);
+		if (!dir.exists("translations")) {
+			continue;
+		}
+
+		if (dir.exists("help")) {
+			m_appPath = candidate;
+			break;
+		}
+
+	}
+
+	if (m_appPath.isEmpty()) {
+		m_appPath = QCoreApplication::applicationDirPath();
+		DebugDialog::debug("Data folder not found.", DebugDialog::Warning);
+		DebugDialog::debug(" Checked: ");
+		for (const QString& candidate : candidates) {
+			DebugDialog::debug(candidate);
+		}
+	}
+#endif
+
+	DebugDialog::debug(QString("Using data folder: %1").arg(m_appPath), DebugDialog::Info);
 	return m_appPath;
 }
 
@@ -375,7 +392,7 @@ void FolderUtils::rmdir(const QString &dirPath) {
 }
 
 void FolderUtils::rmdir(QDir & dir) {
-	//DebugDialog::debug(QString("removing folder: %1").arg(dir.path()));
+	DebugDialog::debug(QString("removing folder: %1").arg(dir.path()));
 
 	QStringList files = dir.entryList(QDir::AllEntries | QDir::NoDotAndDotDot);
 	for(int i=0; i < files.size(); i++) {
@@ -397,15 +414,16 @@ bool FolderUtils::createFZAndSaveTo(const QDir &dirToCompress, const QString &fi
 
 	QFileInfoList files=dirToCompress.entryInfoList();
 	QFile inFile;
+	QDir destDir = QFileInfo(filepath).dir();
 
 	QString currFolderBU = QDir::currentPath();
 	QDir::setCurrent(dirToCompress.path());
-	foreach(QFileInfo file, files) {
-		if(!file.isFile()||file.fileName()==filepath) continue;
+	Q_FOREACH(QFileInfo file, files) {
+		if(!file.isFile()) continue;
 		if (file.fileName().contains(LockManager::LockedFileName)) continue;
 
 		bool skip = false;
-		foreach (QString suffix, skipSuffixes) {
+		Q_FOREACH (QString suffix, skipSuffixes) {
 			if (file.fileName().endsWith(suffix)) {
 				skip = true;
 				break;
@@ -413,18 +431,28 @@ bool FolderUtils::createFZAndSaveTo(const QDir &dirToCompress, const QString &fi
 		}
 		if (skip) continue;
 
-		inFile.setFileName(file.fileName());
+		QString destination = destDir.absoluteFilePath(file.fileName());
+		// If dirToCompress already is the destination folder, source and
+		// destination are the same file. Copying it would mean removing the
+		// destination (= the source) and then failing the copy, silently
+		// destroying the bundle contents (issue #1158). Leave it in place.
+		if (destination == file.absoluteFilePath()) continue;
 
+		inFile.setFileName(file.fileName());
 		if(!inFile.open(QIODevice::ReadOnly)) {
 			qWarning("inFile.open(): %s", inFile.errorString().toLocal8Bit().constData());
+			QDir::setCurrent(currFolderBU);
 			return false;
 		}
-		QString destination = QFileInfo(filepath).dir().filePath(inFile.fileName());
 		if (QFileInfo(destination).exists())
 			QFile::remove(destination);
 		DebugDialog::debug("Destination " + destination);
-		inFile.copy(destination);
-
+		if (!inFile.copy(destination)) {
+			qWarning("inFile.copy(): %s", inFile.errorString().toLocal8Bit().constData());
+			inFile.close();
+			QDir::setCurrent(currFolderBU);
+			return false;
+		}
 		inFile.close();
 	}
 	QDir::setCurrent(currFolderBU);
@@ -440,7 +468,7 @@ bool FolderUtils::createZipAndSaveTo(const QDir &dirToCompress, const QString &f
 	DebugDialog::debug("temp file: "+tempZipFile);
 	QuaZip zip(tempZipFile);
 	if(!zip.open(QuaZip::mdCreate)) {
-		qWarning("zip.open(): %d", zip.getZipError());
+		qWarning() << QString("zip.open(): %1").arg(zip.getZipError());
 		return false;
 	}
 
@@ -448,15 +476,16 @@ bool FolderUtils::createZipAndSaveTo(const QDir &dirToCompress, const QString &f
 	QFile inFile;
 	QuaZipFile outFile(&zip);
 	char c;
+	int entriesWritten = 0;
 
 	QString currFolderBU = QDir::currentPath();
 	QDir::setCurrent(dirToCompress.path());
-	foreach(QFileInfo file, files) {
+	Q_FOREACH(QFileInfo file, files) {
 		if(!file.isFile()||file.fileName()==filepath) continue;
 		if (file.fileName().contains(LockManager::LockedFileName)) continue;
 
 		bool skip = false;
-		foreach (QString suffix, skipSuffixes) {
+		Q_FOREACH (QString suffix, skipSuffixes) {
 			if (file.fileName().endsWith(suffix)) {
 				skip = true;
 				break;
@@ -490,16 +519,38 @@ bool FolderUtils::createZipAndSaveTo(const QDir &dirToCompress, const QString &f
 			return false;
 		}
 		inFile.close();
+		entriesWritten++;
 	}
 	zip.close();
 	QDir::setCurrent(currFolderBU);
+
+	if (entriesWritten < 1) {
+		// Refuse to overwrite the target with a 0-entry (empty) archive; doing so
+		// would silently destroy the user's file (issue #1158). Leave it intact.
+		qWarning() << "Saving failed. Refusing to write an empty bundle to" << filepath;
+		QFile::remove(tempZipFile);
+		return false;
+	}
+
+	QFile file(tempZipFile);
+	QString randSuffix = TextUtils::getRandText();
+	QString temporaryFilepathInTargetDir = addToBasename(filepath, randSuffix);
+	bool result = FolderUtils::slamCopy(file, temporaryFilepathInTargetDir);
+	if (!result) {
+		qWarning("Saving failed. Copying file to target dir failed.");
+		return false;
+	}
 
 	if(QFileInfo(filepath).exists()) {
 		// if we're here the usr has already accepted to overwrite
 		QFile::remove(filepath);
 	}
-	QFile file(tempZipFile);
-	FolderUtils::slamCopy(file, filepath);
+	QFile file2(temporaryFilepathInTargetDir);
+	result = file2.rename(filepath);
+	if (!result) {
+		qWarning("Saving failed. Renaming file to target file name failed.");
+		return false;
+	}
 	file.remove();
 
 	if(zip.getZipError()!=0) {
@@ -517,7 +568,7 @@ bool FolderUtils::unzipTo(const QString &filepath, const QString &dirToDecompres
 
 	QuaZip zip(filepath);
 	if(!zip.open(QuaZip::mdUnzip)) {
-		error = QString("zip.open(): %d").arg(zip.getZipError());
+		error = QString("zip.open(): %1").arg(zip.getZipError());
 		DebugDialog::debug(error);
 		return false;
 	}
@@ -531,19 +582,20 @@ bool FolderUtils::unzipTo(const QString &filepath, const QString &dirToDecompres
 	char c;
 	for(bool more=zip.goToFirstFile(); more; more=zip.goToNextFile()) {
 		if(!zip.getCurrentFileInfo(&info)) {
-			error = QString("getCurrentFileInfo(): %d\n").arg(zip.getZipError());
+			error = QString("getCurrentFileInfo(): %1\n").arg(zip.getZipError());
 			DebugDialog::debug(error);
 			return false;
 		}
 
 		if(!file.open(QIODevice::ReadOnly)) {
-			error = QString("file.open(): %d").arg(file.getZipError());
+			error = QString("file.open(): %1").arg(file.getZipError());
 			DebugDialog::debug(error);
 			return false;
 		}
 		name=file.getActualFileName();
+		DebugDialog::debug(QString("  unzipped: %1").arg(name));
 		if(file.getZipError()!=UNZ_OK) {
-			error = QString("file.getFileName(): %d").arg(file.getZipError());
+			error = QString("file.getFileName(): %1").arg(file.getZipError());
 			DebugDialog::debug(error);
 			return false;
 		}
@@ -555,8 +607,8 @@ bool FolderUtils::unzipTo(const QString &filepath, const QString &dirToDecompres
 				if (name[i].unicode() < 32) {
 					name.replace(i, 1, &underscore, 1);
 				}
-				else for (unsigned int j = 0; j < (sizeof(badCharacters) / sizeof(QChar)); j++) {
-						if (name[i] == badCharacters[j]) {
+				else for (auto badCharacter : badCharacters) {
+						if (name[i] == badCharacter) {
 							name.replace(i, 1, &underscore, 1);
 							break;
 						}
@@ -564,7 +616,7 @@ bool FolderUtils::unzipTo(const QString &filepath, const QString &dirToDecompres
 			}
 			out.setFileName(dirToDecompress+"/"+name);
 			if(!out.open(QIODevice::WriteOnly)) {
-				error = QString("out.open(): %s").arg(out.errorString().toLocal8Bit().constData());
+				error = QString("out.open(): %1").arg(out.errorString().toLocal8Bit().constData());
 				DebugDialog::debug(error);
 				return false;
 			}
@@ -591,7 +643,7 @@ bool FolderUtils::unzipTo(const QString &filepath, const QString &dirToDecompres
 
 		out.close();
 		if(file.getZipError()!=UNZ_OK) {
-			error = QString("file.getFileName(): %d").arg(file.getZipError());
+			error = QString("file.getFileName(): %1").arg(file.getZipError());
 			DebugDialog::debug(error);
 			return false;
 		}
@@ -602,14 +654,14 @@ bool FolderUtils::unzipTo(const QString &filepath, const QString &dirToDecompres
 		}
 		file.close();
 		if(file.getZipError()!=UNZ_OK) {
-			error = QString("file.close(): %d").arg(file.getZipError());
+			error = QString("file.close(): %1").arg(file.getZipError());
 			DebugDialog::debug(error);
 			return false;
 		}
 	}
 	zip.close();
 	if(zip.getZipError()!=UNZ_OK) {
-		error = QString("zip.close(): %d").arg(zip.getZipError());
+		error = QString("zip.close(): %1").arg(zip.getZipError());
 		DebugDialog::debug(error);
 		return false;
 	}
@@ -620,13 +672,13 @@ bool FolderUtils::unzipTo(const QString &filepath, const QString &dirToDecompres
 void FolderUtils::collectFiles(const QDir & parent, QStringList & filters, QStringList & files, bool recursive)
 {
 	QFileInfoList fileInfoList = parent.entryInfoList(filters, QDir::Files | QDir::Hidden | QDir::NoSymLinks);
-	foreach (QFileInfo fileInfo, fileInfoList) {
+	Q_FOREACH (QFileInfo fileInfo, fileInfoList) {
 		files.append(fileInfo.absoluteFilePath());
 	}
 
 	if (recursive) {
 		QFileInfoList dirList = parent.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::NoSymLinks);
-		foreach (QFileInfo dirInfo, dirList) {
+		Q_FOREACH (QFileInfo dirInfo, dirList) {
 			QDir dir(dirInfo.filePath());
 			//DebugDialog::debug(QString("looking in backup dir %1").arg(dir.absolutePath()));
 
@@ -703,7 +755,7 @@ void FolderUtils::showInFolder(const QString & path)
 	QString param = QLatin1String("/e,/select,");
 	param += QDir::toNativeSeparators(path);
 	QProcess::startDetached(explorer, QStringList(param));
-#elif defined(Q_OS_MAC)
+#elif defined(Q_OS_MACOS)
 	QStringList scriptArgs;
 	scriptArgs << QLatin1String("-e")
 	           << QString::fromLatin1("tell application \"Finder\" to reveal POSIX file \"%1\"")
@@ -718,60 +770,190 @@ void FolderUtils::showInFolder(const QString & path)
 #endif
 }
 
+// make sure that the folder structure for parts and bins, exists
 void FolderUtils::createUserDataStoreFolders() {
-	// make sure that the folder structure for parts and bins, exists
-
-	if (singleton == NULL) {
+	if (singleton == nullptr) {
 		singleton = new FolderUtils();
 	}
 
 	QDir userDataStore(getTopLevelUserDataStorePath());
-	foreach(QString folder, singleton->m_userFolders) {
+	for (const QString &folder : singleton->m_userFolders) {
 		QString path = userDataStore.absoluteFilePath(folder);
-		if(!QFileInfo(path).exists()) {
+		if (!QFileInfo::exists(path)) {
 			userDataStore.mkpath(folder);
 		}
 	}
 
 	QDir documents(getTopLevelDocumentsPath());
-	QStringList documentFolders(singleton->m_documentFolders);
-	foreach(QString folder, documentFolders) {
+	for (const QString &folder : singleton->m_documentFolders) {
 		QString path = documents.absoluteFilePath(folder);
-		if(!QFileInfo(path).exists()) {
+		if (!QFileInfo::exists(path)) {
 			documents.mkpath(folder);
 		}
 	}
 
 	// in older versions of Fritzing, local parts and bins were in userDataStore
-	QList<QDir> toRemove;
-	QStringList folders;
-	folders << "bins" << "parts";
-	bool foundOld = false;
-	foreach(QString folder, folders ) {
-		foundOld || QFileInfo(userDataStore.absoluteFilePath(folder)).exists();
+	// "older" refers to Fritzing versions before 2013.
+	for (const QString folder : {"bins", "parts"}) {
+		QDir oldDir(userDataStore.absoluteFilePath(folder));
+		if (oldDir.exists()) {
+			QString oldLocation(oldDir.absolutePath());
+			QString newLocation(documents.absoluteFilePath(folder));
+
+			FMessageBox::information(nullptr,
+									 QCoreApplication::translate("Legacy", "Move Your Custom Parts"),
+									 QCoreApplication::translate("Legacy", "<p>Please move your custom-made parts and bins from the old location:<br/><br/><em>%1</em><br/><br/>"
+																		   "to the new Fritzing documents folder at:<br/><br/><em>%2</em><br/><br/>")
+										 .arg(oldLocation, newLocation));
+			break;
+		}
+	}
+}
+
+QString FolderUtils::addToBasename(const QString &filePath, const QString &addition)
+{
+	QFileInfo fileInfo(filePath);
+	QString baseName = fileInfo.baseName();
+	QString suffix = fileInfo.completeSuffix();
+	QString path = fileInfo.path();
+
+	return QString("%1/%2%3.%4").arg(path, baseName, addition, suffix);
+}
+
+bool FolderUtils::ensureDirectoryExists(const QString & filePath) {
+	QDir dir = QFileInfo(filePath).absoluteDir();
+	if (!dir.exists()) {
+		return dir.mkpath(dir.absolutePath());
+	}
+	return true;
+}
+
+QString FolderUtils::sanitizeForFolder(const QString & name) {
+	return sanitizeForPath(name);
+}
+
+bool FolderUtils::checkFileLoadability(QWidget* parent, const QString& filePath) {
+	QString fileType;
+	static const QMap<QString, QString> fileTypes {
+		{FritzingSketchExtension, QObject::tr("Fritzing sketch", "This is a file type used for an error message.")},
+		{FritzingBundleExtension, QObject::tr("Fritzing bundle", "This is a file type used for an error message.")},
+		{FritzingBinExtension, QObject::tr("Fritzing bin", "This is a file type used for an error message.")},
+		{FritzingBundledBinExtension, QObject::tr("Fritzing bundled bin", "This is a file type used for an error message.")},
+		{FritzingPartExtension, QObject::tr("Fritzing part", "This is a file type used for an error message.")},
+		{FritzingBundledPartExtension, QObject::tr("Fritzing bundled part", "This is a file type used for an error message.")}
+	};
+	for (auto it = fileTypes.begin(); it != fileTypes.end(); ++it) {
+		if (filePath.endsWith(it.key())) {
+			fileType = it.value();
+			break;
+		}
 	}
 
-	if (foundOld) {
-		// inform user about the move
-		FMessageBox::information(NULL, QCoreApplication::translate("FolderUtils", "Moving your custom parts"),
-		                         QCoreApplication::translate("FolderUtils", "<p>Your custom-made parts and bins are moved from the hidden "
-		                                 "app data folder to your fritzing documents folder at <br/><br/><em>%1</em><br/><br/>"
-		                                 "This way we hope to make it easier for you to find and edit them manually.</p>")
-		                         .arg(documents.absolutePath()));
+	if (!QFileInfo::exists(filePath)) {
+		QFileInfo fileInfo(filePath);
+		QStringList errorDetails;
 
-		// copy these into the new locations
-		foreach(QString folder, folders ) {
-			QDir source(userDataStore.absoluteFilePath(folder));
-			QDir target(documents.absoluteFilePath(folder));
-			if (source.exists()) {
-				replicateDir(source, target);
-				toRemove << source;
+		if (fileInfo.isSymLink()) {
+			errorDetails << QObject::tr("A symbolic link exists but points to missing file: %1")
+						.arg(fileInfo.symLinkTarget());
+		}
+
+		QString parentPath = fileInfo.path();
+		if (!QFileInfo(parentPath).exists()) {
+			errorDetails << QObject::tr("The parent directory does not exist: %1").arg(parentPath);
+		}
+
+		// Check for case sensitivity issues
+		QDir dir(fileInfo.path());
+		QStringList entries = dir.entryList(QDir::Files | QDir::NoDotAndDotDot);
+		for (const QString& entry : entries) {
+			if (entry.compare(fileInfo.fileName(), Qt::CaseInsensitive) == 0 &&
+				entry != fileInfo.fileName()) {
+				errorDetails << QObject::tr("Found similar filename with different case: %1")
+							.arg(entry);
 			}
 		}
 
-		// now remove the obsolete locations
-		foreach (QDir dir, toRemove) {
-			rmdir(dir);
-		}
+		QString errorDetail = errorDetails.isEmpty() ?
+			"" : "\n\nPossible issues:\n• " + errorDetails.join("\n• ");
+
+		FMessageBox::warning(
+			parent,
+			QObject::tr("Fritzing"),
+			QObject::tr("Cannot find file '%1'.\n\nFile type: %2\n\nPlease check if the file exists.")
+				.arg(filePath)
+				.arg(fileType) + errorDetail
+		);
+		return false;
+	}
+
+	QFile file(filePath);
+	if (!file.open(QFile::ReadOnly)) {
+		FMessageBox::warning(
+					parent,
+					QObject::tr("Fritzing"),
+					QObject::tr("Cannot read file '%1'.\n\nFile type: %2\n\nPlease ensure you have permission to read the file.")
+					.arg(filePath)
+					.arg(fileType)
+					);
+		return false;
+	}
+	file.close();
+
+	if (QFileInfo(filePath).size() == 0) {
+		FMessageBox::warning(
+					parent,
+					QObject::tr("Fritzing"),
+					QObject::tr("File '%1' is empty.\n\nFile type: %2\n\nThis could be due to a cloud storage or network drive issue. Please ensure the file has been properly synchronized and saved.")
+					.arg(filePath)
+					.arg(fileType)
+					);
+		return false;
+	}
+	return true;
+}
+
+QString FolderUtils::getHistoryPath() {
+	return getTopLevelUserDataStorePath() + "/history";
+}
+
+void FolderUtils::savePreviousVersionToHistory(const QString &filePath, int maxVersions) {
+	QFileInfo sourceInfo(filePath);
+	if (!sourceInfo.exists() || sourceInfo.size() == 0) {
+		return;
+	}
+
+	QString historyDir = getHistoryPath();
+	QDir dir(historyDir);
+	if (!dir.exists()) {
+		dir.mkpath(historyDir);
+	}
+
+	// Build history filename: <md5_8chars>_<basename>_<timestamp>.<ext>
+	QByteArray pathHash = QCryptographicHash::hash(
+		sourceInfo.absoluteFilePath().toUtf8(), QCryptographicHash::Md5);
+	QString hashPrefix = pathHash.toHex().left(8);
+
+	QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+	QString historyFileName = QString("%1_%2_%3.%4")
+		.arg(hashPrefix,
+		     sourceInfo.completeBaseName(),
+		     timestamp,
+		     sourceInfo.suffix());
+
+	QString historyFilePath = dir.absoluteFilePath(historyFileName);
+	if (!QFile::copy(filePath, historyFilePath)) {
+		DebugDialog::debug(QString("savePreviousVersionToHistory: failed to copy '%1' to '%2'")
+			.arg(filePath, historyFilePath));
+		return;
+	}
+
+	// Prune: keep at most maxVersions files matching this path hash prefix
+	QStringList nameFilter;
+	nameFilter << (hashPrefix + "_*");
+	QFileInfoList historyFiles = dir.entryInfoList(nameFilter, QDir::Files, QDir::Time);
+	while (historyFiles.size() > maxVersions) {
+		QFileInfo oldest = historyFiles.takeLast();
+		QFile::remove(oldest.absoluteFilePath());
 	}
 }

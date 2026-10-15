@@ -27,7 +27,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 PEBaseCommand::PEBaseCommand(PEMainWindow * peMainWindow, QUndoCommand *parent)
-	: BaseCommand(BaseCommand::CrossView, NULL, parent)
+	: BaseCommand(BaseCommand::CrossView, nullptr, parent)
 {
 	m_peMainWindow = peMainWindow;
 }
@@ -100,6 +100,38 @@ void ChangeTagsCommand::redo()
 
 QString ChangeTagsCommand::getParamString() const {
 	return "ChangeTagsCommand " +
+	       QString(" old:%1, new:%2")
+	       .arg(m_old.count())
+	       .arg(m_new.count())
+	       ;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+ChangeHistoryCommand::ChangeHistoryCommand(PEMainWindow * peMainWindow, const QList<HistoryEntry>  & oldHistory, const QList<HistoryEntry> & newHistory, QUndoCommand *parent)
+	: PEBaseCommand(peMainWindow, parent)
+{
+	m_old = oldHistory;
+	m_new = newHistory;
+}
+
+void ChangeHistoryCommand::undo()
+{
+	m_peMainWindow->changeHistory(m_old, true);
+}
+
+void ChangeHistoryCommand::redo()
+{
+	if (m_skipFirstRedo) {
+		m_skipFirstRedo = false;
+	}
+	else {
+		m_peMainWindow->changeHistory(m_new, true);
+	}
+}
+
+QString ChangeHistoryCommand::getParamString() const {
+	return "ChangeHistoryCommand " +
 	       QString(" old:%1, new:%2")
 	       .arg(m_old.count())
 	       .arg(m_new.count())
@@ -331,7 +363,7 @@ QString RemoveBusConnectorCommand::getParamString() const {
 	       QString(" busID:%1, connectorID:%2 inv:%3")
 	       .arg(m_busID)
 	       .arg(m_connectorID)
-	       .arg(m_inverted);
+	       .arg(static_cast<int>(m_inverted));
 	;
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////

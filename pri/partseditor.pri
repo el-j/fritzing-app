@@ -46,6 +46,7 @@ HEADERS += \
     \
     src/partseditor/pemainwindow.h \
     src/partseditor/pemetadataview.h \
+    src/partseditor/pehistoryentrydialog.h \
     src/partseditor/pecommands.h \
     src/partseditor/peconnectorsview.h \
     src/partseditor/pesvgview.h \
@@ -55,6 +56,7 @@ HEADERS += \
     src/partseditor/kicadmoduledialog.h \
     src/partseditor/hashpopulatewidget.h \
     src/partseditor/baseremovebutton.h \
+    src/partseditor/tageditorwidget.h \
 
 
 SOURCES += \
@@ -81,6 +83,7 @@ SOURCES += \
      \
     src/partseditor/pemainwindow.cpp \
     src/partseditor/pemetadataview.cpp \
+    src/partseditor/pehistoryentrydialog.cpp \
     src/partseditor/pecommands.cpp \
     src/partseditor/peconnectorsview.cpp \
     src/partseditor/pesvgview.cpp \
@@ -89,3 +92,4 @@ SOURCES += \
     src/partseditor/pegraphicsitem.cpp \
     src/partseditor/kicadmoduledialog.cpp \
     src/partseditor/hashpopulatewidget.cpp \
+    src/partseditor/tageditorwidget.cpp \

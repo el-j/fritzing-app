@@ -40,7 +40,7 @@ class Board : public PaletteItem
 
 public:
 	// after calling this constructor if you want to render the loaded svg (either from model or from file), MUST call <renderImage>
-	Board(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
+	explicit Board(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
 	~Board();
 
 	QStringList collectValues(const QString & family, const QString & prop, QString & value);
@@ -49,6 +49,7 @@ public:
 	bool stickyEnabled();
 	PluralType isPlural();
 	bool canFindConnectorsUnder();
+	bool lockSymbolAlwaysVisible();
 	bool collectExtraInfo(QWidget * parent, const QString & family, const QString & prop, const QString & value, bool swappingEnabled, QString & returnProp, QString & returnValue, QWidget * & returnWidget, bool & hide);
 
 protected:
@@ -76,9 +77,9 @@ public:
 	static QString convertToXmlName(const QString &);
 	static QString convertFromXmlName(const QString &);
 
-protected slots:
+protected Q_SLOTS:
 	void prepLoadImage();
-	void fileNameEntry(const QString & filename);
+	void fileNameEntry(int index);
 
 protected:
 	QPointer<QComboBox> m_fileNameComboBox;
@@ -99,7 +100,10 @@ public:
 	~ResizableBoard();
 
 	virtual bool resizeMM(double w, double h, const LayerHash & viewLayers);
-	void resizePixels(double w, double h, const LayerHash & viewLayers);
+	virtual void resizePixels(double w, double h, const LayerHash & viewLayers);
+	// px the SVG canvas extends beyond the logical (resizable) size on each axis.
+	// 0 for a plain board; the Pad overrides it with its handle-clearance margin.
+	virtual double sizeOffset() const { return 0.0; }
 	void loadLayerKin(const LayerHash & viewLayers, ViewLayer::ViewLayerPlacement);
 	virtual void setInitialSize();
 	QString retrieveSvg(ViewLayer::ViewLayerID, QHash<QString, QString> & svgHash, bool blackOnly, double dpi, double & factor);
@@ -114,7 +118,7 @@ public:
 	bool inResize();
 	void figureHover();
 
-public slots:
+public Q_SLOTS:
 	virtual void widthEntry();
 	virtual void heightEntry();
 	void keepAspectRatio(bool checkState);
@@ -161,6 +165,7 @@ protected:
 
 protected:
 	static const double CornerHandleSize;
+	static constexpr int kDefaultDecimalsAfter = 1;
 
 	Corner m_corner;
 	QSizeF m_boardSize;
@@ -183,7 +188,6 @@ protected:
 	QPointF m_resizeStartTopRight;
 	QPointF m_resizeStartBottomLeft;
 	int m_decimalsAfter;
-
 };
 
 #endif

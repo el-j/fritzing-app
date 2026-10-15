@@ -13,22 +13,34 @@
 # along with Fritzing. If not, see <http://www.gnu.org/licenses/>.
 # ********************************************************************/
 HEADERS += \
+	src/sketch/renderthing.h \
     src/sketch/fgraphicsscene.h \
     src/sketch/breadboardsketchwidget.h \
     src/sketch/infographicsview.h \
     src/sketch/pcbsketchwidget.h \
     src/sketch/schematicsketchwidget.h \
     src/sketch/sketchwidget.h \
+    src/sketch/outlierhandler.h \
+    src/sketch/migrationhandler.h \
     src/sketch/welcomeview.h \
     src/sketch/zoomablegraphicsview.h \
+    src/sketch/subpartswapmanager.h \
+	src/sketch/swapthing.h \
+    src/sketch/FProbeScrollPosition.h \
 
 
 SOURCES += \
+	src/sketch/renderthing.cpp \
     src/sketch/fgraphicsscene.cpp \
     src/sketch/breadboardsketchwidget.cpp \
     src/sketch/infographicsview.cpp \
     src/sketch/pcbsketchwidget.cpp \
     src/sketch/schematicsketchwidget.cpp \
     src/sketch/sketchwidget.cpp \
+    src/sketch/outlierhandler.cpp \
+    src/sketch/migrationhandler.cpp \
     src/sketch/welcomeview.cpp \
     src/sketch/zoomablegraphicsview.cpp \
+    src/sketch/subpartswapmanager.cpp \
+	src/sketch/swapthing.cpp \
+    src/sketch/FProbeScrollPosition.cpp \

@@ -36,7 +36,7 @@ class Hole : public PaletteItem
 
 public:
 	// after calling this constructor if you want to render the loaded svg (either from model or from file), MUST call <renderImage>
-	Hole(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
+	explicit Hole(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
 	~Hole();
 
 	QString getProperty(const QString & key);
@@ -56,20 +56,20 @@ public:
 	bool canFindConnectorsUnder();
 	QRectF trueSceneBoundingRect();
 
-protected slots:
+protected Q_SLOTS:
 	void changeHoleSize(const QString &);
 	void changeUnits(bool);
 
 protected:
-	QString makeSvg(const QString & holeDiameter, const QString & ringThickness, ViewLayer::ViewLayerID, bool includeHole);
+	QString makeSvg(const QString & holeDiameter, const QString & ringThickness, ViewLayer::ViewLayerID, bool includeHole, bool blackOnly);
 	virtual QString makeID();
 	ItemBase * setBothSvg(const QString & holeDiameter, const QString & ringThickness);
 	void setBothNonConnectors(ItemBase * itemBase, SvgIdLayer * svgIdLayer);
 	virtual void setBoth(const QString & holeDiameter, const QString &  thickness);
-	QRectF getRect(const QString & newSize);
 	ViewLayer::ViewID useViewIDForPixmap(ViewLayer::ViewID, bool swappingEnabled);
 
 public:
+	QRectF getRect(const QString & newSize);   // public so a group apply can recenter each hole
 	static const double OffsetPixels;
 };
 

@@ -13,6 +13,7 @@
  <properties>
    <property name="family">net label</property>
    <property name="label"></property>
+   <property name="style"></property>
  </properties>
  <description>A net label for schematic view will be connected to any other net label with the same name.</description>
  <views>

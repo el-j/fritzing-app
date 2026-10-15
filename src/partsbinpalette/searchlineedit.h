@@ -22,33 +22,23 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #define SEARCHLINEEDIT_H
 
 #include <QLineEdit>
-#include <QMouseEvent>
+#include <QTimer>
 
 class SearchLineEdit : public QLineEdit {
 	Q_OBJECT
 
 public:
-	SearchLineEdit(QWidget * parent = NULL);
-	~SearchLineEdit();
+	SearchLineEdit(QWidget * parent = nullptr);
+	~SearchLineEdit() = default;
 
-	void setDecoy(bool);
-	bool decoy();
 
-public:
-	static void cleanup();
+Q_SIGNALS:
+	void updateSearch(const QString& searchTerm);
 
-signals:
-	void clicked();
+private:
+	QTimer mTimer;
 
-protected:
-	void paintEvent(QPaintEvent *);
-	void mousePressEvent(QMouseEvent *);
-	void enterEvent( QEvent *);
-	void leaveEvent( QEvent *);
-	void setColors(const QColor & base, const QColor & text);
 
-protected:
-	bool m_decoy;
 };
 
 

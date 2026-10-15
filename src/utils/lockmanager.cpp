@@ -21,6 +21,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "lockmanager.h"
 #include "folderutils.h"
 #include "textutils.h"
+#include "../debugdialog.h"
 
 #include <QTimer>
 #include <QPointer>
@@ -35,7 +36,8 @@ const long LockManager::SlowTime = 240000;
 static LockManager TheLockManager;
 static QHash<long, QPointer<QTimer> > TheTimers;
 static QMultiHash<long, LockedFile *> TheLockedFiles;
-static QMutex TheMutex;
+static QMutex LockedFilesMutex;
+static QMutex TimersMutex;
 
 LockedFile::LockedFile(const QString & filename, long freq) {
 	file.setFileName(filename);
@@ -60,15 +62,14 @@ LockManager::LockManager() : QObject()
 
 LockManager::~LockManager()
 {
-	foreach (QTimer * timer, TheTimers) {
-		if (timer) timer->stop();
-	}
-	TheTimers.clear();
+	cleanup();
 }
 
 void LockManager::cleanup() {
-	foreach (QTimer * timer, TheTimers) {
-		if (timer) {
+	QMutexLocker locker(&TimersMutex);
+
+	Q_FOREACH (QTimer * timer, TheTimers) {
+		if (timer != nullptr) {
 			timer->stop();
 			delete timer;
 		}
@@ -77,11 +78,11 @@ void LockManager::cleanup() {
 }
 
 void LockManager::touchFiles() {
-	QTimer * timer = qobject_cast<QTimer *>(sender());
-	if (timer == NULL) return;
+	auto * timer = qobject_cast<QTimer *>(sender());
+	if (timer == nullptr) return;
 
-	QMutexLocker locker(&TheMutex);
-	foreach (LockedFile * lockedFile, TheLockedFiles.values(timer->interval())) {
+	QMutexLocker locker(&LockedFilesMutex);
+	Q_FOREACH (LockedFile * lockedFile, TheLockedFiles.values(timer->interval())) {
 		lockedFile->touch();
 	}
 }
@@ -100,13 +101,15 @@ void LockManager::initLockedFiles(const QString & prefix, QString & folder, QHas
 }
 
 LockedFile * LockManager::makeLockedFile(const QString & path, long touchFrequency) {
-	LockedFile * lockedFile = new LockedFile(path, touchFrequency);
+	auto * lockedFile = new LockedFile(path, touchFrequency);
 	lockedFile->touch();
-	TheMutex.lock();
+	LockedFilesMutex.lock();
 	TheLockedFiles.insert(touchFrequency, lockedFile);
-	TheMutex.unlock();
-	QTimer * timer = TheTimers.value(touchFrequency, NULL);
-	if (timer == NULL) {
+	LockedFilesMutex.unlock();
+
+	QMutexLocker locker(&TimersMutex);
+	QTimer * timer = TheTimers.value(touchFrequency, nullptr);
+	if (timer == nullptr) {
 		timer = new QTimer();
 		timer->setInterval(touchFrequency);
 		timer->setSingleShot(false);
@@ -127,12 +130,16 @@ void LockManager::releaseLockedFiles(const QString & folder, QHash<QString, Lock
 void LockManager::releaseLockedFiles(const QString & folder, QHash<QString, LockedFile *> & lockedFiles, bool remove)
 {
 	QDir backupDir(folder);
-	backupDir.cdUp();
-	foreach (QString sub, lockedFiles.keys()) {
+	if (! backupDir.cdUp()) {
+		DebugDialog::debug(QString("Error, lock directory not found: %1").arg(backupDir.dirName()));
+		return;
+	}
+
+	Q_FOREACH (QString sub, lockedFiles.keys()) {
 		LockedFile * lockedFile = lockedFiles.value(sub);
-		TheMutex.lock();
+		LockedFilesMutex.lock();
 		TheLockedFiles.remove(lockedFile->frequency, lockedFile);
-		TheMutex.unlock();
+		LockedFilesMutex.unlock();
 		if (remove) {
 			FolderUtils::rmdir(backupDir.absoluteFilePath(sub));
 		}
@@ -144,9 +151,12 @@ void LockManager::releaseLockedFiles(const QString & folder, QHash<QString, Lock
 void LockManager::checkLockedFiles(const QString & prefix, QFileInfoList & backupList, QHash<QString, LockedFile *> & lockedFiles, bool recurse, long touchFrequency)
 {
 	QDir backupDir(FolderUtils::getTopLevelUserDataStorePath());
-	backupDir.cd(prefix);
+	if (! backupDir.cd(prefix)) {
+		DebugDialog::debug(QString("Error, lock directory not found: %1 %2").arg(backupDir.absolutePath(), prefix));
+		return;
+	}
 	QFileInfoList dirList = backupDir.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::NoSymLinks);
-	foreach (QFileInfo dirInfo, dirList) {
+	Q_FOREACH (QFileInfo dirInfo, dirList) {
 		QDir dir(dirInfo.filePath());
 		QStringList filters;
 		//DebugDialog::debug(QString("looking in backup dir %1").arg(dir.absolutePath()));
@@ -179,10 +189,9 @@ void LockManager::checkLockedFiles(const QString & prefix, QFileInfoList & backu
 		}
 
 		// we own the file
-		QString folder;
 		LockedFile * lockedFile = makeLockedFile(dir.absoluteFilePath(LockedFileName), touchFrequency);
 		lockedFiles.insert(dirInfo.fileName(), lockedFile);
-		foreach (QFileInfo fileInfo, fileInfoList) {
+		Q_FOREACH (QFileInfo fileInfo, fileInfoList) {
 			backupList << fileInfo;
 		}
 	}
@@ -191,7 +200,7 @@ void LockManager::checkLockedFiles(const QString & prefix, QFileInfoList & backu
 bool LockManager::checkLockedFilesAux(const QDir & parent, QStringList & filters)
 {
 	QFileInfoList dirList = parent.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::NoSymLinks);
-	foreach (QFileInfo dirInfo, dirList) {
+	Q_FOREACH (QFileInfo dirInfo, dirList) {
 		QDir dir(dirInfo.filePath());
 		//DebugDialog::debug(QString("looking in backup dir %1").arg(dir.absolutePath()));
 		QFileInfoList fileInfoList = dir.entryInfoList(filters, QDir::Files | QDir::Hidden | QDir::NoSymLinks);

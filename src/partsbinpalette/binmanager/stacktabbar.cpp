@@ -23,14 +23,15 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QMouseEvent>
 #include <QMenu>
 #include <QStylePainter>
-#include <QStyleOptionTabV2>
+#include <QtGlobal>
+#include <QStyleOptionTab>
 #include <QMimeData>
 
 #include "stacktabbar.h"
 #include "stacktabwidget.h"
-#include "../partsbinpalettewidget.h"
-#include "../partsbinview.h"
-#include "../../debugdialog.h"
+#include "binmanager.h"
+#include "partsbinpalette/partsbinpalettewidget.h"
+#include "partsbinpalette/partsbinview.h"
 
 
 StackTabBar::StackTabBar(StackTabWidget *parent) : QTabBar(parent) {
@@ -40,6 +41,7 @@ StackTabBar::StackTabBar(StackTabWidget *parent) : QTabBar(parent) {
 	//this->setTabsClosable(true);
 	setMovable(true);
 	m_parent = parent;
+	m_tabWasMoved = false;
 	setProperty("current","false");
 	setExpanding(false);
 	setElideMode(Qt::ElideRight);
@@ -47,7 +49,8 @@ StackTabBar::StackTabBar(StackTabWidget *parent) : QTabBar(parent) {
 
 	setContextMenuPolicy(Qt::CustomContextMenu);
 
-	connect(this, SIGNAL(customContextMenuRequested(const QPoint &)), SLOT(showContextMenu(const QPoint &)));
+	connect(this, SIGNAL(customContextMenuRequested(QPoint)), SLOT(showContextMenu(QPoint)));
+	connect(this, SIGNAL(tabMoved(int,int)), this, SLOT(onTabMoved(int,int)));
 
 	m_dragMoveTimer.setSingleShot(true);
 	m_dragMoveTimer.setInterval(250);
@@ -55,7 +58,7 @@ StackTabBar::StackTabBar(StackTabWidget *parent) : QTabBar(parent) {
 }
 
 bool StackTabBar::mimeIsAction(const QMimeData* m, const QString& action) {
-	if(m) {
+	if(m != nullptr) {
 		QStringList formats = m->formats();
 		return formats.contains("action") && (m->data("action") == action);
 	} else {
@@ -78,14 +81,14 @@ void StackTabBar::dragLeaveEvent(QDragLeaveEvent *event) {
 
 void StackTabBar::dragMoveEvent(QDragMoveEvent* event) {
 	const QMimeData *m = event->mimeData();
-	int index = tabAt(event->pos());
+	int index = tabAt(event->position().toPoint());
 	if ((event->source() != this) && mimeIsAction(m,"part-reordering")) {
-		PartsBinPaletteWidget* bin = qobject_cast<PartsBinPaletteWidget*>(m_parent->widget(index));
-		if(bin && bin->allowsChanges()) {
+		auto* bin = qobject_cast<PartsBinPaletteWidget*>(m_parent->widget(index));
+		if((bin != nullptr) && bin->allowsChanges()) {
 			event->acceptProposedAction();
 			m_dragMoveTimer.setProperty("index", index);
 			if (!m_dragMoveTimer.isActive()) {
-				DebugDialog::debug("starting drag move timer");
+				// DebugDialog::debug("starting drag move timer");
 				m_dragMoveTimer.start();
 			}
 			//DebugDialog::debug(QString("setting index %1").arg(index));
@@ -94,12 +97,12 @@ void StackTabBar::dragMoveEvent(QDragMoveEvent* event) {
 }
 
 void StackTabBar::dropEvent(QDropEvent* event) {
-	int toIndex = tabAt(event->pos());
+	int toIndex = tabAt(event->position().toPoint());
 
 	const QMimeData *m = event->mimeData();
 	if(mimeIsAction(m, "part-reordering")) {
-		PartsBinPaletteWidget* bin = qobject_cast<PartsBinPaletteWidget*>(m_parent->widget(toIndex));
-		if(bin && bin->allowsChanges()) {
+		auto* bin = qobject_cast<PartsBinPaletteWidget*>(m_parent->widget(toIndex));
+		if((bin != nullptr) && bin->allowsChanges()) {
 			bin->currentView()->dropEventAux(event,true);
 		}
 	}
@@ -112,13 +115,13 @@ void StackTabBar::showContextMenu(const QPoint &point)
 	if (point.isNull()) return;
 
 	int tabIndex = this->tabAt(point);
-	PartsBinPaletteWidget* bin = qobject_cast<PartsBinPaletteWidget*>(m_parent->widget(tabIndex));
-	if (bin == NULL) return;
+	auto* bin = qobject_cast<PartsBinPaletteWidget*>(m_parent->widget(tabIndex));
+	if (bin == nullptr) return;
 
 	setCurrentIndex(tabIndex);
 
 	QMenu * contextMenu = bin->binContextMenu();
-	if (contextMenu) {
+	if (contextMenu != nullptr) {
 		contextMenu->exec(this->mapToGlobal(point));
 	}
 	delete contextMenu;
@@ -133,7 +136,7 @@ void StackTabBar::paintEvent(QPaintEvent *event)
 
 	for(int i = 0; i < this->count(); ++i)
 	{
-		QStyleOptionTabV2 option;
+		QStyleOptionTab option;
 		initStyleOption(&option, i);
 		option.shape = RoundedNorth;
 		option.text = "";
@@ -142,7 +145,7 @@ void StackTabBar::paintEvent(QPaintEvent *event)
 }
 
 void StackTabBar::setIndex() {
-	if (sender() == NULL) return;
+	if (sender() == nullptr) return;
 
 	bool ok = false;
 	int index = sender()->property("index").toInt(&ok);
@@ -150,3 +153,26 @@ void StackTabBar::setIndex() {
 
 	setCurrentIndex(index);
 }
+
+
+void StackTabBar::onTabMoved(int, int) {
+	m_tabWasMoved = true;
+}
+
+void StackTabBar::mouseReleaseEvent(QMouseEvent* event) {
+	// Call parent implementation first
+	QTabBar::mouseReleaseEvent(event);
+	
+	// Check if we need to correct Search bin position after drag is complete
+	if (m_tabWasMoved) {
+		// Get the BinManager and call the unified method
+		auto* binManager = qobject_cast<BinManager*>(m_parent->parent());
+		if (binManager) {
+			binManager->moveSearchBinToTop();
+		}
+		
+		m_tabWasMoved = false;  // Reset flag at the end
+	}
+}
+
+

@@ -1,7 +1,7 @@
 /*******************************************************************
 
 Part of the Fritzing project - http://fritzing.org
-Copyright (c) 2007-2019 Fritzing
+Copyright (c) 2007-2019,2025 Fritzing
 
 Fritzing is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,7 +22,6 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "stacktabwidget.h"
 #include "stacktabbar.h"
-#include "../../debugdialog.h"
 
 StackTabWidget::StackTabWidget(QWidget *parent) : QTabWidget(parent) {
 	setElideMode(Qt::ElideRight);
@@ -44,9 +43,9 @@ StackTabBar *StackTabWidget::stackTabBar() {
 }
 
 void StackTabWidget::informCurrentChanged(int index) {
-	emit currentChanged(this,index);
+	Q_EMIT currentChanged(this,index);
 }
 
 void StackTabWidget::informTabCloseRequested(int index) {
-	emit tabCloseRequested(this, index);
+	Q_EMIT tabCloseRequested(this, index);
 }

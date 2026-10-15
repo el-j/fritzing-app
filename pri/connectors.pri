@@ -1,6 +1,6 @@
 # /*******************************************************************
 # Part of the Fritzing project - http://fritzing.org
-# Copyright (c) 2007-08 Fritzing
+# Copyright (c) 2007-23 Fritzing GmbH
 # Fritzing is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -14,6 +14,7 @@
 # ********************************************************************/
 
 HEADERS += \
+	$$PWD/../src/connectors/debugconnectorsprobe.h \
 src/connectors/bus.h \
 src/connectors/busshared.h \
 src/connectors/connector.h \
@@ -21,9 +22,11 @@ src/connectors/connectoritem.h \
 src/connectors/nonconnectoritem.h \
 src/connectors/connectorshared.h \
 src/connectors/ercdata.h \
-src/connectors/svgidlayer.h
+src/connectors/svgidlayer.h \
+src/connectors/debugconnectors.h
 
 SOURCES += \
+	$$PWD/../src/connectors/debugconnectorsprobe.cpp \
 src/connectors/bus.cpp \
 src/connectors/busshared.cpp \
 src/connectors/connector.cpp \
@@ -31,4 +34,5 @@ src/connectors/connectoritem.cpp \
 src/connectors/nonconnectoritem.cpp \
 src/connectors/connectorshared.cpp \
 src/connectors/ercdata.cpp \
-src/connectors/svgidlayer.cpp
+src/connectors/svgidlayer.cpp \
+src/connectors/debugconnectors.cpp

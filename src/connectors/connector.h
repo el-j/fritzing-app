@@ -73,6 +73,7 @@ public:
 	class SvgIdLayer * fullPinInfo(ViewLayer::ViewID viewId, ViewLayer::ViewLayerID viewLayerID);
 	const QList<SvgIdLayer *> svgIdLayers() const;
 	QList< QPointer<class ConnectorItem> > viewItems();
+	const QHash< int, QPointer<class ConnectorItem> > & viewItemsHash() const;
 	const QString & legID(ViewLayer::ViewID, ViewLayer::ViewLayerID);
 	void setConnectorLocalName(const QString &);
 	const QString & connectorLocalName();

@@ -33,7 +33,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QMenu>
 
 #include "itembase.h"
-#include "../utils/cursormaster.h"
+#include "utils/svgcursorbuilder.h"
 
 class WireAction : public QAction {
 	Q_OBJECT
@@ -54,7 +54,7 @@ class Wire : public ItemBase, public CursorKeyListener
 	Q_OBJECT
 
 public:
-	Wire(class ModelPart *, ViewLayer::ViewID, const ViewGeometry &, long id, QMenu * itemMenu, bool initLabel);
+	explicit Wire(class ModelPart *, ViewLayer::ViewID, const ViewGeometry &, long id, QMenu * itemMenu, bool initLabel);
 	virtual ~Wire();
 
 
@@ -85,10 +85,10 @@ public:
 	ConnectorItem * connector0();
 	ConnectorItem * connector1();
 	virtual class FSvgRenderer * setUp(ViewLayer::ViewLayerID viewLayerID, const LayerHash & viewLayers, class InfoGraphicsView *);
-	void findConnectorsUnder();
+	void findConnectorsUnder(bool enableHoverFeedback = true, bool allowAlready = false);
 	void collectChained(QList<Wire *> &, QList<ConnectorItem *> & ends);
 	void collectWires(QList<Wire *> & wires);
-	bool stickyEnabled();
+	virtual bool stickyEnabled();
 	void setPcbPenBrush(QBrush & brush);
 	bool getRouted();
 	void setRouted(bool);
@@ -112,9 +112,9 @@ public:
 	double opacity();
 	void setOpacity(double opacity);
 	const QColor & color();
-	void setWireWidth(double width, InfoGraphicsView *, double hoverStrokeWidth);
+	virtual void setWireWidth(double width, InfoGraphicsView *, double hoverStrokeWidth);
 	void setPenWidth(double width, InfoGraphicsView *, double hoverStrokeWidth);
-	double width();
+	virtual double wireWidth();
 	double shadowWidth();
 	double mils();
 	void setExtras(QDomElement &, InfoGraphicsView *);
@@ -132,11 +132,11 @@ public:
 	virtual bool canSwitchLayers();
 	void paint ( QPainter * painter, const QStyleOptionGraphicsItem * option, QWidget * widget = 0 );
 	void paintBody(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
+	virtual QString makeWireSVG(QPointF offset, double dpi, double printerscale, bool blackOnly);
 
 	bool hasPartNumberProperty();
 	bool rotationAllowed();
 	bool rotation45Allowed();
-	void addedToScene(bool temporary);
 	void setConnectorDimensions(double width, double height);
 	void originalConnectorDimensions(double & width, double & height);
 	double hoverStrokeWidth();
@@ -159,12 +159,12 @@ public:
 	void setProp(const QString & prop, const QString & value);
 	void setConnector0Rect();
 	void setConnector1Rect();
-	QRectF connector0Rect(const QLineF & line);
+	QRectF connector0Rect();
 	QRectF connector1Rect(const QLineF & line);
 	void colorByLength(bool);
 
-protected slots:
-	void colorEntry(const QString & text);
+protected Q_SLOTS:
+	void colorEntry(int index);
 	void setBandedProp(bool);
 
 public:
@@ -217,7 +217,16 @@ protected:
 	ViewLayer::ViewID useViewIDForPixmap(ViewLayer::ViewID, bool swappingEnabled);
 	QColor colorForLength();
 	bool coloredByLength();
+	QString makeWireSVGAux(
+		QPointF offset, double dpi, double printerScale, bool blackOnly, double scale);
 
+	QString makeWireSVGLine(double width,
+							const QString &color,
+							QPointF offset,
+							double dpi,
+							double printerScale,
+							bool blackOnly,
+							bool dashed);
 protected:
 	QLineF	m_line;
 	QPen	m_pen;
@@ -255,7 +264,7 @@ public:
 	static QList<int> widths;
 	static QList<QColor> lengthColorTrans;
 
-signals:
+Q_SIGNALS:
 	void wireChangedSignal(Wire* me, const QLineF & oldLine, const QLineF & newLine, QPointF oldPos, QPointF newPos, ConnectorItem * from, ConnectorItem * to);
 	void wireChangedCurveSignal(Wire* me, const Bezier * oldB, const Bezier * newB, bool triggerFirstTime);
 	void wireSplitSignal(Wire* me, QPointF newPos, QPointF oldPos, const QLineF & oldLine);

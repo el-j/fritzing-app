@@ -13,14 +13,18 @@
 # along with Fritzing. If not, see <http://www.gnu.org/licenses/>.
 # ********************************************************************/
 HEADERS += \
-    src/model/modelbase.h \
+	src/model/floaderror.h \
+	src/model/fzpinfo.h \
+	src/model/modelbase.h \
     src/model/modelpart.h \
     src/model/modelpartshared.h \
     src/model/palettemodel.h \
     src/model/sketchmodel.h
 
 SOURCES += \
-    src/model/modelbase.cpp \
+	src/model/floaderror.cpp \
+	src/model/fzpinfo.cpp \
+	src/model/modelbase.cpp \
     src/model/modelpart.cpp \
     src/model/modelpartshared.cpp \
     src/model/palettemodel.cpp \

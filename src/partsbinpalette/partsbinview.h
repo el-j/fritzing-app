@@ -19,13 +19,14 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 ********************************************************************/
 
 
-
 #ifndef PARTSBINVIEW_H_
 #define PARTSBINVIEW_H_
 
-#include "../model/palettemodel.h"
-#include "../items/paletteitem.h"
-#include "../referencemodel/referencemodel.h"
+#include "model/palettemodel.h"
+#include "referencemodel/referencemodel.h"
+
+#include <QDropEvent>
+
 
 class PartsBinPaletteWidget;
 
@@ -33,7 +34,7 @@ class PartsBinView {
 
 public:
 	PartsBinView(ReferenceModel *referenceModel, PartsBinPaletteWidget *parent);
-	virtual ~PartsBinView();				// removes compiler warnings
+	virtual ~PartsBinView() = default;				// removes compiler warnings
 
 	virtual void setPaletteModel(PaletteModel * model, bool clear = false);
 	void reloadParts(PaletteModel * model);
@@ -75,10 +76,10 @@ public:
 	static QHash<QString, QString> TranslatedCategoryNames;
 
 protected:
-	ReferenceModel *m_referenceModel;
-	PartsBinPaletteWidget *m_parent;
+	ReferenceModel *m_referenceModel = nullptr;
+	PartsBinPaletteWidget *m_parent = nullptr;
 
-	bool m_infoViewOnHover;
+	bool m_infoViewOnHover = false;
 
 	QPoint m_dragStartPos;
 

@@ -63,33 +63,33 @@ public:
 	void flash();
 	class ItemBase * itemBase();
 
-signals:
+Q_SIGNALS:
 	void highlightSignal(PEGraphicsItem *);
 	void mousePressedSignal(PEGraphicsItem *, bool & ignore);
 	void mouseReleasedSignal(PEGraphicsItem *);
 	void terminalPointMoved(PEGraphicsItem *, QPointF);
 	void terminalPointChanged(PEGraphicsItem *, QPointF before, QPointF after);
 
-protected slots:
+protected Q_SLOTS:
 	void restoreColor();
 
 protected:
-	bool m_highlighted;
-	bool m_flash;
+	bool m_highlighted = false;
+	bool m_flash = false;
 	QDomElement  m_element;
 	QPointF m_offset;
-	bool m_showTerminalPoint;
-	bool m_showMarquee;
+	bool m_showTerminalPoint = false;
+	bool m_showMarquee = false;
 	QPointF m_terminalPoint;
 	QPointF m_pendingTerminalPoint;
-	bool m_dragTerminalPoint;
+	bool m_dragTerminalPoint = false;
 	QPointF m_dragTerminalOrigin;
 	QPointF m_terminalPointOrigin;
-	bool m_drawHighlight;
-	int m_wheelAccum;
-	qreal m_savedOpacity;
-	bool m_pick;
-	class ItemBase * m_itemBase;
+	bool m_drawHighlight = false;
+	int m_wheelAccum = 0;
+	qreal m_savedOpacity = 0;
+	bool m_pick = false;
+	class ItemBase * m_itemBase = nullptr;
 };
 
 #endif /* PEGRAPHICSITEM_H_ */

@@ -26,7 +26,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QPixmap>
 #include <QVariant>
 #include <QComboBox>
-#include <QDoubleValidator>
+#include <QDoubleSpinBox>
 
 #include "paletteitem.h"
 
@@ -36,7 +36,7 @@ class Ruler : public PaletteItem
 
 public:
 	// after calling this constructor if you want to render the loaded svg (either from model or from file), MUST call <renderImage>
-	Ruler(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
+	explicit Ruler(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
 	~Ruler();
 
 	void resizeMM(double magnitude, double unitsFlag, const LayerHash & viewLayers);
@@ -50,7 +50,7 @@ public:
 	bool hasPartNumberProperty();
 	bool canFindConnectorsUnder();
 
-public slots:
+public Q_SLOTS:
 	void widthEntry();
 	void unitsEntry();
 
@@ -59,9 +59,9 @@ protected:
 	ViewLayer::ViewID useViewIDForPixmap(ViewLayer::ViewID, bool swappingEnabled);
 
 protected:
-	QPointer<QLineEdit> m_widthEditor;
+	QPointer<QDoubleSpinBox> m_widthEditor;
 	QPointer<QRadioButton> m_unitsEditor;
-	QPointer<QDoubleValidator> m_widthValidator;
+
 };
 
 #endif

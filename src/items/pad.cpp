@@ -24,18 +24,16 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "pad.h"
 
 #include "../utils/graphicsutils.h"
-#include "../utils/folderutils.h"
-#include "../utils/textutils.h"
 #include "../fsvgrenderer.h"
 #include "../sketch/infographicsview.h"
-#include "../svg/svgfilesplitter.h"
 #include "moduleidnames.h"
+#include "utils/misc.h"
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QFrame>
 #include <QLabel>
-#include <QRegExp>
+#include <QRegularExpression>
 #include <QPushButton>
 #include <QImageReader>
 #include <QMessageBox>
@@ -189,7 +187,7 @@ QStringList Pad::collectValues(const QString & family, const QString & prop, QSt
 
 	QStringList newValues;
 	if (prop.compare("layer", Qt::CaseInsensitive) == 0) {
-		foreach (QString xmlName, values) {
+		Q_FOREACH (QString xmlName, values) {
 			newValues << Board::convertFromXmlName(xmlName);
 		}
 		value = Board::convertFromXmlName(value);
@@ -210,7 +208,7 @@ bool Pad::collectExtraInfo(QWidget * parent, const QString & family, const QStri
 
 	if (!copperBlocker()) {
 		if (prop.compare("connect to", Qt::CaseInsensitive) == 0) {
-			QComboBox * comboBox = new QComboBox();
+			auto * comboBox = new QComboBox();
 			comboBox->setObjectName("infoViewComboBox");
 			comboBox->setEditable(false);
 			comboBox->setEnabled(swappingEnabled);
@@ -227,7 +225,7 @@ bool Pad::collectExtraInfo(QWidget * parent, const QString & family, const QStri
 				}
 			}
 
-			connect(comboBox, SIGNAL(currentIndexChanged(const QString &)), this, SLOT(terminalPointEntry(const QString &)));
+			connect(comboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(terminalPointEntry(int)));
 
 			returnWidget = comboBox;
 			returnProp = tr("connect to");
@@ -237,10 +235,10 @@ bool Pad::collectExtraInfo(QWidget * parent, const QString & family, const QStri
 
 	bool result = PaletteItem::collectExtraInfo(parent, family, prop, value, swappingEnabled, returnProp, returnValue, returnWidget, hide);
 
-	if (prop.compare("layer") == 0 && returnWidget != NULL) {
+	if (prop.compare("layer") == 0 && (returnWidget != nullptr)) {
 		bool disabled = true;
 		InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-		if (infoGraphicsView && infoGraphicsView->boardLayers() == 2) disabled = false;
+		if ((infoGraphicsView != nullptr) && infoGraphicsView->boardLayers() == 2) disabled = false;
 		returnWidget->setDisabled(disabled);
 	}
 
@@ -298,6 +296,11 @@ bool Pad::hasPartNumberProperty()
 	return false;
 }
 
+bool Pad::isBomItem()
+{
+	return false;
+}
+
 void Pad::setInitialSize() {
 	double w = m_modelPart->localProp("width").toDouble();
 	if (w == 0) {
@@ -310,12 +313,29 @@ void Pad::setInitialSize() {
 
 void Pad::resizeMMAux(double mmW, double mmH) {
 	ResizableBoard::resizeMMAux(mmW, mmH);
-	resetConnectors(NULL, NULL);
+	resetConnectors(nullptr, nullptr);
+}
+
+void Pad::resizePixels(double w, double h, const LayerHash & viewLayers) {
+	// The mouse-resize path (ResizableBoard::mouseMoveEvent) sizes from m_size,
+	// which for a Pad is the SVG canvas = copper + TheOffset. That margin is
+	// deliberate: it keeps the resize handles (ResizableBoard::findCorner) clear
+	// of the connector terminal, which fills the whole copper. But the canvas-
+	// sized value was then written back as the *copper* size (m_resizeStartSize is
+	// the canvas, not the logical size), so every gesture inflated the pad by
+	// TheOffset. Strip the margin here so the copper grows by exactly the dragged
+	// amount; makeLayerSvg re-adds it, leaving m_size (the canvas) consistent. The
+	// inspector path goes straight to resizeMMAux with logical mm and is unaffected.
+	ResizableBoard::resizePixels(qMax(w - sizeOffset(), 1.0), qMax(h - sizeOffset(), 1.0), viewLayers);
+}
+
+double Pad::sizeOffset() const {
+	return TheOffset;
 }
 
 void Pad::addedToScene(bool temporary)
 {
-	if (this->scene()) {
+	if (this->scene() != nullptr) {
 		setInitialSize();
 		resizeMMAux(m_modelPart->localProp("width").toDouble(), m_modelPart->localProp("height").toDouble());
 	}
@@ -323,16 +343,16 @@ void Pad::addedToScene(bool temporary)
 	return PaletteItem::addedToScene(temporary);
 }
 
-void Pad::terminalPointEntry(const QString &) {
-	QComboBox * comboBox = qobject_cast<QComboBox *>(sender());
-	if (comboBox == NULL) return;
+void Pad::terminalPointEntry(int) {
+	auto * comboBox = qobject_cast<QComboBox *>(sender());
+	if (comboBox == nullptr) return;
 
 	QString value = comboBox->itemData(comboBox->currentIndex()).toString();
 	QString connectAt = m_modelPart->localProp("connect").toString();
 	if (connectAt.compare(value) == 0) return;
 
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView != NULL) {
+	if (infoGraphicsView != nullptr) {
 		infoGraphicsView->setProp(this, "connect to", tr("connect to"), connectAt, value, true);
 	}
 }
@@ -344,7 +364,7 @@ ResizableBoard::Corner Pad::findCorner(QPointF scenePos, Qt::KeyboardModifiers m
 
 	if (modifiers & altOrMetaModifier()) {
 		// free rotate
-		setCursor(*CursorMaster::RotateCursor);
+		setCursor(*SvgCursorBuilder::RotateCursor);
 		return ResizableBoard::NO_CORNER;
 	}
 

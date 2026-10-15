@@ -1,0 +1,79 @@
+{
+  "terms": [
+    {
+      "source": "fritzing.org",
+      "target": "fritzing.org",
+      "language": "de"
+    },
+    {
+      "source": "Fritzing",
+      "target": "Fritzing",
+      "language": "de"
+    },
+    {
+      "source": "send to the back",
+      "target": "nach hinten legen",
+      "language": "de"
+    },
+    {
+      "source": "Raise to the front",
+      "target": "Nach vorne bringen",
+      "language": "de"
+    },
+    {
+      "source": "Ground Fill",
+      "target": "Massefüllung",
+      "language": "de"
+    },
+    {
+      "source": "Copper Fill",
+      "target": "Kupferfüllung",
+      "language": "de"
+    },
+    {
+      "source": "Breadboard",
+      "target": "Placa de Prueba",
+      "language": "es"
+    },
+    {
+      "source": "part",
+      "target": "pieza",
+      "language": "es"
+    },
+    {
+      "source": "Tips and Tricks",
+      "target": "Consejos y Trucos",
+      "language": "es"
+    },
+    {
+      "source": "parts",
+      "target": "composants",
+      "language": "fr"
+    },
+    {
+      "source": "Ratsnest wire",
+      "target": "Filo ratsnest",
+      "language": "it"
+    },
+    {
+      "source": "Ratsnest",
+      "target": "ラッツネスト",
+      "language": "ja"
+    },
+    {
+      "source": "wire",
+      "target": "ワイヤー",
+      "language": "ja"
+    },
+    {
+      "source": "wires",
+      "target": "ワイヤー",
+      "language": "ja"
+    },
+    {
+      "source": "Ratsnests",
+      "target": "ラッツネスト",
+      "language": "ja"
+    }
+  ]
+}

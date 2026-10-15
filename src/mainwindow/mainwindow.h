@@ -33,18 +33,27 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QProcess>
 #include <QDockWidget>
 #include <QXmlStreamWriter>
-#include <QRegExp>
+#include <QRegularExpression>
 #include <QProxyStyle>
 #include <QStyle>
 #include <QStylePainter>
 #include <QPrinter>
+#include <QNetworkAccessManager>
+#include <QShortcut>
 
-#include "fritzingwindow.h"
-#include "sketchareawidget.h"
-#include "../viewlayer.h"
+#include "../model/modelpart.h"
+#include "../partseditor/peutils.h"
+#include <quazip/quazip.h>
 #include "../program/programwindow.h"
-#include "../svg/svg2gerber.h"
+#include "../project_properties.h"
 #include "../routingstatus.h"
+#include "../simulation/simulator.h"
+#include "../svg/svg2gerber.h"
+#include "../viewlayer.h"
+#include "fritzingwindow.h"
+#include "getspice.h"
+#include "sketchareawidget.h"
+#include "utils/textutils.h"
 
 QT_BEGIN_NAMESPACE
 class QAction;
@@ -52,7 +61,12 @@ class QListWidget;
 class QMenu;
 QT_END_NAMESPACE
 
+class ServiceListFetcher;
+
 class FSizeGrip;
+
+class DebugConnectors;
+
 
 typedef class FDockWidget * (*DockFactory)(const QString & title, QWidget * parent);
 
@@ -67,7 +81,7 @@ public:
 
 	//int addTab(QWidget * page, const QIcon & icon, const QIcon & hoverIcon, const QIcon & inactiveIcon, const QString & label);
 
-protected slots:
+protected Q_SLOTS:
 	//void tabIndexChanged(int index);
 
 protected:
@@ -85,26 +99,6 @@ public:
 
 protected:
 	bool m_firstTime;
-};
-
-class SwapTimer : public QTimer
-{
-	Q_OBJECT
-
-public:
-	SwapTimer();
-
-	void setAll(const QString & family, const QString & prop, QMap<QString, QString> &  propsMap, ItemBase *);
-	const QString & family();
-	const QString & prop();
-	QMap<QString, QString> propsMap();
-	ItemBase * itemBase();
-
-protected:
-	QString m_family;
-	QString m_prop;
-	QMap<QString, QString> m_propsMap;
-	QPointer <ItemBase> m_itemBase;
 };
 
 struct GridSizeThing
@@ -155,17 +149,32 @@ struct TraceMenuThing {
 	}
 };
 
+class FProbeWire;
+class FProbePart;
+class FProbeSelectedPartLabel;
+
 class MainWindow : public FritzingWindow
 {
 	Q_OBJECT
-	Q_PROPERTY(int fireQuoteDelay READ fireQuoteDelay WRITE setFireQuoteDelay DESIGNABLE true)
+
+	friend class FProbeWire;
+	friend class FProbePart;
+	friend class FProbeSelectedPartLabel;
+
+	class SketchWidget * currentGraphicsView();
+
+	void setEnableSubmenu(QMenu *menu, bool value);
+	void save_text_file(QString text, QString actionType, QString dialogTitle, QString differentiator, QString errorMessage);
 
 public:
+	// standard duration for timed status bar messages ("Saved ...", "Sketch exported", ...)
+	static constexpr int StatusMessageTimeout = 4000;
+
 	MainWindow(class ReferenceModel *referenceModel, QWidget * parent);
 	MainWindow(QFile & fileToLoad);
 	~MainWindow();
 
-	void mainLoad(const QString & fileName, const QString & displayName, bool checkObsolete);
+	bool mainLoad(const QString & fileName, const QString & displayName, bool checkObsolete);
 	bool loadWhich(const QString & fileName, bool setAsLastOpened, bool addToRecent, bool checkObsolete, const QString & displayName);
 	void notClosableForAWhile();
 	QAction *raiseWindowAction();
@@ -191,28 +200,32 @@ public:
 	// if we consider a part as the smallest ("atomic") entity inside
 	// fritzing, then this functions may help with the bundle tasks
 	// on the complex entities: sketches, bins, modules (?)
-	void saveBundledNonAtomicEntity(QString &filename, const QString &extension, Bundler *bundler, const QList<ModelPart*> &partsToSave, bool askForFilename, const QString & destFolderPath, bool saveModel, bool deleteLeftovers);
+	bool saveBundledNonAtomicEntity(QString &filename, const QString &extension, Bundler *bundler, const QList<ModelPart*> &partsToSave, bool askForFilename, const QString & destFolderPath, bool saveModel, bool deleteLeftovers);
 	bool loadBundledNonAtomicEntity(const QString &filename, Bundler *bundler, bool addToBin, bool dontAsk);
-	void saveAsShareable(const QString & path, bool saveModel);
+	bool saveAsShareable(const QString & path, bool saveModel);
 
 
 	void setCurrentFile(const QString &fileName, bool addToRecent, bool setAsLastOpened);
 	void setReportMissingModules(bool);
 	QList<class SketchWidget *> sketchWidgets();
+	class SketchWidget * sketchWidgetForView(ViewLayer::ViewID viewID);
+	ItemBase * findItemInAnyView(qint64 id);
 	ProgramWindow * programmingWidget();
 	void setCloseSilently(bool);
 	class PCBSketchWidget * pcbView();
 	void noBackup();
 	void swapSelectedAux(ItemBase * itemBase, const QString & moduleID, bool useViewLayerPlacement, ViewLayer::ViewLayerPlacement, QMap<QString, QString> & propsMap);
-	void swapLayers(ItemBase * itemBase, int layers, const QString & msg, int delay);
+	void swapSelectionForProp(const QString & prop, const QString & value);
+	void swapNetLabelStyleForSelection(const QString & picked);
+	void swapLayers(ItemBase * itemBase, int layers, const QString & msg);
 	bool saveAsAux(const QString & fileName);
 	void swapObsolete(bool displayFeedback, QList<ItemBase *> &);
+	int swapObsoleteDirect(const QList<ItemBase *> & items, bool displayFeedback);
+	long swapPartForMigration(ItemBase * itemBase, const QString & newModuleID);
 	QList<ItemBase *> selectAllObsolete(bool displayFeedback);
 	void hideTempPartsBin();
 	const QString & fritzingVersion();
 	void removeGroundFill(ViewLayer::ViewLayerID, QUndoCommand * parentCommand);
-	void groundFill(ViewLayer::ViewLayerID);
-	void copperFill(ViewLayer::ViewLayerID);
 	bool hasAnyAlien();
 	void exportSvg(double res, bool selectedItems, bool flatten, const QString & filename);
 	void setCurrentView(ViewLayer::ViewID);
@@ -224,10 +237,15 @@ public:
 	void selectPartsWithModuleID(ModelPart *);
 	void addToSketch(QList<ModelPart *> &);
 	QStringList newDesignRulesCheck(bool showOkMessage);
-	int fireQuoteDelay();
-	void setFireQuoteDelay(int);
 	void setInitialTab(int);
 	void noSchematicConversion();
+	QString getExportBOM_CSV();
+	QString getSpiceNetlist(QString, QList< QList<class ConnectorItem *>* >&, QSet<class ItemBase *>& );
+	bool isSimulatorEnabled();
+	void enableSimulator(bool);
+	void triggerSimulator();
+	QSharedPointer<ProjectProperties> getProjectProperties();
+	bool isTransientSimulationEnabled();
 
 public:
 	static void initNames();
@@ -235,17 +253,30 @@ public:
 	static void setAutosavePeriod(int);
 	static void setAutosaveEnabled(bool);
 
-signals:
+	// The shared Undo/Redo actions (they act on the active undo stack). Exposed so non-main-window
+	// widgets — e.g. the non-modal Part Migration dialog — can add them and let their keyboard
+	// shortcuts reach the sketch while that widget has focus.
+	QAction *undoAction() const { return m_undoAct; }
+	QAction *redoAction() const { return m_redoAct; }
+
+	// The sketch model backing this window. Used by the FTesting CurrentSketchXml
+	// probe to read the current window's sketch; null if it has been torn down.
+	// Defined in the .cpp: QPointer's conversion needs the complete SketchModel type.
+	class SketchModel * sketchModel() const;
+
+Q_SIGNALS:
 	void alienPartsDismissed();
 	void mainWindowMoved(QWidget *);
 	void changeActivationSignal(bool activate, QWidget * originator);
 	void externalProcessSignal(QString & name, QString & path, QStringList & args);
 
-public slots:
+public Q_SLOTS:
 	void ensureClosable();
-	ModelPart* loadBundledPart(const QString &fileName, bool addToBin);
+	QList<ModelPart*> loadBundledPart(const QString &fileName, bool addToBin);
+	QList<ModelPart *> loadPart(const QString &fileName, bool addToBin);
 	void acceptAlienFiles();
 	void statusMessage(QString message, int timeout);
+	void statusHint(QString message);
 	void showPCBView();
 	void groundFill();
 	void removeGroundFill();
@@ -256,6 +287,7 @@ public slots:
 	void changeBoardLayers(int layers, bool doEmit);
 	void selectAllObsolete();
 	void swapObsolete();
+	void migrateObsoletePart(qint64 itemId);
 	void swapBoardImageSlot(SketchWidget * sketchWidget, ItemBase * itemBase, const QString & filename, const QString & moduleID, bool addName);
 	void updateTraceMenu();
 	virtual void updateExportMenu();
@@ -266,8 +298,11 @@ public slots:
 	void setGroundFillKeepout();
 	void oldSchematicsSlot(const QString & filename, bool & useOldSchematics);
 	void showWelcomeView();
+	void putItemByModuleID(const QString & moduleID);
+	void handleFocusWidget(const QString &objectName, int index, const QString &property);
+	void onServicesFetched(const QStringList& services);
 
-protected slots:
+protected Q_SLOTS:
 	void mainLoad();
 	void revert();
 	void openRecentOrExampleFile();
@@ -315,9 +350,9 @@ protected slots:
 	void togglePartLibrary(bool toggle);
 	void toggleInfo(bool toggle);
 	void toggleUndoHistory(bool toggle);
+	void showUndoHistory();
 	void toggleDebuggerOutput(bool toggle);
 	void openHelp();
-	void openDonate();
 	void openExamples();
 	void openPartsReference();
 	void visitFritzingDotOrg();
@@ -365,9 +400,9 @@ protected slots:
 
 	void newAutoroute();
 	void orderFab();
-	void activeLayerTop();
-	void activeLayerBottom();
-	void activeLayerBoth();
+	void activeLayerTop(bool showMessage = true);
+	void activeLayerBottom(bool showMessage = true);
+	void activeLayerBoth(bool showMessage = true);
 	void toggleActiveLayer();
 	void createTrace();
 	void excludeFromAutoroute();
@@ -401,6 +436,7 @@ protected slots:
 	void startSaveInstancesSlot(const QString & fileName, ModelPart *, QXmlStreamWriter &);
 	void loadedViewsSlot(class ModelBase *, QDomElement & views);
 	void loadedRootSlot(const QString & filename, ModelBase *, QDomElement & views);
+	void loadedProjectPropertiesSlot(const QDomElement & projectProperties);
 	void obsoleteSMDOrientationSlot();
 	void exportNormalizedSVG();
 	void exportNormalizedFlattenedSVG();
@@ -435,11 +471,10 @@ protected slots:
 	void setSticky();
 	void autorouterSettings();
 	void boardDeletedSlot();
+	void boardReaddedSlot();
 	void cursorLocationSlot(double, double, double=0.0, double=0.0);
 	void locationLabelClicked();
 	void swapSelectedMap(const QString & family, const QString & prop, QMap<QString, QString> & currPropsMap, ItemBase *);
-	void swapSelectedDelay(const QString & family, const QString & prop, QMap<QString, QString> & currPropsMap, ItemBase *);
-	void swapSelectedTimeout();
 	void filenameIfSlot(QString & filename);
 	void openURL();
 	void setActiveWire(class Wire *);
@@ -460,6 +495,9 @@ protected slots:
 	void setViewFromAbove();
 	void updateWelcomeViewRecentList(bool doEmit = true);
 	virtual void initZoom();
+	void onShareOnlineFinished();
+	void disableUndoAction();
+	void enableUndoAction();
 
 protected:
 	void initSketchWidget(SketchWidget *);
@@ -475,6 +513,7 @@ protected:
 	void populateMenuFromXMLFile(QMenu *parentMenu, QStringList &actionsTracker, const QString &folderPath, const QString &indexFileName);
 	QHash<QString, struct SketchDescriptor *> indexAvailableElements(QDomElement &domElem, const QString &srcPrefix, QStringList & actionsTracker, const QString & localeName);
 	void populateMenuWithIndex(const QHash<QString, struct SketchDescriptor *> &, QMenu * parentMenu, QDomElement &domElem, const QString & localeName);
+	bool evaluateMenuRequires(const QString & requiresAttr);
 	void populateMenuFromFolderContent(QMenu *parentMenu, const QString &path);
 	void createOpenRecentMenu();
 	void createEditMenuActions();
@@ -487,20 +526,28 @@ protected:
 	virtual void connectPairs();
 	void connectPair(SketchWidget * signaller, SketchWidget * slotter);
 	void closeEvent(QCloseEvent * event);
-	void saveAsAuxAux(const QString & fileName);
+	bool saveAsAuxAux(const QString & fileName);
 	void printAux(QPrinter &printer, bool removeBackground, bool paginate);
 	void exportAux(QString fileName, QImage::Format format, int quality, bool removeBackground);
+	QRectF prepareExport(bool removeBackground);
+	void transformPainter(QPainter &painter, qreal width);
+	void afterExport(bool removeBackground);
 	void notYetImplemented(QString action);
 	bool eventFilter(QObject *obj, QEvent *event);
 	void setActionsIcons(int index, QList<QAction *> &);
 	void exportToEagle();
 	void exportToGerber();
 	void exportBOM();
+	void exportBOM_CSV();
+	void exportBOM_PDF();
 	void exportNetlist();
 	void exportSpiceNetlist();
 	void exportSvg(double res, bool selectedItems, bool flatten);
 	void exportSvgWatermark(QString & svg, double res);
 	void exportEtchable(bool wantPDF, bool wantSVG);
+
+	QString getSpiceNetlist(QString simulationName);
+	void saveTextFile(QString text, QString action, QString dialogTitle, QString differentiator, QString errorMessage);
 
 	virtual QList<QWidget*> getButtonsForView(ViewLayer::ViewID viewId);
 	const QString untitledFileName();
@@ -516,9 +563,9 @@ protected:
 	void hideShowProgramMenu();
 	void updatePCBTraceMenu(QGraphicsItem *, TraceMenuThing &);
 
-	QList<ModelPart*> moveToPartsFolder(QDir &unzipDir, MainWindow* mw, bool addToBin, bool addToAlien, const QString & prefixFolder, const QString &destFolder, bool importingSinglePart);
-	QString copyToSvgFolder(const QFileInfo& file, bool addToAlien, const QString & prefixFolder, const QString &destFolder);
-	ModelPart* copyToPartsFolder(const QFileInfo& file, bool addToAlien, const QString & prefixFolder, const QString &destFolder);
+	QList<ModelPart*> moveToPartsFolder(QDir &unzipDir, bool addToBin, bool addToAlien, const QString & prefixFolder, const QString &destFolder, bool importingSinglePart);
+	QString copyToSvgFolder(const QFileInfo& file, bool addToAlien, const QString & prefixFolder, const QString &destFolder, const QString &moduleID = QString());
+	ModelPart* copyToPartsFolder(const QFileInfo& file, bool addToAlien, const QString & prefixFolder, const QString &destFolder, const QString &moduleID);
 
 	void closeIfEmptySketch(MainWindow* mw);
 	bool whatToDoWithAlienFiles();
@@ -542,11 +589,14 @@ protected:
 	SketchToolButton *createFlipButton(SketchAreaWidget *parent);
 	SketchToolButton *createAutorouteButton(SketchAreaWidget *parent);
 	SketchToolButton *createOrderFabButton(SketchAreaWidget *parent);
+	void updateOrderFabMenu(SketchToolButton* orderFabButton);
 	QWidget *createActiveLayerButton(SketchAreaWidget *parent);
 	QWidget *createViewFromButton(SketchAreaWidget *parent);
 	class ExpandingLabel * createRoutingStatusLabel(SketchAreaWidget *);
 	SketchToolButton *createExportEtchableButton(SketchAreaWidget *parent);
 	SketchToolButton *createNoteButton(SketchAreaWidget *parent);
+	QWidget *createSimulationButton(SketchAreaWidget *parent);
+
 	QWidget *createToolbarSpacer(SketchAreaWidget *parent);
 	SketchAreaWidget *currentSketchArea();
 	const QString fritzingTitle();
@@ -584,7 +634,7 @@ protected:
 	void groundFillAux(bool fillGroundTraces, ViewLayer::ViewLayerID viewLayerID);
 	void groundFillAux2(bool fillGroundTraces);
 	void connectStartSave(bool connect);
-	void loadBundledSketch(const QString &fileName, bool addToRecent, bool setAsLastOpened, bool checkObsolete);
+	QString loadBundledSketch(const QString &fileName, bool addToRecent, bool setAsLastOpened, bool checkObsolete);
 	void dropEvent(QDropEvent *event);
 	void dragEnterEvent(QDragEnterEvent *event);
 	void mainLoadAux(const QString & fileName);
@@ -604,11 +654,12 @@ protected:
 	virtual void createWindowMenu();
 	virtual void createTraceMenus();
 	virtual void createHelpMenu();
-	virtual void createRotateSubmenu(QMenu * parentMenu);
-	virtual void createZOrderSubmenu(QMenu * parentMenu);
+	virtual QMenu * createRotateSubmenu(QMenu * parentMenu);
+	virtual QMenu * createZOrderSubmenu(QMenu * parentMenu);
 	//  virtual void createZOrderWireSubmenu(QMenu * parentMenu);
-	virtual void createAlignSubmenu(QMenu * parentMenu);
-	virtual void createAddToBinSubmenu(QMenu * parentMenu);
+
+	virtual QMenu * createAlignSubmenu(QMenu * parentMenu);
+	virtual QMenu * createAddToBinSubmenu(QMenu * parentMenu);
 	virtual void populateExportMenu();
 
 	// dock management
@@ -631,10 +682,23 @@ protected:
 	virtual void setCurrentTabIndex(int);
 	virtual QWidget * currentTabWidget();
 	virtual bool activeLayerWidgetAlwaysOn();
-	bool copySvg(const QString & path, QFileInfoList & svgEntryInfoList);
-	void checkSwapObsolete(QList<ItemBase *> &, bool includeUpdateLaterMessage);
+	bool copySvg(const QString & path, QFileInfoList & svgEntryInfoList, const QString &moduleID = QString());
+	QList<class SketchWidget *> migrationScanViews();   // the non-null breadboard/schematic/pcb views
+	QList<ItemBase *> collectObsoleteAcrossViews();
+	bool hasObsoleteParts();
+	// Where a migration check was triggered from. Governs the per-mode prompt policy:
+	// forced (classic) prompts on Load + ManualUpdate (not mid-Drop); ask (soft) prompts on
+	// ManualUpdate always, on Load/Drop only when mixed; silent always auto-swaps.
+	enum class TriggerContext { Load, Drop, ManualUpdate };
+	QList<ItemBase *> routeHistoryMigrations(const QList<ItemBase *> & obsoleteItems, TriggerContext context);
+	void scheduleDropMigrationCheck();
+	void checkDroppedPartMigration();
+	void onItemAddedToSketch(ModelPart *, ItemBase *, ViewLayer::ViewLayerPlacement, const ViewGeometry &, long, class SketchWidget * dropOrigin);
 	QMessageBox::StandardButton oldSchematicMessage(const QString & filename);
 	MainWindow * revertAux();
+	void migratePartLabelOffset(QList<ModelPart*>);
+
+	bool hasCopperFill();
 
 protected:
 	static void removeActionsStartingAt(QMenu *menu, int start=0);
@@ -642,8 +706,10 @@ protected:
 
 protected:
 
-	QUndoGroup *m_undoGroup;
-	QUndoView *m_undoView;
+	QUndoGroup *m_undoGroup = nullptr;
+	QUndoView *m_undoView = nullptr;
+
+	QShortcut *m_undoShortcut;
 
 	QPointer<SketchAreaWidget> m_breadboardWidget;
 	QPointer<class BreadboardSketchWidget> m_breadboardGraphicsView;
@@ -655,7 +721,9 @@ protected:
 	QPointer<class PCBSketchWidget> m_pcbGraphicsView;
 
 	QPointer<SketchAreaWidget> m_welcomeWidget;
-	class WelcomeView * m_welcomeView;
+	class WelcomeView * m_welcomeView = nullptr;
+
+	bool m_migrationCheckPending = false;
 
 	QPointer<class BinManager> m_binManager;
 	QPointer<QWidget> m_tabWidget;
@@ -664,9 +732,11 @@ protected:
 	QPointer<class HtmlInfoView> m_infoView;
 	QPointer<QToolBar> m_toolbar;
 
-	bool m_closing;
-	bool m_dontClose;
-	bool m_firstOpen;
+	class Simulator *m_simulator;
+
+	bool m_closing = false;
+	bool m_dontClose = false;
+	bool m_firstOpen = false;
 
 	QPointer<SketchAreaWidget> m_currentWidget;
 	QPointer<SketchWidget> m_currentGraphicsView;
@@ -674,217 +744,222 @@ protected:
 	//QToolBar *m_fileToolBar;
 	//QToolBar *m_editToolBar;
 
-	QAction *m_raiseWindowAct;
+	QAction *m_raiseWindowAct = nullptr;
+
+	QNetworkAccessManager m_manager;
 
 	// Fritzing Menu
-	QMenu *m_fritzingMenu;
-	QAction *m_aboutAct;
-	QAction *m_preferencesAct;
-	QAction *m_quitAct;
-	QAction *m_exceptionAct;
+	QMenu *m_fritzingMenu = nullptr;
+	QAction *m_aboutAct = nullptr;
+	QAction *m_preferencesAct = nullptr;
+	QAction *m_quitAct = nullptr;
+	QAction *m_exceptionAct = nullptr;
 
 	// File Menu
 	enum { MaxRecentFiles = 10 };
 
-	QMenu *m_fileMenu;
-	QAction *m_newAct;
-	QAction *m_openAct;
-	QAction *m_revertAct;
-	QMenu *m_openRecentFileMenu;
-	QAction *m_openRecentFileActs[MaxRecentFiles];
-	QMenu *m_openExampleMenu;
-	QAction *m_saveAct;
-	QAction *m_saveAsAct;
-	QAction *m_pageSetupAct;
-	QAction *m_printAct;
-	QAction *m_shareOnlineAct;
+	QMenu *m_fileMenu = nullptr;
+	QAction *m_newAct = nullptr;
+	QAction *m_openAct = nullptr;
+	QAction *m_revertAct = nullptr;
+	QMenu *m_openRecentFileMenu = nullptr;
+	QAction *m_openRecentFileActs[MaxRecentFiles] = { nullptr };
+	QMenu *m_openExampleMenu = nullptr;
+	QAction *m_saveAct = nullptr;
+	QAction *m_saveAsAct = nullptr;
+	QAction *m_pageSetupAct = nullptr;
+	QAction *m_printAct = nullptr;
+	QAction *m_shareOnlineAct = nullptr;
 
-	QAction * m_launchExternalProcessAct;
+	QAction * m_launchExternalProcessAct = nullptr;
 
-	QMenu *m_zOrderMenu;
-	QMenu *m_zOrderWireMenu;
-	QAction *m_bringToFrontAct;
-	QAction *m_bringForwardAct;
-	QAction *m_sendBackwardAct;
-	QAction *m_sendToBackAct;
-	class WireAction *m_bringToFrontWireAct;
-	class WireAction *m_bringForwardWireAct;
-	class WireAction *m_sendBackwardWireAct;
-	class WireAction *m_sendToBackWireAct;
+	QMenu *m_zOrderMenu = nullptr;
+	QMenu *m_zOrderWireMenu = nullptr;
+	QAction *m_bringToFrontAct = nullptr;
+	QAction *m_bringForwardAct = nullptr;
+	QAction *m_sendBackwardAct = nullptr;
+	QAction *m_sendToBackAct = nullptr;
+	class WireAction *m_bringToFrontWireAct = nullptr;
+	class WireAction *m_bringForwardWireAct = nullptr;
+	class WireAction *m_sendBackwardWireAct = nullptr;
+	class WireAction *m_sendToBackWireAct = nullptr;
 
-	QMenu *m_alignMenu;
-	QAction * m_alignVerticalCenterAct;
-	QAction * m_alignHorizontalCenterAct;
-	QAction * m_alignTopAct;
-	QAction * m_alignLeftAct;
-	QAction * m_alignBottomAct;
-	QAction * m_alignRightAct;
+	QMenu *m_alignMenu = nullptr;
+	QAction * m_alignVerticalCenterAct = nullptr;
+	QAction * m_alignHorizontalCenterAct = nullptr;
+	QAction * m_alignTopAct = nullptr;
+	QAction * m_alignLeftAct = nullptr;
+	QAction * m_alignBottomAct = nullptr;
+	QAction * m_alignRightAct = nullptr;
 
 	// Export Menu
-	QMenu *m_exportMenu;
-	QAction *m_exportJpgAct;
-	QAction *m_exportPngAct;
-	QAction *m_exportPdfAct;
-	QAction *m_exportEagleAct;
-	QAction *m_exportGerberAct;
-	QAction *m_exportEtchablePdfAct;
-	QAction *m_exportEtchableSvgAct;
-	QAction *m_exportBomAct;
-	QAction *m_exportNetlistAct;
-	QAction *m_exportSpiceNetlistAct;
-	QAction *m_exportSvgAct;
+	QMenu *m_exportMenu = nullptr;
+	QAction *m_exportJpgAct = nullptr;
+	QAction *m_exportPngAct = nullptr;
+	QAction *m_exportPdfAct = nullptr;
+	QAction *m_exportEagleAct = nullptr;
+	QAction *m_exportGerberAct = nullptr;
+	QAction *m_exportEtchablePdfAct = nullptr;
+	QAction *m_exportEtchableSvgAct = nullptr;
+	QAction *m_exportBomAct = nullptr;
+	QAction *m_exportBomCsvAct = nullptr;
+	QAction *m_exportBomPdfAct = nullptr;
+	QAction *m_exportIpcAct = nullptr;
+	QAction *m_exportNetlistAct = nullptr;
+	QAction *m_exportSpiceNetlistAct = nullptr;
+	QAction *m_exportSvgAct = nullptr;
 
 	// Edit Menu
-	QMenu *m_editMenu;
-	QAction *m_undoAct;
-	QAction *m_redoAct;
-	QAction *m_cutAct;
-	QAction *m_copyAct;
-	QAction *m_pasteAct;
-	QAction *m_pasteInPlaceAct;
-	QAction *m_duplicateAct;
-	QAction *m_deleteAct;
-	QAction *m_deleteMinusAct;
-	class WireAction *m_deleteWireAct;
-	class WireAction *m_deleteWireMinusAct;
-	QAction *m_selectAllAct;
-	QAction *m_deselectAct;
-	QAction *m_addNoteAct;
+	QMenu *m_editMenu = nullptr;
+	QAction *m_undoAct = nullptr;
+	QAction *m_redoAct = nullptr;
+	QAction *m_cutAct = nullptr;
+	QAction *m_copyAct = nullptr;
+	QAction *m_pasteAct = nullptr;
+	QAction *m_pasteInPlaceAct = nullptr;
+	QAction *m_duplicateAct = nullptr;
+	QAction *m_deleteAct = nullptr;
+	QAction *m_deleteMinusAct = nullptr;
+	class WireAction *m_deleteWireAct = nullptr;
+	class WireAction *m_deleteWireMinusAct = nullptr;
+	QAction *m_selectAllAct = nullptr;
+	QAction *m_deselectAct = nullptr;
+	QAction *m_addNoteAct = nullptr;
+	QAction *m_startSimulatorAct = nullptr;
+	QAction *m_stopSimulatorAct = nullptr;
 
 	// Part Menu
-	QMenu *m_partMenu;
-	QAction *m_infoViewOnHoverAction;
-	QAction *m_exportNormalizedSvgAction;
-	QAction *m_exportNormalizedFlattenedSvgAction;
-	QAction *m_dumpAllPartsAction;
-	QAction *m_testConnectorsAction;
-	QAction *m_openInPartsEditorNewAct;
-	QMenu *m_addToBinMenu;
+	QMenu *m_partMenu = nullptr;
+	QAction *m_infoViewOnHoverAction = nullptr;
+	QAction *m_exportNormalizedSvgAction = nullptr;
+	QAction *m_exportNormalizedFlattenedSvgAction = nullptr;
+	QAction *m_dumpAllPartsAction = nullptr;
+	QAction *m_testConnectorsAction = nullptr;
+	QAction *m_openInPartsEditorNewAct = nullptr;
+	QMenu *m_addToBinMenu = nullptr;
 
 
-	QMenu *m_rotateMenu;
-	QAction *m_rotate90cwAct;
-	QAction *m_rotate180Act;
-	QAction *m_rotate90ccwAct;
-	QAction *m_rotate45ccwAct;
-	QAction *m_rotate45cwAct;
+	QMenu *m_rotateMenu = nullptr;
+	QAction *m_rotate90cwAct = nullptr;
+	QAction *m_rotate180Act = nullptr;
+	QAction *m_rotate90ccwAct = nullptr;
+	QAction *m_rotate45ccwAct = nullptr;
+	QAction *m_rotate45cwAct = nullptr;
 
-	QAction *m_moveLockAct;
-	QAction *m_stickyAct;
-	QAction *m_selectMoveLockAct;
-	QAction *m_flipHorizontalAct;
-	QAction *m_flipVerticalAct;
-	QAction *m_showPartLabelAct;
-	QAction *m_saveBundledPart;
-	QAction *m_disconnectAllAct;
-	QAction *m_selectAllObsoleteAct;
-	QAction *m_swapObsoleteAct;
-	QAction *m_findPartInSketchAct;
-	QAction * m_openProgramWindowAct;
+	QAction *m_moveLockAct = nullptr;
+	QAction *m_stickyAct = nullptr;
+	QAction *m_selectMoveLockAct = nullptr;
+	QAction *m_flipHorizontalAct = nullptr;
+	QAction *m_flipVerticalAct = nullptr;
+	QAction *m_showPartLabelAct = nullptr;
+	QAction *m_saveBundledPart = nullptr;
+	QAction *m_disconnectAllAct = nullptr;
+	QAction *m_selectAllObsoleteAct = nullptr;
+	QAction *m_swapObsoleteAct = nullptr;
+	QAction *m_findPartInSketchAct = nullptr;
+	QAction * m_openProgramWindowAct = nullptr;
 
-	QAction *m_addBendpointAct;
-	QAction *m_convertToViaAct;
-	QAction *m_convertToBendpointAct;
-	QAction * m_convertToBendpointSeparator;
-	QAction *m_flattenCurveAct;
-	QAction *m_showAllLayersAct;
-	QAction *m_hideAllLayersAct;
+	QAction *m_addBendpointAct = nullptr;
+	QAction *m_convertToViaAct = nullptr;
+	QAction *m_convertToBendpointAct = nullptr;
+	QAction * m_convertToBendpointSeparator = nullptr;
+	QAction *m_flattenCurveAct = nullptr;
+	QAction *m_showAllLayersAct = nullptr;
+	QAction *m_hideAllLayersAct = nullptr;
 
-	QAction *m_hidePartSilkscreenAct;
-	QAction *m_regeneratePartsDatabaseAct;
+	QAction *m_hidePartSilkscreenAct = nullptr;
+	QAction *m_regeneratePartsDatabaseAct = nullptr;
 
 
 	// View Menu
-	QMenu *m_viewMenu;
-	QAction *m_zoomInAct;
-	QAction *m_zoomInShortcut;
-	QAction *m_zoomOutAct;
-	QAction *m_fitInWindowAct;
-	QAction *m_actualSizeAct;
-	QAction *m_100PercentSizeAct;
-	QAction *m_alignToGridAct;
-	QAction *m_showGridAct;
-	QAction *m_setGridSizeAct;
-	QAction *m_setBackgroundColorAct;
-	QAction *m_colorWiresByLengthAct;
-	QAction *m_showWelcomeAct;
-	QAction *m_showBreadboardAct;
-	QAction *m_showSchematicAct;
-	QAction *m_showProgramAct;
-	QAction *m_showPCBAct;
-	QAction *m_showPartsBinIconViewAct;
-	QAction *m_showPartsBinListViewAct;
+	QMenu *m_viewMenu = nullptr;
+	QAction *m_zoomInAct = nullptr;
+	QAction *m_zoomInShortcut = nullptr;
+	QAction *m_zoomOutAct = nullptr;
+	QAction *m_fitInWindowAct = nullptr;
+	QAction *m_actualSizeAct = nullptr;
+	QAction *m_100PercentSizeAct = nullptr;
+	QAction *m_alignToGridAct = nullptr;
+	QAction *m_showGridAct = nullptr;
+	QAction *m_setGridSizeAct = nullptr;
+	QAction *m_setBackgroundColorAct = nullptr;
+	QAction *m_colorWiresByLengthAct = nullptr;
+	QAction *m_showWelcomeAct = nullptr;
+	QAction *m_showBreadboardAct = nullptr;
+	QAction *m_showSchematicAct = nullptr;
+	QAction *m_showProgramAct = nullptr;
+	QAction *m_showPCBAct = nullptr;
+	QAction *m_showPartsBinIconViewAct = nullptr;
+	QAction *m_showPartsBinListViewAct = nullptr;
 	//QAction *m_toggleToolbarAct;
-	int m_numFixedActionsInViewMenu;
+	int m_numFixedActionsInViewMenu = 0;
 
 	// Window Menu
-	QMenu *m_windowMenu;
-	QAction *m_minimizeAct;
-	QAction *m_togglePartLibraryAct;
-	QAction *m_toggleInfoAct;
-	QAction *m_toggleUndoHistoryAct;
-	QAction *m_toggleDebuggerOutputAct;
-	QAction *m_windowMenuSeparator;
+	QMenu *m_windowMenu = nullptr;
+	QAction *m_minimizeAct = nullptr;
+	QAction *m_togglePartLibraryAct = nullptr;
+	QAction *m_toggleInfoAct = nullptr;
+	QAction *m_toggleUndoHistoryAct = nullptr;
+	QAction *m_toggleDebuggerOutputAct = nullptr;
+	QAction *m_windowMenuSeparator = nullptr;
 
 	// Trace Menu
-	QMenu *m_pcbTraceMenu;
-	QMenu *m_schematicTraceMenu;
-	QMenu *m_breadboardTraceMenu;
-	QAction *m_newAutorouteAct;
-	QAction *m_orderFabAct;
-	QAction *m_activeLayerTopAct;
-	QAction *m_activeLayerBottomAct;
-	QAction *m_activeLayerBothAct;
-	QAction *m_viewFromBelowToggleAct;
-	QAction *m_viewFromBelowAct;
-	QAction *m_viewFromAboveAct;
-	class WireAction *m_createTraceWireAct;
-	class WireAction *m_createWireWireAct;
-	QAction *m_createJumperAct;
-	QAction *m_changeTraceLayerAct;
-	class WireAction *m_changeTraceLayerWireAct;
-	QAction *m_excludeFromAutorouteAct;
-	class WireAction *m_excludeFromAutorouteWireAct;
-	QAction * m_showUnroutedAct;
-	QAction *m_selectAllTracesAct;
-	QAction *m_selectAllWiresAct;
-	QAction *m_selectAllCopperFillAct;
-	QAction *m_updateRoutingStatusAct;
-	QAction *m_selectAllExcludedTracesAct;
-	QAction *m_selectAllIncludedTracesAct;
-	QAction *m_selectAllJumperItemsAct;
-	QAction *m_selectAllViasAct;
-	QAction *m_groundFillAct;
-	QAction *m_removeGroundFillAct;
-	QAction *m_copperFillAct;
-	class ConnectorItemAction *m_setOneGroundFillSeedAct;
-	QAction *m_setGroundFillSeedsAct;
-	QAction *m_clearGroundFillSeedsAct;
-	QAction *m_setGroundFillKeepoutAct;
-	QAction *m_newDesignRulesCheckAct;
-	QAction *m_autorouterSettingsAct;
-	QAction *m_fabQuoteAct;
-	QAction *m_tidyWiresAct;
-	QAction *m_checkLoadedTracesAct;
+	QMenu *m_pcbTraceMenu = nullptr;
+	QMenu *m_schematicTraceMenu = nullptr;
+	QMenu *m_breadboardTraceMenu = nullptr;
+	QAction *m_newAutorouteAct = nullptr;
+	QAction *m_orderFabAct = nullptr;
+	QAction *m_activeLayerTopAct = nullptr;
+	QAction *m_activeLayerBottomAct = nullptr;
+	QAction *m_activeLayerBothAct = nullptr;
+	QAction *m_viewFromBelowToggleAct = nullptr;
+	QAction *m_viewFromBelowAct = nullptr;
+	QAction *m_viewFromAboveAct = nullptr;
+	class WireAction *m_createTraceWireAct = nullptr;
+	class WireAction *m_createWireWireAct = nullptr;
+	QAction *m_createJumperAct = nullptr;
+	QAction *m_changeTraceLayerAct = nullptr;
+	class WireAction *m_changeTraceLayerWireAct = nullptr;
+	QAction *m_excludeFromAutorouteAct = nullptr;
+	class WireAction *m_excludeFromAutorouteWireAct = nullptr;
+	QAction * m_showUnroutedAct = nullptr;
+	QAction *m_selectAllTracesAct = nullptr;
+	QAction *m_selectAllWiresAct = nullptr;
+	QAction *m_selectAllCopperFillAct = nullptr;
+	QAction *m_updateRoutingStatusAct = nullptr;
+	QAction *m_selectAllExcludedTracesAct = nullptr;
+	QAction *m_selectAllIncludedTracesAct = nullptr;
+	QAction *m_selectAllJumperItemsAct = nullptr;
+	QAction *m_selectAllViasAct = nullptr;
+	QAction *m_groundFillAct = nullptr;
+	QAction *m_removeGroundFillAct = nullptr;
+	QAction *m_copperFillAct = nullptr;
+	class ConnectorItemAction *m_setOneGroundFillSeedAct = nullptr;
+	QAction *m_setGroundFillSeedsAct = nullptr;
+	QAction *m_clearGroundFillSeedsAct = nullptr;
+	QAction *m_setGroundFillKeepoutAct = nullptr;
+	QAction *m_newDesignRulesCheckAct = nullptr;
+	QAction *m_autorouterSettingsAct = nullptr;
+	QAction *m_fabQuoteAct = nullptr;
+	QAction *m_tidyWiresAct = nullptr;
 
 	// Help Menu
-	QMenu *m_helpMenu;
-	QAction *m_openHelpAct;
-	QAction *m_openDonateAct;
-	QAction *m_examplesAct;
-	QAction *m_partsRefAct;
-	QAction *m_visitFritzingDotOrgAct;
-	QAction *m_checkForUpdatesAct;
-	QAction *m_aboutQtAct;
-	QAction *m_reportBugAct;
-	QAction *m_enableDebugAct;
-	QAction *m_partsEditorHelpAct;
-	QAction *m_tipsAndTricksAct;
-	QAction *m_firstTimeHelpAct;
+	QMenu *m_helpMenu = nullptr;
+	QAction *m_openHelpAct = nullptr;
+	QAction *m_examplesAct = nullptr;
+	QAction *m_partsRefAct = nullptr;
+	QAction *m_visitFritzingDotOrgAct = nullptr;
+	QAction *m_checkForUpdatesAct = nullptr;
+	QAction *m_aboutQtAct = nullptr;
+	QAction *m_reportBugAct = nullptr;
+	QAction *m_enableDebugAct = nullptr;
+	QAction *m_partsEditorHelpAct = nullptr;
+	QAction *m_tipsAndTricksAct = nullptr;
+	QAction *m_firstTimeHelpAct = nullptr;
 
 	// Wire Color Menu
-	QMenu * m_breadboardWireColorMenu;
-	QMenu * m_schematicWireColorMenu;
+	QMenu * m_breadboardWireColorMenu = nullptr;
+	QMenu * m_schematicWireColorMenu = nullptr;
 
 	// Dot icons
 	QIcon m_dotIcon;
@@ -892,14 +967,13 @@ protected:
 
 	QList<SketchToolButton*> m_rotateButtons;
 	QList<SketchToolButton*> m_flipButtons;
-	QStackedWidget * m_activeLayerButtonWidget;
-	QStackedWidget * m_viewFromButtonWidget;
+	QStackedWidget * m_activeLayerButtonWidget = nullptr;
+	QStackedWidget * m_viewFromButtonWidget = nullptr;
 
-	bool m_comboboxChanged;
-	bool m_restarting;
+	bool m_comboboxChanged = false;
+	bool m_restarting = false;
 
 	QStringList m_alienFiles;
-	QString m_alienPartsMsg;
 	QStringList m_filesReplacedByAlienOnes;
 
 	QStringList m_openExampleActions;
@@ -911,6 +985,8 @@ protected:
 	QPointer<class ZoomSlider> m_zoomSlider;
 	QPointer<QLabel> m_locationLabel;
 	QString m_locationLabelUnits;
+	QString m_timedStatusMessage;
+	QPointer<QLabel> m_statusHintLabel;
 
 	QByteArray m_externalProcessOutput;
 
@@ -920,36 +996,43 @@ protected:
 	QList<LinkedFile *>  m_linkedProgramFiles;
 	QString m_backupFileNameAndPath;
 	QTimer m_autosaveTimer;
-	QTimer m_fireQuoteTimer;
-	bool m_autosaveNeeded;
-	bool m_backingUp;
+	bool m_autosaveNeeded = false;
+	bool m_backingUp = false;
 	QString m_bundledSketchName;
 	RoutingStatus m_routingStatus;
-	bool m_orderFabEnabled;
-	bool m_closeSilently;
+	bool m_orderFabEnabled = false;
+	bool m_closeSilently = false;
 	QString m_fzzFolder;
 	QHash<QString, struct LockedFile *> m_fzzFiles;
-	SwapTimer m_swapTimer;
 	QPointer<Wire> m_activeWire;
 	QPointer<ConnectorItem> m_activeConnectorItem;
-	bool m_addedToTemp;
+	bool m_addedToTemp = false;
 	QString m_settingsPrefix;
-	bool m_convertedSchematic;
-	bool m_useOldSchematic;
-	bool m_noSchematicConversion;
-	int m_initialTab;
+	bool m_convertedSchematic = false;
+	bool m_useOldSchematic = false;
+	bool m_noSchematicConversion = false;
+	int m_initialTab = 0;
 
 	// dock management
 	QList<FDockWidget*> m_docks;
-	FDockWidget* m_topDock;
-	FDockWidget* m_bottomDock;
+	FDockWidget* m_topDock = nullptr;
+	FDockWidget* m_bottomDock = nullptr;
 	QString m_oldTopDockStyle;
 	QString m_oldBottomDockStyle;
-	bool m_dontKeepMargins;
+	bool m_dontKeepMargins = false;
 	QPointer<QDialog> m_rolloverQuoteDialog;
-	bool m_obsoleteSMDOrientation;
-	QWidget * m_orderFabButton;
-	int m_fireQuoteDelay;
+	bool m_obsoleteSMDOrientation = false;
+	SketchToolButton * m_orderFabButton = nullptr;
+	QPointer<DebugConnectors> m_debugConnectors;
+
+	// exporting
+	QGraphicsItem * m_watermark;
+	QList<QGraphicsItem*> m_selectedItems;
+	QList<QGraphicsItem*> m_hiddenForExport;
+	QColor m_bgColor;
+	QSharedPointer<ProjectProperties> m_projectProperties;
+	QSharedPointer<ServiceListFetcher> m_serviceListFetcher;
+	QStringList m_services;
 
 public:
 	static int AutosaveTimeoutMinutes;
@@ -958,12 +1041,20 @@ public:
 	static const int DockMinWidth;
 	static const int DockMinHeight;
 
+	QString exportIPC_D_356A();
 protected:
 	static const QString UntitledSketchName;
 	static int UntitledSketchIndex;
 	static int CascadeFactorX;
 	static int CascadeFactorY;
-	static QRegExp GuidMatcher;
+	static QRegularExpression GuidMatcher;
+	void exportIPC_D_356A_interactive();
+
+private:
+	void validatePartInfo(const QString &fzpPath);
+	bool saveBundleDirectly(const QString &bundledFileName);
+	bool writeFileToZip(QuaZip *zip, const QString &filePath, const QString &fileNameInZip);
+	int writePartToZip(QuaZip *zip, ModelPart *mp);
 };
 
 #endif

@@ -26,7 +26,6 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QStringList>
 #include <QFileDialog>
 
-#include "misc.h"
 
 class FolderUtils
 {
@@ -40,13 +39,14 @@ public:
 	static QString getTopLevelDocumentsPath();
 	static QString getUserBinsPath();
 	static QString getUserPartsPath();
+	static QString getLocalPartsPath();
 	static bool createFolderAndCdIntoIt(QDir &dir, QString newFolder);
 	static bool setApplicationPath(const QString & path);
 	static bool setAppPartsPath(const QString & path);
 	static const QString getLibraryPath();
-	static QString getOpenFileName( QWidget * parent = 0, const QString & caption = QString(), const QString & dir = QString(), const QString & filter = QString(), QString * selectedFilter = 0, QFileDialog::Options options = 0 );
-	static QStringList getOpenFileNames( QWidget * parent = 0, const QString & caption = QString(), const QString & dir = QString(), const QString & filter = QString(), QString * selectedFilter = 0, QFileDialog::Options options = 0 );
-	static QString getSaveFileName( QWidget * parent = 0, const QString & caption = QString(), const QString & dir = QString(), const QString & filter = QString(), QString * selectedFilter = 0, QFileDialog::Options options = 0 );
+	static QString getOpenFileName( QWidget * parent = 0, const QString & caption = QString(), const QString & dir = QString(), const QString & filter = QString(), QString * selectedFilter = 0, QFileDialog::Options options = {} );
+	static QStringList getOpenFileNames( QWidget * parent = 0, const QString & caption = QString(), const QString & dir = QString(), const QString & filter = QString(), QString * selectedFilter = 0, QFileDialog::Options options = {} );
+	static QString getSaveFileName( QWidget * parent = 0, const QString & caption = QString(), const QString & dir = QString(), const QString & filter = QString(), QString * selectedFilter = 0, QFileDialog::Options options = {} );
 	static void setOpenSaveFolder(const QString& path);
 	static void setOpenSaveFolderAux(const QString& path);
 	static const QString openSaveFolder();
@@ -64,6 +64,12 @@ public:
 	static bool slamCopy(QFile &, const QString & dest);
 	static void showInFolder(const QString & path);
 	static void createUserDataStoreFolders();
+	static QString addToBasename(const QString &filePath, const QString &addition);
+	static bool checkFileLoadability(QWidget* parent, const QString& filePath);
+	static bool ensureDirectoryExists(const QString & filePath);
+	static QString sanitizeForFolder(const QString & name);
+	static void savePreviousVersionToHistory(const QString &filePath, int maxVersions = 10);
+	static QString getHistoryPath();
 
 protected:
 	FolderUtils();

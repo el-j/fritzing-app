@@ -21,13 +21,19 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef PALETTEITEMBASE_H
 #define PALETTEITEMBASE_H
 
+#include <QtGlobal>
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include <QGraphicsSvgItem>
+#else
+#include <QtSvgWidgets/QGraphicsSvgItem>
+#endif
 #include <QGraphicsSceneMouseEvent>
 #include <QSet>
 
 #include "../model/modelpart.h"
+
 #include "itembase.h"
-#include "../utils/cursormaster.h"
+#include "utils/svgcursorbuilder.h"
 
 class LayerKinPaletteItem;
 
@@ -36,7 +42,7 @@ class PaletteItemBase : public ItemBase, public CursorKeyListener
 	Q_OBJECT
 
 public:
-	PaletteItemBase(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu);
+	explicit PaletteItemBase(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu);
 
 	void saveGeometry();
 	bool itemMoved();
@@ -87,7 +93,7 @@ protected:
 
 protected:
 	void setUpConnectors(FSvgRenderer *, bool ignoreTerminalPoints);
-	void findConnectorsUnder();
+	void findConnectorsUnder(bool enableHoverFeedback = true, bool allowAlready = false);
 	virtual bool canFindConnectorsUnder();
 	bool inRotationLocation(QPointF scenePos, Qt::KeyboardModifiers modifiers, QPointF & returnPoint);
 	virtual bool freeRotationAllowed(Qt::KeyboardModifiers modifiers);
@@ -97,17 +103,20 @@ protected:
 	virtual LayerKinPaletteItem * newLayerKinPaletteItem(PaletteItemBase * chief, ModelPart *, const ViewGeometry &, long id, QMenu* itemMenu, const LayerHash &, LayerAttributes &);
 	virtual void setInitialTransform(const QTransform &);
 	virtual void cacheLoaded(const LayerAttributes &);
+	bool collectExtraInfoPartNumber(const QString & propertyName, const QString & prop, bool swappingEnabled, QString & returnProp, QString & returnValue, QWidget * & returnWidget);
+	void initLocalProperty(const QString & propertyName, ModelPart * modelPart);
+	void setLocalProp(const QString & prop, const QString & value, const QString & propertyName);
 
-protected slots:
+protected Q_SLOTS:
 	void partPropertyEntry();
 
 protected:
-	bool m_blockItemSelectedChange;
-	bool m_blockItemSelectedValue;
+	bool m_blockItemSelectedChange = 0;
+	bool m_blockItemSelectedValue = 0;
 	QPointF m_offset;
-	bool m_syncSelected;
+	bool m_syncSelected = 0;
 	QPointF m_syncMoved;
-	bool m_svg;
+	bool m_svg = 0;
 };
 
 

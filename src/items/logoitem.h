@@ -36,7 +36,7 @@ class LogoItem : public ResizableBoard
 	Q_OBJECT
 
 public:
-	LogoItem(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
+	explicit LogoItem(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
 	~LogoItem();
 
 	QString retrieveSvg(ViewLayer::ViewLayerID, QHash<QString, QString> & svgHash, bool blackOnly, double dpi, double & factor);
@@ -60,10 +60,26 @@ public:
 	QString getInspectorTitle();
 	void setInspectorTitle(const QString & oldText, const QString & newText);
 
-protected slots:
+public Q_SLOTS:
+	void swapEntry(int index);
+
+protected Q_SLOTS:
 	void logoEntry();
 	void widthEntry();
 	void heightEntry();
+
+private:
+	QString hackSvg_v4(const QString &svg, const QString &logo);
+	QString hackSvg_v5(const QString &svg, const QString &logo);
+	void migrateToVersion5();
+
+	std::pair<double, double> getTextPosition(const QDomElement &root, int index);
+
+	QStringList getViewBox(const QDomElement &root);
+
+	bool parseDOM(QDomDocument &doc, const QString &svg, const QString &context);
+
+	QString removeFlip(const QString &svg);
 
 protected:
 	virtual QString hackSvg(const QString & svg, const QString & logo);
@@ -90,6 +106,7 @@ protected:
 	void logoEntryAux(const QString & newText);
 
 protected:
+	static constexpr int kDecimalsAfter = 2;
 	QString m_logo;
 	bool m_hasLogo;
 	QString m_originalFilename;
@@ -137,7 +154,7 @@ public:
 	bool collectExtraInfo(QWidget * parent, const QString & family, const QString & prop, const QString & value, bool swappingEnabled, QString & returnProp, QString & returnValue, QWidget * & returnWidget, bool & hide);
 	void setProp(const QString & prop, const QString & value);
 
-public slots:
+public Q_SLOTS:
 	void changeTextColor();
 
 protected:

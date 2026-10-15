@@ -7,10 +7,10 @@
 
 PlatformArduino::PlatformArduino() : Platform(QString("Arduino"))
 {
-	setReferenceUrl(QUrl(QString("http://arduino.cc/en/Reference/")));
-	setIdeName("Arduino IDE");
-	setDownloadUrl(QUrl("http://arduino.cc/en/Main/Software"));
-	setMinVersion("1.5.2");
+	setReferenceUrl(QUrl(QString("https://www.arduino.cc/reference/tr/")));
+	setIdeName("Arduino CLI");
+	setDownloadUrl(QUrl("https://github.com/arduino/arduino-cli"));
+	setMinVersion("1.0.0");
 	setCanProgram(true);
 	setExtensions(QStringList() << ".ino" << ".pde");
 
@@ -48,7 +48,7 @@ PlatformArduino::PlatformArduino() : Platform(QString("Arduino"))
 
 void PlatformArduino::upload(QWidget *source, const QString &port, const QString &board, const QString &fileLocation)
 {
-	QProcess * process = new QProcess(this);
+	auto * process = new QProcess(this);
 	process->setProcessChannelMode(QProcess::MergedChannels);
 	process->setReadChannel(QProcess::StandardOutput);
 	connect(process, SIGNAL(finished(int, QProcess::ExitStatus)), source, SLOT(programProcessFinished(int, QProcess::ExitStatus)));
@@ -70,17 +70,39 @@ void PlatformArduino::upload(QWidget *source, const QString &port, const QString
 	}
 
 	QStringList args;
-	// see https://github.com/arduino/Arduino/blob/ide-1.5.x/build/shared/manpage.adoc
-	//args.append(QString("--verbose"));
-	args.append(QString("--board"));
+	if (!usingArduinoCLI()) {
+		// see https://github.com/arduino/Arduino/blob/ide-1.5.x/build/shared/manpage.adoc
+		//args.append(QString("--verbose"));
+		args.append(QString("--board"));
+	}else {
+		// see https://github.com/arduino/arduino-cli
+		//args.append(QString("--verbose"));
+		args.append(QString("compile"));
+		args.append(QString("-b"));
+	}
 	args.append(getBoards().value(board));
 	args.append(QString("--port"));
 	args.append(port);
 	args.append(QString("--upload"));
 	args.append(QDir::toNativeSeparators(tmpFilePath));
 
-	ProgramTab *tab = qobject_cast<ProgramTab *>(source);
-	if (tab)
+	auto *tab = qobject_cast<ProgramTab *>(source);
+	if (tab != nullptr)
 		tab->appendToConsole(tr("Running %1 %2").arg(getCommandLocation()).arg(args.join(" ")));
 	process->start(getCommandLocation(), args);
+
+}
+
+bool PlatformArduino::usingArduinoCLI() {
+	//We make an error and analize if we are using the arduino-cli or not
+	auto * process = new QProcess(this);
+	QStringList args;
+	args.append(QString("--board"));
+	args.append(QString(" sssssss"));
+
+	process->start(getCommandLocation(), args);
+	process->waitForFinished(500);
+	QString version = process->readAllStandardError();
+
+	return version.contains("arduino-cli");
 }

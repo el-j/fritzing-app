@@ -1,7 +1,7 @@
 /*******************************************************************
 
 Part of the Fritzing project - http://fritzing.org
-Copyright (c) 2007-2019 Fritzing
+Copyright (c) 2007-2019,2025 Fritzing
 
 Fritzing is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -32,6 +32,7 @@ class ModelPart;
 class PaletteModel;
 class MainWindow;
 class PartsBinPaletteWidget;
+class SearchBinPaletteWidget;
 
 struct BinLocation {
 	enum Location {
@@ -108,18 +109,21 @@ public:
 	void setTempPartsBinLocation(const QString & filename);
 	void hideTabBar();
 	void reloadPart(const QString & moduleID);
+	void moveSearchBinToTop();
+	PartsBinPaletteWidget* currentBin();
+	PartsBinPaletteWidget* searchBin() const;
 
-signals:
+Q_SIGNALS:
 	void savePartAsBundled(const QString &moduleId);
 
 
-public slots:
+public Q_SLOTS:
 	void updateBinCombinedMenuCurrent();
 	void toIconView();
 	void toListView();
 	void setAsCurrentBin(PartsBinPaletteWidget* bin);
 
-protected slots:
+protected Q_SLOTS:
 	void updateFileName(PartsBinPaletteWidget* bin, const QString &newFileName, const QString &oldFilename);
 	void currentChanged(int);
 	void tabCloseRequested(int);
@@ -141,9 +145,9 @@ protected slots:
 protected:
 	void createMenu();
 	PartsBinPaletteWidget* newBin();
+	PartsBinPaletteWidget* newBin(bool isSearchBin);
 	void registerBin(PartsBinPaletteWidget* bin);
 	PartsBinPaletteWidget* getBin(int index);
-	PartsBinPaletteWidget* currentBin();
 	void setAsCurrentTab(PartsBinPaletteWidget* bin);
 	PartsBinPaletteWidget* getOrOpenMyPartsBin();
 	PartsBinPaletteWidget* getOrOpenSearchBin();
@@ -172,6 +176,7 @@ protected:
 	MainWindow *m_mainWindow;
 	PartsBinPaletteWidget *m_currentBin;
 	class StackTabWidget* m_stackTabWidget;
+	class SearchBinPaletteWidget* m_searchBin;
 
 	QHash<QString /*filename*/,PartsBinPaletteWidget*> m_openedBins;
 	int m_unsavedBinsCount;
@@ -221,6 +226,7 @@ public:
 	static bool isTabReorderingEvent(QDropEvent* event);
 	static void initNames();
 	static bool getBinTitle(const QString & filename, QString & binTitle, QString & binIcon);
+
 };
 
 #endif /* BINMANAGER_H_ */

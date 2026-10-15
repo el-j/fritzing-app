@@ -26,14 +26,13 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QByteArray>
 #include <QDomElement>
 #include <QObject>
-#include <QMatrix>
+#include <QTransform>
 #include <QPainterPath>
-#include <QRegExp>
 #include <QFile>
 
 struct PathUserData {
 	QString string;
-	QMatrix transform;
+	QTransform transform;
 	double sNewWidth;
 	double sNewHeight;
 	double vbWidth;
@@ -48,11 +47,11 @@ class SvgFileSplitter : public QObject {
 	Q_OBJECT
 
 public:
-	SvgFileSplitter();
+	SvgFileSplitter() = default;
 	bool split(const QString & filename, const QString & elementID);
 	bool splitString(QString & contents, const QString & elementID);
-	const QByteArray & byteArray();
-	const QDomDocument & domDocument();
+	const QByteArray & byteArray() const noexcept { return m_byteArray; }
+	const QDomDocument & domDocument() const noexcept { return m_domDocument; }
 	bool normalize(double dpi, const QString & elementID, bool blackOnly, double & factor);
 	QString shift(double x, double y, const QString & elementID, bool shiftTransforms);
 	QString elementString(const QString & elementID);
@@ -62,7 +61,7 @@ public:
 	void shiftChild(QDomElement & element, double x, double y, bool shiftTransforms);
 	bool load(const QString * filename);
 	bool load(QFile *);
-	bool load(const QString string);
+	bool load(const QString& string);
 	QString toString();
 	void gWrap(const QHash<QString, QString> & attributes);
 	void gReplace(const QString & id);
@@ -88,6 +87,8 @@ protected:
 	                    double sNewWidth, double sNewHeight,
 	                    double vbWidth, double vbHeight, bool blackOnly);
 	bool normalizeAttribute(QDomElement & element, const char * attributeName, double num, double denom);
+	bool normalizeArrayAttribute(QDomElement & element, const char * attributeName, double num, double denom);
+	bool normalizeFontSize(QDomElement & element, const char * attributeName, double num, double denom);
 	void painterPathChild(QDomElement & element, QPainterPath & ppath);			// note: only partially implemented
 	void normalizeTranslation(QDomElement & element,
 	                          double sNewWidth, double sNewHeight,
@@ -101,7 +102,7 @@ protected:
 	static void hideTextAux(QDomElement & parent, bool hideChildren);
 	static void showTextAux(QDomElement & parent, bool & hasText, bool root);
 
-protected slots:
+protected Q_SLOTS:
 	void normalizeCommandSlot(QChar command, bool relative, QList<double> & args, void * userData);
 	void shiftCommandSlot(QChar command, bool relative, QList<double> & args, void * userData);
 	virtual void rotateCommandSlot(QChar, bool, QList<double> &, void *) {}

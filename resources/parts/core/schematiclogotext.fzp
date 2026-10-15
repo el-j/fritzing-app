@@ -14,14 +14,15 @@
  <properties>
    <property name="family" >Logo</property>
    <property name="logo" >logo</property>
+   <property name="font" >Droid Sans</property>
    <property name="shape" ></property>
    <property name="type" >text</property>
  </properties>
  <taxonomy>discreteParts.schematic.logo</taxonomy>
- <description>For adding text to the schematic view</description>
+ <description>For adding text to the schematic view. Uses the Droid Sans font.</description>
  <views>
   <iconView>
-   <layers image="icon/schematic_text.svg" >
+   <layers image="icon/schematic_text_droid.svg" >
     <layer layerId="icon" />
    </layers>
   </iconView>

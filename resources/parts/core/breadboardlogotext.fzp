@@ -12,11 +12,12 @@
   <tag>fritzing core</tag>
  </tags>
  <properties>
-   <property name="family" >Logo</property>
+   <property name="family" >Breadboard Logo</property>
    <property name="logo" >logo</property>
    <property name="shape" ></property>
    <property name="type" >text</property>
    <property name="color" ></property>
+   <property name="font" >Droid Sans</property>
  </properties>
  <taxonomy>discreteParts.breadboard.logo</taxonomy>
  <description>For adding text to the breadboard view</description>

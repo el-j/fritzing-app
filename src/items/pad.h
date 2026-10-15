@@ -37,7 +37,7 @@ class Pad : public ResizableBoard
 
 public:
 	// after calling this constructor if you want to render the loaded svg (either from model or from file), MUST call <renderImage>
-	Pad(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
+	explicit Pad(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
 	~Pad();
 
 	QString retrieveSvg(ViewLayer::ViewLayerID, QHash<QString, QString> & svgHash, bool blackOnly, double dpi, double & factor);
@@ -52,13 +52,14 @@ public:
 	bool freeRotationAllowed(Qt::KeyboardModifiers);
 	bool freeRotationAllowed();
 	bool hasPartNumberProperty();
+	bool isBomItem() override;
 	void setInitialSize();
 	void addedToScene(bool temporary);
 	void paintHover(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
 	bool copperBlocker();
 
-protected slots:
-	void terminalPointEntry(const QString &);
+protected Q_SLOTS:
+	void terminalPointEntry(int);
 
 
 protected:
@@ -69,6 +70,8 @@ protected:
 	QString makeFirstLayerSvg(double mmW, double mmH, double milsW, double milsH);
 	QString makeNextLayerSvg(ViewLayer::ViewLayerID, double mmW, double mmH, double milsW, double milsH);
 	void resizeMMAux(double w, double h);
+	void resizePixels(double w, double h, const LayerHash & viewLayers) override;
+	double sizeOffset() const override;
 	ResizableBoard::Corner findCorner(QPointF, Qt::KeyboardModifiers);
 	QStringList collectValues(const QString & family, const QString & prop, QString & value);
 

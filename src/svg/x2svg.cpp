@@ -32,13 +32,12 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QDateTime>
 #include <qmath.h>
 
-static const int MAX_INT = std::numeric_limits<int>::max();
-static const int MIN_INT = std::numeric_limits<int>::min();
+constexpr auto MAX_INT = std::numeric_limits<int>::max();
+constexpr auto MIN_INT = std::numeric_limits<int>::min();
 
-X2Svg::X2Svg() {
-	m_attribute = "<fz:attr name='%1'>%2</fz:attr>\n";
-	m_comment = "<fz:comment>%2</fz:comment>\n";
-
+X2Svg::X2Svg() : m_maxX(MIN_INT), m_maxY(MIN_INT), m_minX(MAX_INT), m_minY(MAX_INT),
+    m_attribute("<fz:attr name='%1'>%2</fz:attr>\n"),
+    m_comment ("<fz:comment>%2</fz:comment>\n") {
 }
 
 void X2Svg::initLimits() {
@@ -61,17 +60,15 @@ void X2Svg::checkYLimit(double y) {
 QString X2Svg::offsetMin(const QString & svg) {
 	if (m_minX == 0 && m_minY == 0) return svg;
 
-	QString errorStr;
-	int errorLine;
-	int errorColumn;
 	QDomDocument domDocument;
-	if (!domDocument.setContent(svg, true, &errorStr, &errorLine, &errorColumn)) {
-		throw QObject::tr("failure in svg conversion 1: %1 %2 %3").arg(errorStr).arg(errorLine).arg(errorColumn);
+	QDomDocument::ParseResult parseResult = domDocument.setContent(svg, QDomDocument::ParseOption::UseNamespaceProcessing);
+	if (!parseResult) {
+		throw QObject::tr("failure in svg conversion 1: %1 %2 %3").arg(parseResult.errorMessage).arg(parseResult.errorLine).arg(parseResult.errorColumn);
 	}
 
 	QDomElement root = domDocument.documentElement();
 	if (root.isNull()) {
-		throw QObject::tr("failure in svg conversion 2: %1 %2 %3").arg(errorStr).arg(errorLine).arg(errorColumn);
+		throw QObject::tr("failure in svg conversion 2");
 	}
 
 	SvgFileSplitter splitter;

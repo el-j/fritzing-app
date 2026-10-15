@@ -43,6 +43,20 @@ struct ViewImage {
 	ViewImage(ViewLayer::ViewID);
 };
 
+struct HistoryEntry {
+	QString date;        // ISO date string "2026-01-01"
+	QString author;
+	QString mode;        // "required", "recommended", "optional"
+	QString description;
+
+	QDate parsedDate() const { return QDate::fromString(date, Qt::ISODate); }
+	// Migration insistence of this change. The legacy tokens silent/forced/ask are accepted as
+	// aliases of required/recommended/optional so part FZPs written before the rename still parse.
+	bool isRequired() const { return mode == "required" || mode == "silent"; }          // auto-apply, no choice
+	bool isRecommended() const { return mode == "recommended" || mode == "forced"; }    // prompt every load, can't mute
+	bool isOptional() const { return mode == "optional" || mode == "ask"; }             // prompt when relevant, mutable
+};
+
 class ModelPartShared : public QObject
 {
 	Q_OBJECT
@@ -100,8 +114,8 @@ public:
 	bool canFlipHorizontal(ViewLayer::ViewID);
 	bool canFlipVertical(ViewLayer::ViewID);
 	bool hasViewID(ViewLayer::ViewID viewID);
-	LayerList viewLayers(ViewLayer::ViewID viewID);
-	LayerList viewLayersFlipped(ViewLayer::ViewID viewID);
+	LayerList viewLayers(ViewLayer::ViewID viewID) const;
+	LayerList viewLayersFlipped(ViewLayer::ViewID viewID) const;
 
 	const QString & path();
 	void setPath(QString path);
@@ -133,19 +147,20 @@ public:
 	bool showInLabel(const QString & key);
 	const QString & replacedby();
 	void setReplacedby(const QString & replacedby);
+	const QList<HistoryEntry> & history() const;
+	bool hasHistory() const;
+	bool loadHistoryFromFile();
 
 	void flipSMDAnd();
 	void setFlippedSMD(bool);
 	bool flippedSMD();
 	bool needsCopper1();
-	bool hasViewFor(ViewLayer::ViewID);
-	bool hasViewFor(ViewLayer::ViewID, ViewLayer::ViewLayerID);
+	bool hasViewFor(ViewLayer::ViewID) const;
+	bool hasViewFor(ViewLayer::ViewID, ViewLayer::ViewLayerID) const;
 	QString hasBaseNameFor(ViewLayer::ViewID);
 	void setViewImage(ViewImage *);
 	void addConnector(ConnectorShared *);
 	void insertBus(class BusShared *);
-	void lookForZeroConnector();
-	bool hasZeroConnector();
 	void addOwner(QObject *);
 	void setSubpartOffset(QPointF);
 	QPointF subpartOffset() const;
@@ -158,14 +173,19 @@ protected:
 	void commonInit();
 	void ensurePartNumberProperty();
 	void copyPins(ViewLayer::ViewLayerID from, ViewLayer::ViewLayerID to);
-	LayerList viewLayersAux(ViewLayer::ViewID viewID, qulonglong (*accessor)(ViewImage *));
+	LayerList viewLayersAux(ViewLayer::ViewID viewID, qulonglong (*accessor)(ViewImage *)) const;
 	void addSchematicText(ViewImage *);
 	bool setDomDocument(QDomDocument &);
+	// Parse the <history> children of `root` into m_history (shared by setDomDocument and
+	// loadHistoryFromFile).
+	void parseHistory(const QDomElement & root);
 
-protected slots:
+protected Q_SLOTS:
 	void removeOwner();
 
 public:
+	static const QString MNPropertyName;
+	static const QString MPNPropertyName;
 	static const QString PartNumberPropertyName;
 
 protected:
@@ -185,6 +205,7 @@ protected:
 	QString m_url;
 	QString m_date;
 	QString m_replacedby;
+	QList<HistoryEntry> m_history;
 
 	QString m_path;
 	QString m_taxonomy;
@@ -203,9 +224,8 @@ protected:
 	bool m_flippedSMD;
 	bool m_needsCopper1;				// for converting pre-two-layer parts
 	qulonglong m_dbid;
-	bool m_hasZeroConnector;
 	int m_ownerCount;
-	QList< QPointer<ModelPartShared> > m_subparts;
+	QList<QPointer<ModelPartShared> > m_subparts{};
 	QPointer<ModelPartShared> m_superpart;
 	QString m_subpartID;
 	QPointF m_subpartOffset;

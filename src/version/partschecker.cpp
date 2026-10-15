@@ -19,9 +19,8 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 ********************************************************************/
 
 #include "partschecker.h"
-#include "version.h"
-#include "../debugdialog.h"
-#include "../utils/fmessagebox.h"
+#include "debugdialog.h"
+#include "utils/fmessagebox.h"
 
 #include <QJsonDocument>
 #include <QJsonParseError>
@@ -30,8 +29,8 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QNetworkReply>
 #include <QSettings>
 #include <QTimer>
-#include <QDebug>
 #include <QSettings>
+#include <QDir>
 #include <time.h>
 
 #include <git2.h>
@@ -71,7 +70,7 @@ bool PartsChecker::newPartsAvailable(const QString &repoPath, const QString & sh
 		                "by selecting <i>Part > Regenerate parts database...</i>.</p>"
 		                "<p>If you did not use git to make changes, then you may need to reinstall Fritzing.</p>";
 
-		sNotInMasterBranch = QObject::tr("The parts folder '%1' has been changed--it is not in the master branch (%2). %3");
+		sNotInMasterBranch = QObject::tr("The parts folder '%1' has been changed--it is not in a supported branch (%2). %3");
 		sDamaged = QObject::tr("The parts folder '%1' may have been damaged (%2). %3");
 		sModifiedByGit = QObject::tr("The parts folder '%1' has been changed (%2). %3");
 		sModified = QObject::tr("There are new or modified files in the parts folder '%1'. These changes will be discarded by the update.");
@@ -80,25 +79,28 @@ bool PartsChecker::newPartsAvailable(const QString &repoPath, const QString & sh
 
 	remoteSha = "";
 
-	git_repository *repository = NULL;
-	git_remote *remote = NULL;
+	git_repository * repository = nullptr;
+	git_remote * remote = nullptr;
+	git_reference * head = nullptr;
+	git_oid oid;
 	int error;
 	const git_remote_head **remote_heads;
 	size_t remote_heads_len, i;
-	git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
+	git_remote_callbacks callbacks = {};
+	callbacks.version = GIT_REMOTE_CALLBACKS_VERSION;
 	bool available = false;
 
 	partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_NONE;
 	git_libgit2_init();
 
 	error = git_repository_open(&repository, repoPath.toUtf8().constData());
-	if (error) {
+	if (error != 0) {
 		partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_LOCAL_DAMAGE;
 		partsCheckerResult.errorMessage = QObject::tr("Unable to open parts folder '%1' for update. %2").arg(repoPath).arg(sBoilerPlate1);
 		goto cleanup;
 	}
 
-	if (git_repository_is_bare(repository)) {
+	if (git_repository_is_bare(repository) != 0) {
 		partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_LOCAL_DAMAGE;
 		partsCheckerResult.errorMessage = QObject::tr("Parts folder repo '%1' is empty. %2").arg(repoPath).arg(sBoilerPlate1);
 		goto cleanup;
@@ -106,7 +108,7 @@ bool PartsChecker::newPartsAvailable(const QString &repoPath, const QString & sh
 
 	// Find the remote by name
 	error = git_remote_lookup(&remote, repository, "origin");
-	if (error) {
+	if (error != 0) {
 		partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_LOCAL_DAMAGE;
 		partsCheckerResult.errorMessage = QObject::tr("Unable to determine network site for '%1'. %2").arg(repoPath).arg(sBoilerPlate1);
 		goto cleanup;
@@ -115,14 +117,15 @@ bool PartsChecker::newPartsAvailable(const QString &repoPath, const QString & sh
 	/**
 	 * Connect to the remote.
 	 */
-#if LIBGIT2_VER_MINOR > 24
-	error = git_remote_connect(remote, GIT_DIRECTION_FETCH, &callbacks, NULL, NULL);
+	DebugDialog::debug(QString("remote %1").arg(git_remote_url(remote)));
+#if LIBGIT2_VER_MAJOR > 0 || (LIBGIT2_VER_MAJOR == 0 && LIBGIT2_VER_MINOR > 24)
+	error = git_remote_connect(remote, GIT_DIRECTION_FETCH, &callbacks, nullptr, nullptr);
 #elif LIBGIT2_VER_MINOR == 24
 	error = git_remote_connect(remote, GIT_DIRECTION_FETCH, &callbacks, NULL);
 #else
 	error = git_remote_connect(remote, GIT_DIRECTION_FETCH, &callbacks);
 #endif
-	if (error) {
+	if (error != 0) {
 		partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_REMOTE;
 		partsCheckerResult.errorMessage = QObject::tr("Unable to access network site for '%1'. %2").arg(repoPath).arg(sBoilerPlate1);
 		goto cleanup;
@@ -132,18 +135,51 @@ bool PartsChecker::newPartsAvailable(const QString &repoPath, const QString & sh
 	 * Get the list of references on the remote
 	 */
 	error = git_remote_ls(&remote_heads, &remote_heads_len, remote);
-	if (error) {
+	if (error != 0) {
 		partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_REMOTE;
 		partsCheckerResult.errorMessage = QObject::tr("Unable to retrieve network references for '%1'. %2").arg(repoPath).arg(sBoilerPlate1);
 		goto cleanup;
 	}
 
+	//get the current head
+	error = git_repository_head(&head, repository);
+	if (error == GIT_EUNBORNBRANCH || error == GIT_ENOTFOUND) {
+		// HEAD state changed, assume a git operation
+		partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_USED_GIT;
+		partsCheckerResult.errorMessage = sNotInMasterBranch.arg(repoPath).arg(0).arg(sBoilerPlate2);
+		goto cleanup;
+	}
+	if (error != 0) {
+		// still dealing with git_repository_head error
+		partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_LOCAL_DAMAGE;
+		partsCheckerResult.errorMessage = sDamaged.arg(repoPath).arg(1).arg(sBoilerPlate2);
+		goto cleanup;
+	}
+
+	DebugDialog::debug(QString("current head %1").arg( git_reference_name(head)));
+
+	error = git_reference_name_to_id(&oid, repository, git_reference_name(head));
+	if (error != 0) {
+		partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_LOCAL_DAMAGE;
+		partsCheckerResult.errorMessage = sDamaged.arg(repoPath).arg(2).arg(sBoilerPlate2);
+		goto cleanup;
+	}
+	// TODO: if oid and shaFromDatabase differ, suggest to reindex the database
+	DebugDialog::debug(QString("head oid %1").arg(git_oid_tostr_s(&oid)));
+
 	for (i = 0; i < remote_heads_len; i++) {
-		// we only care about the master branch
-		if (strcmp(remote_heads[i]->name, "refs/heads/master") == 0) {
-			char oid[GIT_OID_HEXSZ + 1] = {0};
-			git_oid_fmt(oid, &remote_heads[i]->oid);
-			QString soid(oid);
+		DebugDialog::debug(QString("remote head name %1, %2, %3").arg(
+							   remote_heads[i]->name).arg(
+							   remote_heads[i]->local).arg(
+							   remote_heads[i]->symref_target));
+		char oid[GIT_OID_HEXSZ + 1] = {0};
+		git_oid_fmt(oid, &remote_heads[i]->oid);
+		QString soid(oid);
+		DebugDialog::debug(QString("ref oid %1").arg(soid));
+
+		// we only care about the current branch
+		if (strcmp(remote_heads[i]->name, git_reference_name(head)) == 0) {
+
 			remoteSha = soid;
 			QSettings settings;
 			QString lastPartsSha = settings.value("lastPartsSha", "").toString();
@@ -160,11 +196,13 @@ bool PartsChecker::newPartsAvailable(const QString &repoPath, const QString & sh
 	}
 
 	partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_REMOTE;
-	partsCheckerResult.errorMessage = QObject::tr("Unable to retrieve master network reference for '%1'. %2").arg(repoPath).arg(sBoilerPlate1);
+	partsCheckerResult.errorMessage = QObject::tr("Unable to retrieve the network reference for '%1'#%2. %3").arg(repoPath).arg(git_reference_name(head)).arg(sBoilerPlate1);
 
 cleanup:
-	if (remote) git_remote_free(remote);
-	if (repository) git_repository_free(repository);
+	if (head != nullptr) git_reference_free(head);
+	if (remote != nullptr) git_remote_free(remote);
+	if (repository != nullptr) git_repository_free(repository);
+
 	git_libgit2_shutdown();
 	return available;
 }
@@ -175,19 +213,20 @@ cleanup:
 bool PartsChecker::checkIfClean(const QString & repoPath,
                                 const QString & shaFromDatabase,
                                 git_repository * repository,
-                                PartsCheckerResult & partsCheckerResult)
+								PartsCheckerResult & partsCheckerResult)
 {
 	// check local branch is master
 	// check local git status is ok
 	// check that last commit matches the one in the database
 
-	git_reference *head = NULL;
-	git_reference * resolved_head = NULL;
+	git_reference *head = nullptr;
+	git_reference * resolved_head = nullptr;
 	git_ref_t ref_type;
 	QString branchName;
 	bool result = false;
-	git_status_list *status_list = NULL;
-	git_status_options status_options = GIT_STATUS_OPTIONS_INIT;
+	git_status_list *status_list = nullptr;
+	git_status_options status_options = {};
+	status_options.version = GIT_STATUS_OPTIONS_VERSION;
 	int errorNumber = 0;
 	QString currentSha;
 	char buffer[GIT_OID_HEXSZ + 1] = {0};
@@ -202,7 +241,7 @@ bool PartsChecker::checkIfClean(const QString & repoPath,
 	}
 
 	errorNumber++;
-	if (error) {
+	if (error != 0) {
 		// still dealing with git_repository_head error
 		partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_LOCAL_DAMAGE;
 		partsCheckerResult.errorMessage = sDamaged.arg(repoPath).arg(errorNumber).arg(sBoilerPlate2);
@@ -211,7 +250,8 @@ bool PartsChecker::checkIfClean(const QString & repoPath,
 
 	errorNumber++;
 	branchName = git_reference_shorthand(head);
-	if (branchName != "master") {
+	// TODO: Remove this restriction, maybe limited to an 'expert mode'
+	if (branchName != "master" && branchName != "release_0.9.8") {
 		partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_USED_GIT;
 		partsCheckerResult.errorMessage = sNotInMasterBranch.arg(repoPath).arg(errorNumber).arg(sBoilerPlate2);
 		goto cleanup;
@@ -221,7 +261,7 @@ bool PartsChecker::checkIfClean(const QString & repoPath,
 	ref_type = git_reference_type(head);
 	if (ref_type == GIT_REF_SYMBOLIC) {
 		error = git_reference_resolve(&resolved_head, head);
-		if (error) {
+		if (error != 0) {
 			partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_LOCAL_DAMAGE;
 			partsCheckerResult.errorMessage = sDamaged.arg(repoPath).arg(errorNumber).arg(sBoilerPlate2);
 			goto cleanup;
@@ -254,7 +294,7 @@ bool PartsChecker::checkIfClean(const QString & repoPath,
 	status_options.flags = GIT_STATUS_OPT_INCLUDE_UNTRACKED | GIT_STATUS_OPT_RECURSE_UNTRACKED_DIRS;
 	status_options.show = GIT_STATUS_SHOW_INDEX_AND_WORKDIR;
 	error = git_status_list_new(&status_list, repository, &status_options);
-	if (error) {
+	if (error != 0) {
 		partsCheckerResult.partsCheckerError = PARTS_CHECKER_ERROR_LOCAL_DAMAGE;
 		partsCheckerResult.errorMessage = sDamaged.arg(repoPath).arg(errorNumber).arg(sBoilerPlate2);
 		goto cleanup;
@@ -291,9 +331,9 @@ bool PartsChecker::checkIfClean(const QString & repoPath,
 	result = true;
 
 cleanup:
-	if (head) git_reference_free(head);
-	if (resolved_head) git_reference_free(resolved_head);
-	if (status_list) git_status_list_free(status_list);
+	if (head != nullptr) git_reference_free(head);
+	if (resolved_head != nullptr) git_reference_free(resolved_head);
+	if (status_list != nullptr) git_status_list_free(status_list);
 
 	return result;
 }
@@ -324,36 +364,36 @@ void PartsChecker::getChanges(git_status_list *status_list, PartsCheckerResult &
 		}
 
 		QString path;
-		if (s->head_to_index) {
+		if (s->head_to_index != nullptr) {
 			path = s->head_to_index->old_file.path;
 		}
-		if (s->index_to_workdir) {
+		if (s->index_to_workdir != nullptr) {
 			if (path.isEmpty()) {
 				path = s->index_to_workdir->old_file.path;
 			}
 		}
 
-		if ((s->status & GIT_STATUS_INDEX_NEW)
-		        || (s->status & GIT_STATUS_INDEX_MODIFIED)
-		        || (s->status & GIT_STATUS_INDEX_DELETED)
-		        || (s->status & GIT_STATUS_INDEX_RENAMED)
-		        || (s->status & GIT_STATUS_INDEX_TYPECHANGE)
-		        || (s->status & GIT_STATUS_CONFLICTED))
+		if (((s->status & GIT_STATUS_INDEX_NEW) != 0)
+		        || ((s->status & GIT_STATUS_INDEX_MODIFIED) != 0)
+		        || ((s->status & GIT_STATUS_INDEX_DELETED) != 0)
+		        || ((s->status & GIT_STATUS_INDEX_RENAMED) != 0)
+		        || ((s->status & GIT_STATUS_INDEX_TYPECHANGE) != 0)
+		        || ((s->status & GIT_STATUS_CONFLICTED) != 0))
 		{
 			partsCheckerResult.gitChangedFiles << path;
 			continue;
 		}
 
-		if ((s->status & GIT_STATUS_WT_MODIFIED)
-		        || (s->status & GIT_STATUS_WT_DELETED)
-		        || (s->status & GIT_STATUS_WT_RENAMED)
-		        || (s->status & GIT_STATUS_WT_TYPECHANGE))
+		if (((s->status & GIT_STATUS_WT_MODIFIED) != 0)
+		        || ((s->status & GIT_STATUS_WT_DELETED) != 0)
+		        || ((s->status & GIT_STATUS_WT_RENAMED) != 0)
+		        || ((s->status & GIT_STATUS_WT_TYPECHANGE) != 0))
 		{
 			partsCheckerResult.changedFiles << path;
 			continue;
 		}
 
-		if (s->status & GIT_STATUS_WT_UNREADABLE) {
+		if ((s->status & GIT_STATUS_WT_UNREADABLE) != 0) {
 			partsCheckerResult.unreadableFiles << path;
 			continue;
 		}
@@ -366,38 +406,38 @@ void PartsChecker::getChanges(git_status_list *status_list, PartsCheckerResult &
  */
 bool PartsChecker::cleanRepo(const QString & repoPath, const PartsCheckerResult & partsCheckerResult) {
 
-	git_repository *repository = NULL;
-	git_reference *head = NULL;
+	git_repository *repository = nullptr;
+	git_reference *head = nullptr;
 	bool result = false;
 	git_oid oid;  /* the SHA1 for last commit */
-	git_object *object = NULL;
+	git_object *object = nullptr;
 	QDir repoDir(repoPath);
 
 	git_libgit2_init();
 
 	int error = git_repository_open(&repository, repoPath.toUtf8().constData());
-	if (error) {
+	if (error != 0) {
 		goto cleanup;
 	}
 
 	error = git_reference_name_to_id(&oid, repository, "HEAD" );
-	if (error) {
+	if (error != 0) {
 		goto cleanup;
 	}
 
 
 	error = git_object_lookup(&object, repository, &oid, GIT_OBJ_ANY);
-	if (error) {
+	if (error != 0) {
 		goto cleanup;
 	}
 
 
-	error = git_reset(repository, object, GIT_RESET_HARD, NULL);
-	if (error) {
+	error = git_reset(repository, object, GIT_RESET_HARD, nullptr);
+	if (error != 0) {
 		goto cleanup;
 	}
 
-	foreach (QString fileName, partsCheckerResult.untrackedFiles) {
+	Q_FOREACH (QString fileName, partsCheckerResult.untrackedFiles) {
 		bool success = QFile::remove(repoDir.absoluteFilePath(fileName));
 		if (!success) {
 			goto cleanup;
@@ -407,9 +447,9 @@ bool PartsChecker::cleanRepo(const QString & repoPath, const PartsCheckerResult 
 	result = true;
 
 cleanup:
-	if (object) git_object_free(object);
-	if (head) git_reference_free(head);
-	if (repository) git_repository_free(repository);
+	if (object != nullptr) git_object_free(object);
+	if (head != nullptr) git_reference_free(head);
+	if (repository != nullptr) git_repository_free(repository);
 	git_libgit2_shutdown();
 	return result;
 }
@@ -420,22 +460,22 @@ cleanup:
 QString PartsChecker::getSha(const QString & repoPath) {
 
 	QString sha;
-	git_repository * repository = NULL;
+	git_repository * repository = nullptr;
 	char buffer[GIT_OID_HEXSZ + 1] = {0};
 
 	git_libgit2_init();
 
 	int error = git_repository_open(&repository, repoPath.toUtf8().constData());
-	if (error) {
-		FMessageBox::warning(NULL, QObject::tr("Regenerating parts database"), QObject::tr("Unable to find parts git repository"));
+	if (error != 0) {
+		FMessageBox::warning(nullptr, QObject::tr("Regenerating parts database"), QObject::tr("Unable to find parts git repository"));
 		goto cleanup;
 	}
 
 	git_oid oid;  /* hold the SHA1 for last commit */
 	/* resolve HEAD into a SHA1 */
 	error = git_reference_name_to_id( &oid, repository, "HEAD" );
-	if (error) {
-		FMessageBox::warning(NULL, QObject::tr("Regenerating parts database"), QObject::tr("Unable to find parts git repository HEAD"));
+	if (error != 0) {
+		FMessageBox::warning(nullptr, QObject::tr("Regenerating parts database"), QObject::tr("Unable to find parts git repository HEAD"));
 		goto cleanup;
 	}
 
@@ -458,9 +498,9 @@ static int transfer_progress_cb(const git_transfer_progress *stats, void *payloa
 	else if (stats->total_objects > 0) {
 		progress = 0.5 * stats->received_objects / stats->total_objects;
 	}
-	if (payload) {
-		PartsCheckerUpdateInterface * interface = static_cast<PartsCheckerUpdateInterface *>(payload);
-		if (interface) {
+	if (payload != nullptr) {
+		auto * interface = static_cast<PartsCheckerUpdateInterface *>(payload);
+		if (interface != nullptr) {
 			interface->updateProgress(progress);
 		}
 	}
@@ -474,12 +514,11 @@ bool PartsChecker::updateParts(const QString & repoPath, const QString & remoteS
 	// from https://github.com/libgit2/libgit2/blob/master/examples/network/fetch.c
 	// useful for testing: http://stackoverflow.com/questions/3489173/how-to-clone-git-repository-with-specific-revision-changeset
 
-	static char *refspec = const_cast<char *>("master:refs/heads/master");
-
 	bool ok = false;
-	git_remote *remote = NULL;
-	git_repository * repository = NULL;
-	git_fetch_options fetch_opts = GIT_FETCH_OPTIONS_INIT;
+	git_remote *remote = nullptr;
+	git_repository * repository = nullptr;
+	git_fetch_options fetch_opts = {};
+	fetch_opts.version = GIT_FETCH_OPTIONS_VERSION;
 
 	if (remoteSha.isEmpty()) {
 		DebugDialog::debug("Missing remoteSha");
@@ -489,14 +528,14 @@ bool PartsChecker::updateParts(const QString & repoPath, const QString & remoteS
 	git_libgit2_init();
 
 	int error = git_repository_open(&repository, repoPath.toUtf8().constData());
-	if (error) {
+	if (error != 0) {
 		DebugDialog::debug("unable to open repo " + repoPath);
 		goto cleanup;
 	}
 
 	// Find the remote by name
 	error = git_remote_lookup(&remote, repository, "origin");
-	if (error) {
+	if (error != 0) {
 		DebugDialog::debug("unable to lookup repo " + repoPath);
 		goto cleanup;
 	}
@@ -511,11 +550,8 @@ bool PartsChecker::updateParts(const QString & repoPath, const QString & remoteS
 	 * "fetch".
 	 */
 
-	git_strarray refspecs;
-	refspecs.count = 1;
-	refspecs.strings = &refspec;
-	error = git_remote_fetch(remote, NULL /* &refspecs */, &fetch_opts, "fetch");
-	if (error) {
+	error = git_remote_fetch(remote, nullptr, &fetch_opts, "fetch");
+	if (error != 0) {
 		DebugDialog::debug("unable to fetch " + repoPath);
 		goto cleanup;
 	}
@@ -544,31 +580,33 @@ int PartsChecker::doMerge(git_repository * repository, const QString & remoteSha
 
 	git_oid their_oids[1];
 	git_annotated_commit *their_heads[1];
-	git_merge_options merge_options = GIT_MERGE_OPTIONS_INIT;
-	git_checkout_options checkout_options = GIT_CHECKOUT_OPTIONS_INIT;
+	git_merge_options merge_options = {};
+	merge_options.version = GIT_MERGE_OPTIONS_VERSION;
+	git_checkout_options checkout_options = {};
+	checkout_options.version = GIT_CHECKOUT_OPTIONS_VERSION;
 	bool afterMerge = false;
-	git_commit *head_commit = NULL;
-	git_commit *remote_commit = NULL;
-	git_signature * signature = NULL;
-	git_tree * saved_tree = NULL;
-	git_reference * master_reference = NULL;
-	git_reference * new_master_reference = NULL;
-	git_reference * head_reference = NULL;
-	git_reference * new_head_reference = NULL;
-	git_index * index = NULL;
+	git_commit *head_commit = nullptr;
+	git_commit *remote_commit = nullptr;
+	git_signature * signature = nullptr;
+	git_tree * saved_tree = nullptr;
+	git_reference * current_reference = nullptr;
+	git_reference * new_reference = nullptr;
+	git_reference * head_reference = nullptr;
+	git_reference * new_head_reference = nullptr;
+	git_index * index = nullptr;
 	//char buffer[GIT_OID_HEXSZ + 1] = {0};
 
 	merge_options.file_favor = GIT_MERGE_FILE_FAVOR_THEIRS;
 	checkout_options.checkout_strategy = GIT_CHECKOUT_FORCE;
 
 	int error = git_oid_fromstr(&their_oids[0], remoteSha.toUtf8().constData());
-	if (error) {
+	if (error != 0) {
 		DebugDialog::debug("unable to convert their oid");
 		goto cleanup;
 	}
 
 	error = git_annotated_commit_lookup(&their_heads[0], repository, &their_oids[0]);
-	if (error) {
+	if (error != 0) {
 		DebugDialog::debug("unable to find their commit");
 		goto cleanup;
 	}
@@ -576,50 +614,56 @@ int PartsChecker::doMerge(git_repository * repository, const QString & remoteSha
 	git_merge_analysis_t merge_analysis_t;
 	git_merge_preference_t merge_preference_t;
 	error = git_merge_analysis(&merge_analysis_t, &merge_preference_t, repository, (const git_annotated_commit **) their_heads, 1);
-	if (error) {
+	if (error != 0) {
 		DebugDialog::debug("analysis failed");
 		goto cleanup;
 	}
 
-	if (merge_analysis_t & GIT_MERGE_ANALYSIS_UP_TO_DATE) {
+	if ((merge_analysis_t & GIT_MERGE_ANALYSIS_UP_TO_DATE) != 0) {
 		// no more work needs to be done
 		DebugDialog::debug("already up to date");
 		goto cleanup;
 	}
 
 	error = git_commit_lookup(&remote_commit, repository, &their_oids[0]);
-	if (error) {
+	if (error != 0) {
 		DebugDialog::debug("unable to find remote parent commit");
 		goto cleanup;
 	}
 
-	if (merge_analysis_t & GIT_MERGE_ANALYSIS_FASTFORWARD || merge_analysis_t & GIT_MERGE_ANALYSIS_UNBORN) {
+	if (((merge_analysis_t & GIT_MERGE_ANALYSIS_FASTFORWARD) != 0) || ((merge_analysis_t & GIT_MERGE_ANALYSIS_UNBORN) != 0)) {
 		error = git_checkout_tree(repository, (git_object *) remote_commit, &checkout_options);
-		if (error) {
+		if (error != 0) {
 			DebugDialog::debug("ff checkout failed");
 			goto cleanup;
 		}
 
-		error = git_reference_lookup(&master_reference, repository, "refs/heads/master");
-		if (error) {
-			DebugDialog::debug("master ref lookup failed");
+		error = git_repository_head(&head_reference, repository);
+		if (error != 0) {
+			DebugDialog::debug("head ref lookup failed");
 			goto cleanup;
 		}
 
-		error = git_reference_set_target(&new_master_reference, master_reference, &their_oids[0], "Update parts");
-		if (error) {
+		error = git_reference_lookup(&current_reference, repository, git_reference_name(head_reference));
+		if (error != 0) {
+			DebugDialog::debug("HEAD ref lookup failed");
+			goto cleanup;
+		}
+
+		error = git_reference_set_target(&new_reference, current_reference, &their_oids[0], "Update parts");
+		if (error != 0) {
 			DebugDialog::debug("ref set target failed");
 			goto cleanup;
 		}
 
 		error = git_repository_head(&head_reference, repository);
-		if (error) {
+		if (error != 0) {
 			DebugDialog::debug("head ref lookup failed");
 			goto cleanup;
 		}
 
 		error = git_reference_set_target(&new_head_reference, head_reference, &their_oids[0], "Update parts");
-		if (error) {
+		if (error != 0) {
 			DebugDialog::debug("head ref set target failed");
 			goto cleanup;
 		}
@@ -629,13 +673,13 @@ int PartsChecker::doMerge(git_repository * repository, const QString & remoteSha
 
 	error = git_merge(repository, (const git_annotated_commit **) their_heads, 1, &merge_options, &checkout_options);
 	afterMerge = true;
-	if (error) {
+	if (error != 0) {
 		DebugDialog::debug("merge failed");
 		goto cleanup;
 	}
 
 	error = git_repository_index(&index, repository);
-	if (error) {
+	if (error != 0) {
 		DebugDialog::debug("unable to get index");
 		goto cleanup;
 	}
@@ -643,26 +687,26 @@ int PartsChecker::doMerge(git_repository * repository, const QString & remoteSha
 	// we are ignoring conflicts...
 
 	error = git_signature_now(&signature, "Fritzing", "info@fritzing.org");
-	if (error) {
+	if (error != 0) {
 		DebugDialog::debug("signature failed");
 		goto cleanup;
 	}
 
 	git_oid saved_oid;
 	error = git_index_write_tree(&saved_oid, index);
-	if (error) {
+	if (error != 0) {
 		DebugDialog::debug("save index failed");
 		goto cleanup;
 	}
 
 	error = git_tree_lookup(&saved_tree, repository, &saved_oid);
-	if (error) {
+	if (error != 0) {
 		DebugDialog::debug("save tree lookup failed");
 		goto cleanup;
 	}
 
 	error = git_repository_head(&head_reference, repository);
-	if (error) {
+	if (error != 0) {
 		DebugDialog::debug("head ref lookup failed");
 		goto cleanup;
 	}
@@ -671,7 +715,7 @@ int PartsChecker::doMerge(git_repository * repository, const QString & remoteSha
 		// put initialization in scope due to compiler complaints
 		const git_oid * head_oid = git_reference_target(head_reference);
 		error = git_commit_lookup(&head_commit, repository, head_oid);
-		if (error) {
+		if (error != 0) {
 			DebugDialog::debug("head lookup failed");
 			goto cleanup;
 		}
@@ -679,8 +723,8 @@ int PartsChecker::doMerge(git_repository * repository, const QString & remoteSha
 
 	git_oid new_commit_id;
 	error = git_commit_create_v(&new_commit_id, repository, "HEAD", signature, signature,
-	                            NULL, "Update parts", saved_tree, 2, head_commit, remote_commit);
-	if (error) {
+	                            nullptr, "Update parts", saved_tree, 2, head_commit, remote_commit);
+	if (error != 0) {
 		DebugDialog::debug("final commit failed");
 		goto cleanup;
 	}
@@ -691,8 +735,8 @@ cleanup:
 	}
 
 	git_index_free(index);
-	git_reference_free(master_reference);
-	git_reference_free(new_master_reference);
+	git_reference_free(current_reference);
+	git_reference_free(new_reference);
 	git_reference_free(head_reference);
 	git_reference_free(new_head_reference);
 	git_signature_free(signature);

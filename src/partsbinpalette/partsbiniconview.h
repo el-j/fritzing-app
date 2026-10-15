@@ -22,24 +22,25 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef ICONVIEW_H_
 #define ICONVIEW_H_
 
+#include "partsbinview.h"
+#include "sketch/infographicsview.h"
+
 #include <QFrame>
 #include <QGraphicsView>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 
-#include "partsbinview.h"
-#include "../sketch/infographicsview.h"
 
-QT_BEGIN_NAMESPACE
-class QDragEnterEvent;
-class QDropEvent;
-QT_END_NAMESPACE
-
+class PaletteModel;
+class SvgIconWidget;
+class GraphicsFlowLayout;
 class PartsBinIconView : public InfoGraphicsView, public PartsBinView
 {
 	Q_OBJECT
 public:
 	PartsBinIconView(ReferenceModel* referenceModel, PartsBinPaletteWidget *parent);
-	void loadFromModel(class PaletteModel *);
-	void setPaletteModel(class PaletteModel *model, bool clear=false);
+	void loadFromModel(PaletteModel *);
+	void setPaletteModel(PaletteModel *model, bool clear=false);
 	void addPart(ModelPart * model, int position = -1);
 	void removePart(const QString &moduleID);
 	void removeParts();
@@ -52,6 +53,10 @@ public:
 
 	QList<QObject*> orderedChildren();
 	void reloadPart(const QString & moduleID);
+
+	static const int PARTSBIN_ICON_IMG_WIDTH;
+	static const int PARTSBIN_ICON_IMG_HEIGHT;
+
 
 protected:
 	void doClear();
@@ -72,19 +77,19 @@ protected:
 
 	bool inEmptyArea(const QPoint& pos);
 	QGraphicsWidget* closestItemTo(const QPoint& pos);
-	class SvgIconWidget * svgIconWidgetAt(const QPoint & pos);
-	class SvgIconWidget * svgIconWidgetAt(int x, int y);
+	SvgIconWidget * svgIconWidgetAt(const QPoint & pos);
+	SvgIconWidget * svgIconWidgetAt(int x, int y);
 	ItemBase * loadItemBase(const QString & moduleID, ItemBase::PluralType &);
 
-public slots:
+public Q_SLOTS:
 	void setSelected(int position, bool doEmit=false);
 	void informNewSelection();
 	void itemMoved(int fromIndex, int toIndex);
 
-protected slots:
+protected Q_SLOTS:
 	void showContextMenu(const QPoint& pos);
 
-signals:
+Q_SIGNALS:
 	void informItemMoved(int fromIndex, int toIndex);
 	void selectionChanged(int index);
 	void settingItem();
@@ -92,11 +97,11 @@ signals:
 protected:
 	LayerHash m_viewLayers;
 
-	QGraphicsWidget *m_layouter;
-	class GraphicsFlowLayout *m_layout;
+	QGraphicsWidget *m_layouter = nullptr;
+	GraphicsFlowLayout *m_layout = nullptr;
 
-	QMenu *m_itemMenu;
-	bool m_noSelectionChangeEmition;
+	QMenu *m_itemMenu = nullptr;
+	bool m_noSelectionChangeEmition = false;
 };
 
 #endif /* ICONVIEW_H_ */

@@ -22,10 +22,11 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QPixmap>
 #include <QIcon>
 #include <QTime>
+#include <QRandomGenerator>
 
 #include "tipsandtricks.h"
 
-TipsAndTricks* TipsAndTricks::Singleton = NULL;
+TipsAndTricks* TipsAndTricks::Singleton = nullptr;
 QList<TipSet *>  TipsAndTricks::TipSets;
 
 TipsAndTricks::TipsAndTricks(QWidget *parent)
@@ -38,9 +39,9 @@ TipsAndTricks::TipsAndTricks(QWidget *parent)
 	QString html("<html><body>");
 	html += QString("<h3>%1</h3>").arg(tr("Fritzing Tips and Tricks"));
 	html += "<ul>";
-	foreach (TipSet * tipSet, TipSets) {
+	Q_FOREACH (TipSet * tipSet, TipSets) {
 		html += QString("<li><h4>%1</h4><ul>").arg(tipSet->heading);
-		foreach (QString tip, tipSet->tips) {
+		Q_FOREACH (QString tip, tipSet->tips) {
 			html += QString("<li>%1</li>").arg(tip);
 		}
 		html += "</ul></li>";
@@ -49,13 +50,13 @@ TipsAndTricks::TipsAndTricks(QWidget *parent)
 	html += "</body></html>";
 
 	Singleton = this;
-	setWindowTitle(tr("Tips and Tricks"));
+	setWindowTitle(tr("Tips and Tricks", "dialog title"));
 	resize(600, 500);
 	m_textEdit = new QTextEdit();
 	m_textEdit->setReadOnly(true);
 	m_textEdit->setHtml(html);
 
-	QVBoxLayout * vLayout = new QVBoxLayout(this);
+	auto * vLayout = new QVBoxLayout(this);
 	vLayout->addWidget(m_textEdit);
 
 }
@@ -63,24 +64,24 @@ TipsAndTricks::TipsAndTricks(QWidget *parent)
 void TipsAndTricks::initTipSets() {
 	if (TipSets.count() > 0) return;
 
-	QTime now = QTime::currentTime();
-	qsrand(now.msec());
 
-	QString localStorage = tr("Fritzing stores files for custom parts, generated parts, and for other temporary and long-term purposes in a 'local storage folder'. "
-	                          "On Mac and Linux this is usually ~/.config/Fritzing/. "
-	                          "Under Windows Vista and above, it is something like C:\\Users\\[user name]\\AppData\\Roaming\\Fritzing\\; "
-	                          "under Windows XP is something like C:\\Documents and Settings\\[user name]\\Application Data\\Fritzing\\.");
+	QString localStorage = tr("The local storage folder is used for storing data that is specific to Fritzing, "
+							  "such as custom parts and settings, as well as temporary and long-term files "
+							  "that are created during the use of the software. On Linux systems, the default "
+							  "location for the Fritzing storage folder is usually ~/.config/Fritzing/. "
+							  "On Windows 11, the default location is typically C:\\Users[user name]\\AppData\\Roaming\\Fritzing, "
+							  "and on macOS Mojave or later, the default location is usually ~/Library/Application Support/Fritzing/.");
 
-	TipSet * ts = new TipSet;
+	auto * ts = new TipSet;
 	ts->heading = tr("examples");
 	ts->tips << tr("Get a jump start by looking at the example circuits under File > Examples.");
 	TipSets.append(ts);
 
 	ts = new TipSet;
 	ts->heading = tr("parts");
-	ts->tips << tr("Can't find your part? Search for it by clicking the magnifier icon in the Parts Bin and type in some keywords");
-	ts->tips << tr("If you can't find a part in the Parts Bin, the Generic IC is your friend.  Drag it onto your sketch, then use the widgets in the Inspector to: choose from among 25 different through-hole and SMD packages; change the pin label; and--for DIPs and SIPs--change the number of pins.  You can also change the pin names with the Pin Label editor");
-	ts->tips << tr("An icon in the parts bin may actually represent multiple related parts.  So when you drag an icon from the parts bin into a sketch, make sure you look at the inspector.  The inspector will display the range of choices available for you to modify a part, or swap it for a related part. The parts bin icon will also be a little 'stack' and not just a flat icon.");
+	ts->tips << tr("Can't find your part? Search for it by clicking the magnifier icon in the Parts Bin and type in some keywords.");
+	ts->tips << tr("If you can't find a part in the Parts Bin, the Generic IC is your friend.  Drag it onto your sketch, then use the widgets in the Inspector to: choose from among 25 different through-hole and SMD packages; change the pin label; and--for DIPs and SIPs--change the number of pins.  You can also change the pin names with the Pin Label editor.");
+	ts->tips << tr("An icon in the parts bin may actually represent multiple related parts.  So when you drag an icon from the parts bin into a sketch, make sure you look at the inspector.  The inspector will display the range of choices available for you to modify a part, or swap it for a related part.");
 	ts->tips << tr("The Inspector Window--which lets you change the properties of parts--is only enabled for parts that are in a sketch (not for parts still in a Parts Bin).");
 	TipSets.append(ts);
 
@@ -89,7 +90,7 @@ void TipsAndTricks::initTipSets() {
 	ts->tips << tr("To constrain the motion of a part to horizontal or vertical, hold down the shift key as you drag it.");
 	ts->tips << tr("If you're having trouble selecting a part or a wire (segment), try selecting the part that's in the way and send it to the back: use the Raise and Lower functions on the Part menu or the context menu (right-click menu).");
 	ts->tips << tr("To more precisely move a selection of parts, use the arrow keys.  Shift-arrow moves by 10 units.");
-	ts->tips << tr("Click on the mouse position indicator in the status bar (at the bottom) to toggle the units from in to mm to px.");
+	ts->tips << tr("Click on the mouse position indicator in the status bar (below) to switch the units between inch, mm and px.");
 	TipSets.append(ts);
 
 	ts = new TipSet;
@@ -101,7 +102,7 @@ void TipsAndTricks::initTipSets() {
 
 	ts = new TipSet;
 	ts->heading = tr("rotation");
-	ts->tips << tr("To free-rotate a part in Breadboard or PCB view, select it, then hover your mouse near one of the corners until you see the rotate cursor. Mouse down and that corner will follow your mouse as you drag.");
+	ts->tips << tr("To free-rotate a part in Breadboard or PCB view, select it, then hover your mouse near one of the corners until you see the rotate cursor. Mouse down, and that corner will follow your mouse as you drag.");
 	ts->tips << tr("To free-rotate a logo text or image item in PCB view hold down the Alt (Linux: meta) key and free-rotate as usual.");
 	TipSets.append(ts);
 
@@ -115,7 +116,7 @@ void TipsAndTricks::initTipSets() {
 	ts = new TipSet;
 	ts->heading = tr("part labels");
 	ts->tips << tr("To edit a part label, double-click it, or use the text input widget in the inspector window.");
-	ts->tips << tr("To display different properties in a part label, as well as rotate it, or change the font, right-click the label.");
+	ts->tips << tr("To display different properties in a part label, rotate it, or change the font, right-click the label.");
 	ts->tips << tr("To move a part label independently from its part, select the part first--both the part and the label will be highlighted. Once the label is selected you can drag it.");
 	TipSets.append(ts);
 
@@ -131,7 +132,10 @@ void TipsAndTricks::initTipSets() {
 	ts = new TipSet;
 	ts->heading = tr("connections");
 	ts->tips << tr("To see all the connectors connected to a given connector, hold the mouse down on the connector--all the connections will be highlighted.");
-	ts->tips << tr("A ratsnest line (very thin 'wire') between connections in one view means that those connections are somehow connected in another view.");
+	ts->tips << tr("A virtual wire between connections in one view indicates that there is already a corresponding connection in another view.");
+	ts->tips << tr("They are displayed as dotted lines. When wires haven't been routed yet and all connections are virtual, the sketch can look quite chaotic.");
+	ts->tips << tr("Therefore, virtual wires are sometimes also called 'Ratsnest lines'.");
+
 	TipSets.append(ts);
 
 	ts = new TipSet;
@@ -139,7 +143,7 @@ void TipsAndTricks::initTipSets() {
 	ts->tips << tr("Check out Parts Editor Help under the <b>Help</b> Menu.");
 	ts->tips << tr("Before using the Parts Editor, see whether a Generic IC, Mystery Part, or Pin Header will do the job. Once you drop one of these into your sketch, you can change the number of pins, pin spacing, and other properties.");
 	ts->tips << tr("In the Parts Editor, to select a graphic underneath another graphic, use the mouse wheel while holding down the shift key.");
-	ts->tips << tr("You can use the Parts Editor to find the SVG file for a part's image for a given view. In the Parts Editor, click on the tab for that view, then use <b>Show in Folder</b> under the <b>File</b> Menu");
+	ts->tips << tr("You can use the Parts Editor to find the SVG file for a part's image for a given view. In the Parts Editor, click on the tab for that view, then use <b>Show in Folder</b> under the <b>File</b> Menu.");
 	ts->tips << localStorage;
 	ts->tips << tr("Do not store your custom part files in the Fritzing installation folder. If you upgrade Fritzing, these files will probably be deleted. Also, files in the Fritzing installation folder will not be saved in sketch (.fzz) files, so you won't be able to share them.");
 	TipSets.append(ts);
@@ -149,20 +153,20 @@ void TipsAndTricks::initTipSets() {
 	ts->tips << tr("Always lead a trace straight out of a pin. This helps to prevent short circuits.");
 	ts->tips << tr("Through-hole parts can be traced from either side of a PCB.");
 	ts->tips << tr("It makes life easier to route traces horizontally on one side of a PCB and vertically on the other side.");
-	ts->tips << tr("Route traces in 45-degree angles to reduce noise.");
-	ts->tips << tr("If Fritzing is missing your special part and you don't want to build one by yourself, then use pinheaders as connectors and the grid to align them.");
+	ts->tips << tr("Route traces in 45-degree angles instead of 90-degrees to reduce noise.");
+	ts->tips << tr("If Fritzing is missing a particular part and you don't want to build one yourself, then use pin headers as connectors and the grid to align them.");
 	ts->tips << tr("You can put your own Logo in the silkscreen of your PCB. Just use the Logo part of the core library and select your own file. SVG is the best format.");
 	ts->tips << tr("Use copper-blocker parts to mask out areas that you want free of copper fill.");
 	ts->tips << tr("To change trace width, select a trace then use the <b>width</b> combo box in the Inspector. You can use the drop-down or just type in a number (from 8 to 128).");
 	ts->tips << tr("To create a custom shape for your PCB, import an SVG file.");
-	ts->tips << tr("To make a stylish Arduino shield in no time, switch the shape of the PCB from a rectangle to the Arduino");
+	ts->tips << tr("To make a stylish Arduino shield in no time, switch the shape of the PCB from a rectangle to the Arduino.");
 	TipSets.append(ts);
 
 	ts = new TipSet;
 	ts->heading = tr("pcb production");
-	ts->tips << tr("Smaller PCBs are more affortable than larger ones. Save space and money.");
+	ts->tips << tr("Smaller PCBs are more affordable than larger ones. Save space and money.");
 	ts->tips << tr("Have your PCB quickly and easily produced with Fritzing Fab. Hover over the 'Fabricate' button to get a quote.");
-	ts->tips << tr("When using the Fritzing Fab Service, If there are empty areas of the PCB that you do not want filled with copper, use the copper-blocker part. This resizable part will mask out copper fill in the rectangle it covers.");
+	ts->tips << tr("When using the Fritzing Fab Service, if there are empty areas of the PCB that you do not want filled with copper, use the copper-blocker part. This resizable part will mask out copper fill in the rectangle it covers.");
 	TipSets.append(ts);
 
 	ts = new TipSet;
@@ -182,13 +186,13 @@ TipsAndTricks::~TipsAndTricks()
 }
 
 void TipsAndTricks::hideTipsAndTricks() {
-	if (Singleton != NULL) {
+	if (Singleton != nullptr) {
 		Singleton->hide();
 	}
 }
 
 void TipsAndTricks::showTipsAndTricks() {
-	if (Singleton == NULL) {
+	if (Singleton == nullptr) {
 		new TipsAndTricks();
 	}
 
@@ -196,22 +200,22 @@ void TipsAndTricks::showTipsAndTricks() {
 }
 
 void TipsAndTricks::cleanup() {
-	if (Singleton) {
+	if (Singleton != nullptr) {
 		delete Singleton;
-		Singleton = NULL;
+		Singleton = nullptr;
 	}
 }
 
 const QString & TipsAndTricks::randomTip() {
 	int tipCount = 0;
-	foreach (TipSet * tipSet, TipSets) {
+	Q_FOREACH (TipSet * tipSet, TipSets) {
 		tipCount += tipSet->tips.count();
 	}
 	if (tipCount == 0) return ___emptyString___;
 
-	int ix = qrand() % tipCount;
+	int ix = QRandomGenerator::global()->generate() % tipCount;
 	tipCount = 0;
-	foreach (TipSet * tipSet, TipSets) {
+	Q_FOREACH (TipSet * tipSet, TipSets) {
 		int count = tipSet->tips.count();
 		if (tipCount + count > ix) {
 			return tipSet->tips.at(ix - tipCount);

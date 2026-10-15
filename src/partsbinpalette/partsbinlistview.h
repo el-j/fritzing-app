@@ -45,14 +45,14 @@ public:
 	QList<QObject*> orderedChildren();
 	void reloadPart(const QString & moduleID);
 
-public slots:
+public Q_SLOTS:
 	void setSelected(int position, bool doEmit=false);
 	void itemMoved(int fromIndex, int toIndex);
 
-protected slots:
+protected Q_SLOTS:
 	void showContextMenu(const QPoint& pos);
 
-signals:
+Q_SIGNALS:
 	void informItemMoved(int fromIndex, int toIndex);
 	void settingItem();
 
@@ -76,7 +76,7 @@ protected:
 	void showInfo(QListWidgetItem * item);
 
 	bool dropMimeData(int index, const QMimeData *data, Qt::DropAction action);
-	QMimeData * mimeData(const QList<QListWidgetItem *> items) const;
+	virtual QMimeData * mimeData(const QList<QListWidgetItem *> & items) const;
 	QStringList mimeTypes() const;
 	void loadImage(ModelPart *, QListWidgetItem * lwi, const QString & moduleID);
 

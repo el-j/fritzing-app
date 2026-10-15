@@ -31,13 +31,14 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "zoomslider.h"
 #include "../debugdialog.h"
 
-double ZoomSlider::ZoomStep;
+double ZoomSlider::ZoomStep = 0.0;
 QList<double> ZoomSlider::ZoomFactors;
 
-static const int MIN_VALUE = 10;
-static const int STARTING_VALUE = 100;
-static const int HEIGHT = 16;
-static const int STEP = 100;
+
+constexpr auto MIN_VALUE = 10;
+constexpr auto STARTING_VALUE = 100;
+constexpr auto HEIGHT = 16;
+constexpr auto STEP = 100;
 
 static int AutoRepeatDelay = 0;
 static int AutoRepeatInterval = 0;
@@ -79,7 +80,7 @@ void ZoomLabel::repeat()
 {
 	if (m_mouseIsIn && m_mouseIsDown) {
 		m_repeated = true;
-		emit clicked();
+		Q_EMIT clicked();
 	}
 }
 
@@ -123,7 +124,7 @@ void ZoomLabel::mouseReleaseEvent(QMouseEvent * event)
 	this->setPixmap(m_normal);
 	QLabel::mouseReleaseEvent(event);
 	if (!m_repeated && m_mouseIsIn) {
-		emit clicked();
+		Q_EMIT clicked();
 	}
 }
 
@@ -135,7 +136,7 @@ ZoomSlider::ZoomSlider(int maxValue, QWidget * parent) : QFrame(parent)
 	// because the status bar layout is privileged for the message text
 
 	m_firstTime = true;
-	if (ZoomFactors.size() == 0) {
+	if (ZoomFactors.empty()) {
 		loadFactors();
 	}
 
@@ -240,7 +241,7 @@ void ZoomSlider::step(int direction) {
 	}
 
 	setValue(ZoomFactors[minIndex]);
-	emit zoomChanged(ZoomFactors[minIndex]);
+	Q_EMIT zoomChanged(ZoomFactors[minIndex]);
 }
 
 void ZoomSlider::sliderValueChanged(int newValue) {
@@ -248,7 +249,7 @@ void ZoomSlider::sliderValueChanged(int newValue) {
 	QString newText = QString("%1").arg(newValue);
 	if (newText.compare(m_lineEdit->text()) != 0) {
 		m_lineEdit->setText(newText);
-		emit zoomChanged(newValue);
+		Q_EMIT zoomChanged(newValue);
 	}
 }
 
@@ -263,7 +264,7 @@ void ZoomSlider::sliderTextEdited(const QString & newText, bool doEmit)
 		disconnect(m_slider, SIGNAL(valueChanged(int)), this, SLOT(sliderValueChanged(int)));
 		m_slider->setValue(value);
 		connect(m_slider, SIGNAL(valueChanged(int)), this, SLOT(sliderValueChanged(int)));
-		if (doEmit) emit zoomChanged(value);
+		if (doEmit) Q_EMIT zoomChanged(value);
 	}
 }
 

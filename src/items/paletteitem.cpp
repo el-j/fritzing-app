@@ -22,21 +22,22 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "../debugdialog.h"
 #include "../viewgeometry.h"
 #include "../sketch/infographicsview.h"
+#include "hole.h"
 #include "layerkinpaletteitem.h"
 #include "../fsvgrenderer.h"
 #include "partlabel.h"
 #include "partfactory.h"
-#include "../commands.h"
 #include "../connectors/connectoritem.h"
 #include "../connectors/connector.h"
 #include "../connectors/svgidlayer.h"
+#include "../items/dip.h"
+#include "../items/mysterypart.h"
 #include "../layerattributes.h"
 #include "../dialogs/pinlabeldialog.h"
-#include "../utils/folderutils.h"
 #include "../utils/textutils.h"
-#include "../utils/graphicsutils.h"
 #include "../utils/familypropertycombobox.h"
 #include "../svg/svgfilesplitter.h"
+#include "utils/misc.h"
 #include "wire.h"
 
 #include <QGraphicsSceneMouseEvent>
@@ -48,7 +49,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QMessageBox>
 #include <QPushButton>
 #include <QVBoxLayout>
-#include <QRegExp>
+#include <QRegularExpression>
 #include <QGroupBox>
 #include <QLabel>
 #include <limits>
@@ -66,23 +67,22 @@ QString HoleSettings::holeSize() {
 
 /////////////////////////////////////////////////
 
-static QRegExp LabelFinder("id=['|\"]label['|\"]");
-
 static bool ByIDParseSuccessful = true;
 
-static QRegExp ConnectorFinder("connector\\d+pin");
+static QRegularExpression ConnectorFinder("connector\\d+pin");
 const QString PaletteItem::HoleSizePrefix("_hs_");
 
 int findNumber(const QString & string) {
-	int ix = string.indexOf(IntegerFinder);
+	QRegularExpressionMatch match;
+	int ix = string.indexOf(IntegerFinder, 0, &match);
 	if (ix < 0) {
 		return -1;
 	}
 
-	int result = IntegerFinder.cap(0).toInt();
-	int length = IntegerFinder.cap(0).length();
+	int result = match.captured(0).toInt();
+	int length = match.captured(0).length();
 
-	int jx = string.lastIndexOf(IntegerFinder);
+	int jx = string.lastIndexOf(IntegerFinder, 0);
 	if (jx >= ix + length) {
 		return -1;
 	}
@@ -109,7 +109,7 @@ bool byID(Connector * c1, Connector * c2)
 		return true;
 	}
 
-	return i1 <= i2;
+	return i1 < i2;
 }
 
 /////////////////////////////////////////////////
@@ -119,10 +119,14 @@ PaletteItem::PaletteItem( ModelPart * modelPart, ViewLayer::ViewID viewID, const
 {
 	m_flipCount = 0;
 	if(doLabel) {
-		m_partLabel = new PartLabel(this, NULL);
+		QWidget *parentWidget = nullptr;
+		if (itemMenu) {
+			parentWidget = itemMenu->parentWidget();
+		}
+		m_partLabel = new PartLabel(this, parentWidget, nullptr);
 		m_partLabel->setVisible(false);
 	} else {
-		m_partLabel = NULL;
+		m_partLabel = nullptr;
 	}
 }
 
@@ -144,17 +148,17 @@ bool PaletteItem::renderImage(ModelPart * modelPart, ViewLayer::ViewID viewID, c
 
 void PaletteItem::loadLayerKin(const LayerHash & viewLayers, ViewLayer::ViewLayerPlacement viewLayerPlacement) {
 
-	if (m_modelPart == NULL) return;
+	if (m_modelPart == nullptr) return;
 
 	ModelPartShared * modelPartShared = m_modelPart->modelPartShared();
-	if (modelPartShared == NULL) return;
+	if (modelPartShared == nullptr) return;
 
 	qint64 id = m_id + 1;
 	ViewGeometry viewGeometry = m_viewGeometry;
 	viewGeometry.setZ(-1);
 
 
-	foreach (ViewLayer::ViewLayerID viewLayerID, viewLayers.keys()) {
+	Q_FOREACH (ViewLayer::ViewLayerID viewLayerID, viewLayers.keys()) {
 		if (viewLayerID == m_viewLayerID) continue;
 		if (!m_modelPart->hasViewFor(m_viewID, viewLayerID)) continue;
 
@@ -198,10 +202,10 @@ void PaletteItem::makeOneKin(qint64 & id, ViewLayer::ViewLayerID viewLayerID, Vi
 
 	LayerKinPaletteItem * lkpi = newLayerKinPaletteItem(this, m_modelPart, viewGeometry, id, m_itemMenu, viewLayers, layerAttributes);
 	if (lkpi->ok()) {
-		DebugDialog::debug(QString("adding layer kin %1 %2 %3 %4")
-		                   .arg(id).arg(m_viewID).arg(viewLayerID)
-		                   .arg((long) lkpi, 0, 16)
-		                  );
+//		DebugDialog::debug(QString("adding layer kin %1 %2 %3 %4")
+//		                   .arg(id).arg(m_viewID).arg(viewLayerID)
+//		                   .arg((long) lkpi, 0, 16)
+//		                  );
 		addLayerKin(lkpi);
 		id++;
 	}
@@ -217,10 +221,10 @@ void PaletteItem::addLayerKin(LayerKinPaletteItem * lkpi) {
 
 void PaletteItem::removeLayerKin() {
 	// assumes paletteitem is still in scene
-	for (int i = 0; i < m_layerKin.size(); i++) {
+	for (auto & i : m_layerKin) {
 		//DebugDialog::debug(QString("removing kin %1 %2").arg(m_layerKin[i]->id()).arg(m_layerKin[i]->z()));
-		this->scene()->removeItem(m_layerKin[i]);
-		delete m_layerKin[i];
+		this->scene()->removeItem(i);
+		delete i;
 	}
 
 	m_layerKin.clear();
@@ -229,7 +233,7 @@ void PaletteItem::removeLayerKin() {
 void PaletteItem::syncKinSelection(bool selected, PaletteItemBase * originator) {
 	PaletteItemBase::syncKinSelection(selected, originator);
 
-	foreach (ItemBase * lkpi, m_layerKin) {
+	Q_FOREACH (ItemBase * lkpi, m_layerKin) {
 		if (lkpi != originator && lkpi->isSelected() != selected) {
 			qobject_cast<LayerKinPaletteItem *>(lkpi)->blockItemSelectedChange(selected);
 			lkpi->setSelected(selected);
@@ -244,6 +248,8 @@ void PaletteItem::syncKinSelection(bool selected, PaletteItemBase * originator) 
 
 QVariant PaletteItem::itemChange(GraphicsItemChange change, const QVariant &value)
 {
+	if (change == ItemSelectedChange && moveLockBlocksSelection(value.toBool())) return false;
+
 	//DebugDialog::debug(QString("chief item change %1 %2").arg(this->id()).arg(change));
 	if (m_layerKin.count() > 0) {
 		if (change == ItemSelectedChange) {
@@ -286,18 +292,21 @@ void PaletteItem::rotateItem(double degrees, bool includeRatsnest) {
 	for (int i = 0; i < m_layerKin.count(); i++) {
 		m_layerKin[i]->rotateItem(degrees, includeRatsnest);
 	}
+
+	QList<ConnectorItem *> already;
+	updateConnections(true, already);
 }
 
 void PaletteItem::flipItem(Qt::Orientations orientation) {
 	PaletteItemBase::flipItem(orientation);
-	foreach (ItemBase * lkpi, m_layerKin) {
+	Q_FOREACH (ItemBase * lkpi, m_layerKin) {
 		lkpi->flipItem(orientation);
 	}
 }
 
-void PaletteItem::transformItem2(const QMatrix & matrix) {
+void PaletteItem::transformItem2(const QTransform & matrix) {
 	PaletteItemBase::transformItem2(matrix);
-	foreach (ItemBase * lkpi, m_layerKin) {
+	Q_FOREACH (ItemBase * lkpi, m_layerKin) {
 		lkpi->transformItem2(matrix);
 	}
 }
@@ -321,6 +330,24 @@ void PaletteItem::setTransforms() {
 	}
 }
 
+QString PaletteItem::transformTextSvg(const QString & textSvg) {
+	QString svg = textSvg;
+	SchematicTextLayerKinPaletteItem * schemItem = nullptr;
+	Q_FOREACH (ItemBase * lkpi, m_layerKin) {
+		auto * schemLayerItem = qobject_cast<SchematicTextLayerKinPaletteItem *>(lkpi);
+		if (schemLayerItem != nullptr) {
+			schemItem = schemLayerItem;
+			break;
+		}
+	}
+
+	if (schemItem != nullptr) {
+		double rotation;
+		svg = schemItem->getTransformedSvg(svg, rotation);
+	}
+	return svg;
+}
+
 void PaletteItem::moveItem(ViewGeometry & viewGeometry) {
 	PaletteItemBase::moveItem(viewGeometry);
 	for (int i = 0; i < m_layerKin.count(); i++) {
@@ -337,14 +364,14 @@ void PaletteItem::setItemPos(QPointF & loc) {
 
 void PaletteItem::updateConnections(bool includeRatsnest, QList<ConnectorItem *> & already) {
 	updateConnectionsAux(includeRatsnest, already);
-	foreach (ItemBase * lkpi, m_layerKin) {
+	Q_FOREACH (ItemBase * lkpi, m_layerKin) {
 		lkpi->updateConnectionsAux(includeRatsnest, already);
 	}
 }
 
 bool PaletteItem::collectFemaleConnectees(QSet<ItemBase *> & items) {
 	bool hasMale = PaletteItemBase::collectFemaleConnectees(items);
-	foreach (ItemBase * lkpi, m_layerKin) {
+	Q_FOREACH (ItemBase * lkpi, m_layerKin) {
 		if (lkpi->collectFemaleConnectees(items)) {
 			hasMale = true;
 		}
@@ -354,7 +381,7 @@ bool PaletteItem::collectFemaleConnectees(QSet<ItemBase *> & items) {
 
 void PaletteItem::collectWireConnectees(QSet<Wire *> & wires) {
 	PaletteItemBase::collectWireConnectees(wires);
-	foreach (ItemBase * lkpi, m_layerKin) {
+	Q_FOREACH (ItemBase * lkpi, m_layerKin) {
 		qobject_cast<LayerKinPaletteItem *>(lkpi)->collectWireConnectees(wires);
 	}
 }
@@ -375,7 +402,7 @@ bool PaletteItem::mousePressEventK(PaletteItemBase * originalItem, QGraphicsScen
 void PaletteItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
 	InfoGraphicsView *infographics = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infographics != NULL && infographics->spaceBarIsPressed()) {
+	if (infographics && infographics->spaceBarIsPressed()) {
 		event->ignore();
 		return;
 	}
@@ -391,7 +418,7 @@ void PaletteItem::syncKinMoved(QPointF offset, QPointF newPos) {
 	//m_syncMoved = pos - offset;
 	//if (newPos != pos()) {
 	setPos(newPos);
-	foreach (ItemBase * lkpi, m_layerKin) {
+	Q_FOREACH (ItemBase * lkpi, m_layerKin) {
 		lkpi->setPos(newPos);
 	}
 	//}
@@ -399,7 +426,7 @@ void PaletteItem::syncKinMoved(QPointF offset, QPointF newPos) {
 
 void PaletteItem::setInstanceTitle(const QString& title, bool initial) {
 	ItemBase::setInstanceTitle(title, initial);
-	foreach (ItemBase * lkpi, m_layerKin) {
+	Q_FOREACH (ItemBase * lkpi, m_layerKin) {
 		lkpi->setInstanceTitle(title, initial);
 	}
 }
@@ -417,35 +444,35 @@ void PaletteItem::setInactive(bool inactivate) {
 void PaletteItem::figureHover() {
 	setAcceptHoverEvents(true);
 	setAcceptedMouseButtons(ALLMOUSEBUTTONS);
-	foreach(ItemBase * lkpi, m_layerKin) {
+	Q_FOREACH(ItemBase * lkpi, m_layerKin) {
 		lkpi->setAcceptHoverEvents(true);
 		lkpi->setAcceptedMouseButtons(ALLMOUSEBUTTONS);
 	}
 }
 
 void PaletteItem::clearModelPart() {
-	foreach (ItemBase * lkpi, m_layerKin) {
-		lkpi->setModelPart(NULL);
+	Q_FOREACH (ItemBase * lkpi, m_layerKin) {
+		lkpi->setModelPart(nullptr);
 	}
 	ItemBase::clearModelPart();
 }
 
 void PaletteItem::resetID() {
 	ItemBase::resetID();
-	foreach (ItemBase * lkpi, m_layerKin) {
+	Q_FOREACH (ItemBase * lkpi, m_layerKin) {
 		lkpi->resetID();
 	}
 }
 
 void PaletteItem::slamZ(double z) {
 	PaletteItemBase::slamZ(z);
-	foreach (ItemBase * lkpi, m_layerKin) {
+	Q_FOREACH (ItemBase * lkpi, m_layerKin) {
 		lkpi->slamZ(z);
 	}
 }
 
 void PaletteItem::resetImage(InfoGraphicsView * infoGraphicsView) {
-	foreach (Connector * connector, modelPart()->connectors()) {
+	Q_FOREACH (Connector * connector, modelPart()->connectors()) {
 		connector->unprocess(this->viewID(), this->viewLayerID());
 	}
 
@@ -453,14 +480,14 @@ void PaletteItem::resetImage(InfoGraphicsView * infoGraphicsView) {
 	initLayerAttributes(layerAttributes, viewID(), viewLayerID(), viewLayerPlacement(), true, !m_selectionShape.isEmpty());
 	this->setUpImage(modelPart(), infoGraphicsView->viewLayers(), layerAttributes);
 
-	foreach (ItemBase * layerKin, m_layerKin) {
+	Q_FOREACH (ItemBase * layerKin, m_layerKin) {
 		resetKinImage(layerKin, infoGraphicsView);
 	}
 }
 
 void PaletteItem::resetKinImage(ItemBase * layerKin, InfoGraphicsView * infoGraphicsView)
 {
-	foreach (Connector * connector, modelPart()->connectors()) {
+	Q_FOREACH (Connector * connector, modelPart()->connectors()) {
 		connector->unprocess(layerKin->viewID(), layerKin->viewLayerID());
 	}
 	LayerAttributes layerAttributes;
@@ -492,7 +519,7 @@ QString PaletteItem::genFZP(const QString & moduleid, const QString & templateNa
 
 	QStringList ss = moduleid.split("_");
 	int count = 0;
-	foreach (QString s, ss) {
+	Q_FOREACH (QString s, ss) {
 		bool ok;
 		int c = s.toInt(&ok);
 		if (ok) {
@@ -519,7 +546,7 @@ bool PaletteItem::collectExtraInfo(QWidget * parent, const QString & family, con
 		returnProp = "";
 		returnValue = value;
 
-		QPushButton * button = new QPushButton(tr("Edit Pin Labels"));
+		auto * button = new QPushButton(tr("Edit Pin Labels"));
 		button->setObjectName("infoViewButton");
 		connect(button, SIGNAL(pressed()), this, SLOT(openPinLabelDialog()));
 		button->setEnabled(swappingEnabled);
@@ -531,7 +558,7 @@ bool PaletteItem::collectExtraInfo(QWidget * parent, const QString & family, con
 
 	bool result = PaletteItemBase::collectExtraInfo(parent, family, prop, value, swappingEnabled, returnProp, returnValue, returnWidget, hide);
 
-	if (prop.compare("layer") == 0 && modelPart()->flippedSMD() && returnWidget != NULL) {
+	if (prop.compare("layer") == 0 && modelPart()->flippedSMD() && returnWidget) {
 		bool disabled = true;
 		InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
 		if (infoGraphicsView && infoGraphicsView->boardLayers() == 2) disabled = false;
@@ -590,10 +617,10 @@ QStringList PaletteItem::collectValues(const QString & family, const QString & p
 
 void PaletteItem::openPinLabelDialog() {
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView == NULL) {
+	if (infoGraphicsView == nullptr) {
 		QMessageBox::warning(
-		    NULL,
-		    tr("Fritzing"),
+		    nullptr,
+		    tr("Fritzing", "dialog title"),
 		    tr("Unable to proceed; unable to find top level view.")
 		);
 		return;
@@ -603,14 +630,14 @@ void PaletteItem::openPinLabelDialog() {
 	QList<Connector *> sortedConnectors = sortConnectors();
 	if (sortedConnectors.count() == 0) {
 		QMessageBox::warning(
-		    NULL,
-		    tr("Fritzing"),
+		    nullptr,
+		    tr("Fritzing", "dialog title"),
 		    tr("Unable to proceed; part connectors do no have standard IDs.")
 		);
 		return;
 	}
 
-	foreach (Connector * connector, sortedConnectors) {
+	Q_FOREACH (Connector * connector, sortedConnectors) {
 		labels.append(connector->connectorSharedName());
 	}
 
@@ -620,24 +647,24 @@ void PaletteItem::openPinLabelDialog() {
 	}
 
 	bool singleRow = isSingleRow(cachedConnectorItems());
-	PinLabelDialog pinLabelDialog(labels, singleRow, chipLabel, modelPart()->isCore(), NULL);
+	PinLabelDialog pinLabelDialog(labels, singleRow, chipLabel, modelPart()->isCore(), nullptr);
 	int result = pinLabelDialog.exec();
 	if (result != QDialog::Accepted) return;
 
 	QStringList newLabels = pinLabelDialog.labels();
 	if (newLabels.count() != sortedConnectors.count()) {
 		QMessageBox::warning(
-		    NULL,
-		    tr("Fritzing"),
+		    nullptr,
+		    tr("Fritzing", "dialog title"),
 		    tr("Label mismatch.  Nothing was saved.")
 		);
 		return;
 	}
 
-	infoGraphicsView->renamePins(this, labels, newLabels, singleRow);
+	infoGraphicsView->renamePins(this, labels, newLabels);
 }
 
-void PaletteItem::renamePins(const QStringList & labels, bool singleRow)
+void PaletteItem::renamePins(const QStringList & labels)
 {
 	QList<Connector *> sortedConnectors = sortConnectors();
 	for (int i = 0; i < labels.count(); i++) {
@@ -646,7 +673,10 @@ void PaletteItem::renamePins(const QStringList & labels, bool singleRow)
 	}
 
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	infoGraphicsView->changePinLabels(this, singleRow);
+	infoGraphicsView->changePinLabels(this);
+
+	QList<ConnectorItem *> already;
+	updateConnections(true, already);
 }
 
 bool PaletteItem::isSingleRow(const QList<ConnectorItem *> & connectorItems) {
@@ -655,10 +685,10 @@ bool PaletteItem::isSingleRow(const QList<ConnectorItem *> & connectorItems) {
 		return false;
 	}
 	else if (connectorItems.count() % 2 == 0) {
-		QPointF p = connectorItems.at(0)->sceneAdjustedTerminalPoint(NULL);
+		QPointF p = connectorItems.at(0)->sceneAdjustedTerminalPoint(nullptr);
 		double slope = 0;
 		for (int i = 1; i < connectorItems.count(); i++) {
-			QPointF q = connectorItems.at(i)->sceneAdjustedTerminalPoint(NULL);
+			QPointF q = connectorItems.at(i)->sceneAdjustedTerminalPoint(nullptr);
 			if (p == q) continue;
 
 			double newSlope = q.x() == p.x() ? std::numeric_limits<double>::max() : (q.y()  - p.y()) / (q.x() - p.x());
@@ -678,12 +708,16 @@ bool PaletteItem::isSingleRow(const QList<ConnectorItem *> & connectorItems) {
 }
 
 QList<Connector *> PaletteItem::sortConnectors() {
+	return sortConnectors(modelPart());
+}
+
+QList<Connector *> PaletteItem::sortConnectors(ModelPart * modelPart) {
 	QList<Connector *> sortedConnectors;
-	foreach (Connector * connector, modelPart()->connectors().values()) {
+	Q_FOREACH (Connector * connector, modelPart->connectors().values()) {
 		sortedConnectors.append(connector);
 	}
 	ByIDParseSuccessful = true;
-	qSort(sortedConnectors.begin(), sortedConnectors.end(), byID);
+	std::sort(sortedConnectors.begin(), sortedConnectors.end(), byID);
 	if (!ByIDParseSuccessful || sortedConnectors.count() == 0) {
 		sortedConnectors.clear();
 	}
@@ -691,8 +725,7 @@ QList<Connector *> PaletteItem::sortConnectors() {
 	return sortedConnectors;
 }
 
-bool PaletteItem::changePinLabels(bool singleRow, bool sip) {
-	Q_UNUSED(singleRow);
+bool PaletteItem::changePinLabels(bool sip) {
 	Q_UNUSED(sip);
 	if (m_viewID != ViewLayer::SchematicView) return true;
 
@@ -705,7 +738,7 @@ QStringList PaletteItem::getPinLabels(bool & hasLocal) {
 	QList<Connector *> sortedConnectors = sortConnectors();
 	if (sortedConnectors.count() == 0) return labels;
 
-	foreach (Connector * connector, sortedConnectors) {
+	Q_FOREACH (Connector * connector, sortedConnectors) {
 		labels.append(connector->connectorSharedName());
 		if (!connector->connectorLocalName().isEmpty()) {
 			hasLocal = true;
@@ -719,13 +752,13 @@ void PaletteItem::resetConnectors() {
 	if (m_viewID != ViewLayer::SchematicView) return;
 
 	FSvgRenderer * renderer = fsvgRenderer();
-	if (renderer == NULL) return;
+	if (renderer == nullptr) return;
 
 	QSizeF size = renderer->defaultSizeF();   // pixels
 	QRectF viewBox = renderer->viewBoxF();
-	foreach (ConnectorItem * connectorItem, cachedConnectorItems()) {
+	Q_FOREACH (ConnectorItem * connectorItem, cachedConnectorItems()) {
 		SvgIdLayer * svgIdLayer = connectorItem->connector()->fullPinInfo(m_viewID, m_viewLayerID);
-		if (svgIdLayer == NULL) continue;
+		if (svgIdLayer == nullptr) continue;
 
 		QRectF bounds = renderer->boundsOnElement(svgIdLayer->m_svgId);
 		QPointF p(bounds.left() * size.width() / viewBox.width(), bounds.top() * size.height() / viewBox.height());
@@ -739,12 +772,12 @@ void PaletteItem::resetConnectors() {
 void PaletteItem::resetConnectors(ItemBase * otherLayer, FSvgRenderer * otherLayerRenderer)
 {
 	// there's only one connector
-	foreach (Connector * connector, m_modelPart->connectors().values()) {
-		if (connector == NULL) continue;
+	Q_FOREACH (Connector * connector, m_modelPart->connectors().values()) {
+		if (connector == nullptr) continue;
 
 		connector->unprocess(m_viewID, m_viewLayerID);
 		SvgIdLayer * svgIdLayer = connector->fullPinInfo(m_viewID, m_viewLayerID);
-		if (svgIdLayer == NULL) continue;
+		if (svgIdLayer == nullptr) continue;
 
 		bool result = fsvgRenderer()->setUpConnector(svgIdLayer, false, viewLayerPlacement());
 		if (!result) continue;
@@ -753,12 +786,12 @@ void PaletteItem::resetConnectors(ItemBase * otherLayer, FSvgRenderer * otherLay
 	}
 
 	if (otherLayer) {
-		foreach (Connector * connector, m_modelPart->connectors().values()) {
-			if (connector == NULL) continue;
+		Q_FOREACH (Connector * connector, m_modelPart->connectors().values()) {
+			if (connector == nullptr) continue;
 
 			connector->unprocess(m_viewID, otherLayer->viewLayerID());
 			SvgIdLayer * svgIdLayer = connector->fullPinInfo(m_viewID, otherLayer->viewLayerID());
-			if (svgIdLayer == NULL) continue;
+			if (svgIdLayer == nullptr) continue;
 
 			bool result = otherLayerRenderer->setUpConnector(svgIdLayer, false, viewLayerPlacement());
 			if (!result) continue;
@@ -773,14 +806,14 @@ void PaletteItem::resetConnectors(ItemBase * otherLayer, FSvgRenderer * otherLay
 void PaletteItem::resetConnector(ItemBase * itemBase, SvgIdLayer * svgIdLayer)
 {
 	QList<ConnectorItem *> already;
-	foreach (ConnectorItem * connectorItem, itemBase->cachedConnectorItems()) {
+	Q_FOREACH (ConnectorItem * connectorItem, itemBase->cachedConnectorItems()) {
 		//DebugDialog::debug(QString("via set rect %1").arg(itemBase->viewID()), svgIdLayer->m_rect);
 
 		connectorItem->setRect(svgIdLayer->rect(viewLayerPlacement()));
 		connectorItem->setTerminalPoint(svgIdLayer->point(viewLayerPlacement()));
 		connectorItem->setRadius(svgIdLayer->m_radius, svgIdLayer->m_strokeWidth);
 		connectorItem->setIsPath(svgIdLayer->m_path);
-		connectorItem->attachedMoved(false, already);
+		connectorItem->attachedMoved(false, false, already);
 		break;
 	}
 }
@@ -795,7 +828,34 @@ bool PaletteItem::collectHoleSizeInfo(const QString & defaultHoleSizeValue, QWid
 	}
 	QWidget * frame = createHoleSettings(parent, m_holeSettings, swappingEnabled, returnValue, true);
 
-	connect(m_holeSettings.sizesComboBox, SIGNAL(currentIndexChanged(const QString &)), this, SLOT(changeHoleSize(const QString &)));
+	// Hole group mode: if several holes are selected with differing values, blank the
+	// affected controls so a stale single value isn't shown for the whole group. Done
+	// before connecting signals so setting the combo to -1 doesn't fire changeHoleSize().
+	{
+		auto * hole = dynamic_cast<Hole *>(this);
+		InfoGraphicsView * igv = InfoGraphicsView::getInfoGraphicsView(this);
+		QList<Hole *> holes;
+		if ((hole != nullptr) && (igv != nullptr) && igv->collectSelectedHoles(holes) > 1 && holes.contains(hole)) {
+			bool mixedDiameter = false, mixedThickness = false, first = true;
+			QString d0, t0;
+			Q_FOREACH (Hole * h, holes) {
+				QStringList dt = h->holeSize().split(",");
+				if (dt.count() != 2) continue;
+				if (first) { d0 = dt.at(0); t0 = dt.at(1); first = false; }
+				else {
+					if (dt.at(0) != d0) mixedDiameter = true;
+					if (dt.at(1) != t0) mixedThickness = true;
+				}
+			}
+			if (mixedDiameter && (m_holeSettings.diameterEdit != nullptr)) m_holeSettings.diameterEdit->setText("");
+			if (mixedThickness && (m_holeSettings.thicknessEdit != nullptr)) m_holeSettings.thicknessEdit->setText("");
+			if ((mixedDiameter || mixedThickness) && (m_holeSettings.sizesComboBox != nullptr)) {
+				m_holeSettings.sizesComboBox->setCurrentIndex(-1);
+			}
+		}
+	}
+
+	connect(m_holeSettings.sizesComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(changeHoleSize(int)));
 	connect(m_holeSettings.mmRadioButton, SIGNAL(toggled(bool)), this, SLOT(changeUnits(bool)));
 	connect(m_holeSettings.inRadioButton, SIGNAL(toggled(bool)), this, SLOT(changeUnits(bool)));
 	connect(m_holeSettings.diameterEdit, SIGNAL(editingFinished()), this, SLOT(changeDiameter()));
@@ -833,14 +893,14 @@ void PaletteItem::setUpHoleSizes(const QString & type, HoleClassThing & holeThin
 }
 void PaletteItem::setUpHoleSizesAux(HoleClassThing & holeThing, const QString & type) {
 	QFile file(":/resources/vias.xml");
-
-	QString errorStr;
-	int errorLine;
-	int errorColumn;
+	if (!file.open(QIODevice::ReadOnly)) {
+		DebugDialog::debug("Unable to open :/resources/vias.xml");
+	}
 
 	QDomDocument domDocument;
-	if (!domDocument.setContent(&file, true, &errorStr, &errorLine, &errorColumn)) {
-		DebugDialog::debug(QString("failed loading properties %1 line:%2 col:%3").arg(errorStr).arg(errorLine).arg(errorColumn));
+	QDomDocument::ParseResult parseResult = domDocument.setContent(&file, QDomDocument::ParseOption::UseNamespaceProcessing);
+	if (!parseResult) {
+		DebugDialog::debug(QString("failed loading properties %1 line:%2 col:%3").arg(parseResult.errorMessage).arg(parseResult.errorLine).arg(parseResult.errorColumn));
 		return;
 	}
 
@@ -893,27 +953,27 @@ void PaletteItem::setUpHoleSizesAux(HoleClassThing & holeThing, const QString & 
 }
 
 QWidget * PaletteItem::createHoleSettings(QWidget * parent, HoleSettings & holeSettings, bool swappingEnabled, const QString & currentHoleSize, bool advanced) {
-	static const int RowHeight = 21;
+	static constexpr int RowHeight = 21;
 
-	holeSettings.diameterEdit = NULL;
-	holeSettings.thicknessEdit = NULL;
-	holeSettings.mmRadioButton = NULL;
-	holeSettings.inRadioButton = NULL;
-	holeSettings.diameterValidator = NULL;
-	holeSettings.thicknessValidator = NULL;
+	holeSettings.diameterEdit = nullptr;
+	holeSettings.thicknessEdit = nullptr;
+	holeSettings.mmRadioButton = nullptr;
+	holeSettings.inRadioButton = nullptr;
+	holeSettings.diameterValidator = nullptr;
+	holeSettings.thicknessValidator = nullptr;
 
-	QFrame * frame = new QFrame(parent);
+	auto * frame = new QFrame(parent);
 	frame->setObjectName("infoViewPartFrame");
 
-	QVBoxLayout * vBoxLayout = new QVBoxLayout(frame);
-	vBoxLayout->setMargin(0);
+	auto * vBoxLayout = new QVBoxLayout(frame);
+	vBoxLayout->setContentsMargins(0, 0, 0, 0);
 	vBoxLayout->setContentsMargins(0, 0, 0, 0);
 	vBoxLayout->setSpacing(0);
 
 	holeSettings.sizesComboBox = new QComboBox(frame);
 	holeSettings.sizesComboBox->setEditable(false);
 	holeSettings.sizesComboBox->setObjectName("infoViewComboBox");
-	foreach (QString key, holeSettings.holeThing->holeSizeKeys) {
+	Q_FOREACH (QString key, holeSettings.holeThing->holeSizeKeys) {
 		holeSettings.sizesComboBox->addItem(key);
 	}
 	holeSettings.sizesComboBox->setEnabled(swappingEnabled);
@@ -923,20 +983,20 @@ QWidget * PaletteItem::createHoleSettings(QWidget * parent, HoleSettings & holeS
 	if (advanced) {
 		vBoxLayout->addSpacing(4);
 
-		QFrame * hFrame = new QFrame(frame);
-		QHBoxLayout * hLayout = new QHBoxLayout(hFrame);
-		hLayout->setMargin(0);
+		auto * hFrame = new QFrame(frame);
+		auto * hLayout = new QHBoxLayout(hFrame);
+		hLayout->setContentsMargins(0, 0, 0, 0);
 
-		QGroupBox * subFrame = new QGroupBox(tr("advanced settings"), frame);
+		auto * subFrame = new QGroupBox(tr("advanced settings"), frame);
 		subFrame->setObjectName("infoViewGroupBox");
 
-		QGridLayout * gridLayout = new QGridLayout(subFrame);
-		gridLayout->setMargin(0);
+		auto * gridLayout = new QGridLayout(subFrame);
+		gridLayout->setContentsMargins(0, 0, 0, 0);
 
-		QGroupBox * rbFrame = new QGroupBox("", subFrame);
+		auto * rbFrame = new QGroupBox("", subFrame);
 		rbFrame->setObjectName("infoViewGroupBox");
-		QVBoxLayout * vbl = new QVBoxLayout(rbFrame);
-		vbl->setMargin(0);
+		auto * vbl = new QVBoxLayout(rbFrame);
+		vbl->setContentsMargins(0, 0, 0, 0);
 
 		holeSettings.inRadioButton = new QRadioButton(tr("in"), subFrame);
 		gridLayout->addWidget(holeSettings.inRadioButton, 0, 2);
@@ -956,11 +1016,12 @@ QWidget * PaletteItem::createHoleSettings(QWidget * parent, HoleSettings & holeS
 		holeSettings.diameterEdit->setMinimumHeight(RowHeight);
 		holeSettings.diameterValidator = new QDoubleValidator(holeSettings.diameterEdit);
 		holeSettings.diameterValidator->setNotation(QDoubleValidator::StandardNotation);
+		holeSettings.diameterValidator->setLocale(TextUtils::getLocale());
 		holeSettings.diameterEdit->setValidator(holeSettings.diameterValidator);
 		gridLayout->addWidget(holeSettings.diameterEdit, 0, 1);
 		holeSettings.diameterEdit->setObjectName("infoViewLineEdit");
 
-		QLabel * label = new QLabel(tr("Hole Diameter"));
+		auto * label = new QLabel(tr("Hole Diameter"));
 		label->setMinimumHeight(RowHeight);
 		label->setObjectName("infoViewGroupBoxLabel");
 		gridLayout->addWidget(label, 0, 0);
@@ -969,14 +1030,15 @@ QWidget * PaletteItem::createHoleSettings(QWidget * parent, HoleSettings & holeS
 		holeSettings.thicknessEdit->setMinimumHeight(RowHeight);
 		holeSettings.thicknessValidator = new QDoubleValidator(holeSettings.thicknessEdit);
 		holeSettings.thicknessValidator->setNotation(QDoubleValidator::StandardNotation);
+		holeSettings.thicknessValidator->setLocale(TextUtils::getLocale());
 		holeSettings.thicknessEdit->setValidator(holeSettings.thicknessValidator);
 		gridLayout->addWidget(holeSettings.thicknessEdit, 1, 1);
 		holeSettings.thicknessEdit->setObjectName("infoViewLineEdit");
 
 		label = new QLabel(tr("Ring Thickness"));
 		label->setMinimumHeight(RowHeight);
+		label->setObjectName("infoViewGroupBoxLabel");
 		gridLayout->addWidget(label, 1, 0);
-		label->setObjectName("infoViewLabel");
 
 		gridLayout->setContentsMargins(10, 2, 0, 2);
 		gridLayout->addItem(new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Minimum), 0, 3);
@@ -1009,9 +1071,9 @@ QWidget * PaletteItem::createHoleSettings(QWidget * parent, HoleSettings & holeS
 }
 
 void PaletteItem::updateEditTexts(HoleSettings & holeSettings) {
-	if (holeSettings.diameterEdit == NULL) return;
-	if (holeSettings.thicknessEdit == NULL) return;
-	if (holeSettings.mmRadioButton == NULL) return;
+	if (holeSettings.diameterEdit == nullptr) return;
+	if (holeSettings.thicknessEdit == nullptr) return;
+	if (holeSettings.mmRadioButton == nullptr) return;
 
 	double hd = TextUtils::convertToInches(holeSettings.holeDiameter);
 	double rt = TextUtils::convertToInches(holeSettings.ringThickness);
@@ -1025,12 +1087,14 @@ void PaletteItem::updateEditTexts(HoleSettings & holeSettings) {
 	}
 
 	QStringList sizes = newVal.split(",");
-	holeSettings.diameterEdit->setText(sizes.at(0));
-	holeSettings.thicknessEdit->setText(sizes.at(1));
+	QLocale locale = TextUtils::getLocale();
+	constexpr int decimalsAfter = 2;
+	holeSettings.diameterEdit->setText(locale.toString(sizes.at(0).toDouble(), 'f', decimalsAfter));
+	holeSettings.thicknessEdit->setText(locale.toString(sizes.at(1).toDouble(), 'f', decimalsAfter));
 }
 
 void PaletteItem::updateSizes(HoleSettings &  holeSettings) {
-	if (holeSettings.sizesComboBox == NULL) return;
+	if (holeSettings.sizesComboBox == nullptr) return;
 
 	int newIndex = -1;
 
@@ -1071,9 +1135,9 @@ void PaletteItem::updateSizes(HoleSettings &  holeSettings) {
 
 void PaletteItem::updateValidators(HoleSettings & holeSettings)
 {
-	if (holeSettings.diameterValidator == NULL) return;
-	if (holeSettings.thicknessValidator == NULL) return;
-	if (holeSettings.mmRadioButton == NULL) return;
+	if (holeSettings.diameterValidator == nullptr) return;
+	if (holeSettings.thicknessValidator == nullptr) return;
+	if (holeSettings.mmRadioButton == nullptr) return;
 
 	QString units = holeSettings.currentUnits();
 	double multiplier = (units == "mm") ? 25.4 : 1.0;
@@ -1084,10 +1148,10 @@ void PaletteItem::updateValidators(HoleSettings & holeSettings)
 void PaletteItem::initHoleSettings(HoleSettings & holeSettings, HoleClassThing * holeThing)
 {
 	holeSettings.holeThing = holeThing;
-	holeSettings.diameterEdit = holeSettings.thicknessEdit = NULL;
-	holeSettings.diameterValidator = holeSettings.thicknessValidator = NULL;
-	holeSettings.inRadioButton = holeSettings.mmRadioButton = NULL;
-	holeSettings.sizesComboBox = NULL;
+	holeSettings.diameterEdit = holeSettings.thicknessEdit = nullptr;
+	holeSettings.diameterValidator = holeSettings.thicknessValidator = nullptr;
+	holeSettings.inRadioButton = holeSettings.mmRadioButton = nullptr;
+	holeSettings.sizesComboBox = nullptr;
 }
 
 
@@ -1109,6 +1173,33 @@ bool PaletteItem::setHoleSize(QString & holeSize, bool force, HoleSettings & hol
 	return true;
 }
 
+static QString clampHoleDim(const QString & valueStr, const QPointF & rangeInches)
+{
+	bool ok;
+	double inches = TextUtils::convertToInches(valueStr, &ok, false);
+	if (!ok) return valueStr;
+	double clamped = inches;
+	double lo = rangeInches.x();
+	double hi = rangeInches.y();
+	if (lo > 0 && clamped < lo) clamped = lo;
+	if (hi > 0 && clamped > hi) clamped = hi;
+	if (clamped == inches) return valueStr;
+	bool mm = valueStr.contains("mm", Qt::CaseInsensitive);
+	double out = mm ? clamped * 25.4 : clamped;
+	return QString::number(out) + (mm ? "mm" : "in");
+}
+
+QString PaletteItem::clampHoleSize(const QString & holeSizeStr)
+{
+	if (m_holeSettings.holeThing == nullptr) return holeSizeStr;
+	QString s = holeSizeStr;
+	QStringList sizes = getSizes(s, m_holeSettings);   // resolves a preset name to "diameter,thickness"
+	if (sizes.count() != 2) return holeSizeStr;
+	QString diameter = clampHoleDim(sizes.at(0), m_holeSettings.holeThing->holeDiameterRange);
+	QString ringThickness = clampHoleDim(sizes.at(1), m_holeSettings.holeThing->ringThicknessRange);
+	return diameter + "," + ringThickness;
+}
+
 QStringList PaletteItem::getSizes(QString & holeSize, HoleSettings & holeSettings)
 {
 	QStringList sizes;
@@ -1123,10 +1214,23 @@ QStringList PaletteItem::getSizes(QString & holeSize, HoleSettings & holeSetting
 	return sizes;
 }
 
+void PaletteItem::changeHoleSize(int index) {
+	auto * comboBox = qobject_cast<QComboBox *>(sender());
+	if (comboBox == nullptr) return;
+	QString newSize = comboBox->itemText(index);
+
+	// In hole group mode, apply the preset's diameter+thickness pair to all selected holes.
+	QString resolved = newSize;
+	QStringList dt = getSizes(resolved, m_holeSettings);
+	if (dt.count() == 2 && applyHoleSizeToSelectionIfGroup(dt.at(0), dt.at(1))) return;
+
+	changeHoleSize(newSize);
+}
+
 void PaletteItem::changeHoleSize(const QString & newSize) {
 	if (this->m_viewID != ViewLayer::PCBView) {
-		PaletteItem * paletteItem = qobject_cast<PaletteItem *>(modelPart()->viewItem(ViewLayer::PCBView));
-		if (paletteItem == NULL) return;
+		auto * paletteItem = qobject_cast<PaletteItem *>(modelPart()->viewItem(ViewLayer::PCBView));
+		if (paletteItem == nullptr) return;
 
 		paletteItem->changeHoleSize(newSize);
 		return;
@@ -1159,19 +1263,16 @@ void PaletteItem::changeHoleSize(const QString & newSize) {
 	m_propsMap.insert("moduleID", newModuleID);
 
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView != NULL) {
+	if (infoGraphicsView) {
 		infoGraphicsView->swap(family(), newModuleID, m_propsMap, this);
 	}
 }
 
 QString PaletteItem::hackFzpHoleSize(const QString & fzp, const QString & moduleid, int hsix)
 {
-	QString errorStr;
-	int errorLine;
-	int errorColumn;
 	QDomDocument document;
-	bool result = document.setContent(fzp, &errorStr, &errorLine, &errorColumn);
-	if (!result) {
+	QDomDocument::ParseResult parseResult = document.setContent(fzp);
+	if (!parseResult) {
 		DebugDialog::debug(QString("bad fzp in %1:%2").arg(moduleid).arg(fzp));
 	}
 	QStringList strings = moduleid.mid(hsix).split("_");
@@ -1181,13 +1282,13 @@ QString PaletteItem::hackFzpHoleSize(const QString & fzp, const QString & module
 
 QString PaletteItem::hackFzpHoleSize(const QString & newModuleID, const QString & pcbFilename, const QString & newSize) {
 	QFile file(modelPart()->path());
-	QString errorStr;
-	int errorLine;
-	int errorColumn;
+	if (!file.open(QIODevice::ReadOnly)) {
+		DebugDialog::debug(QString("Unable to open :%1").arg(modelPart()->path()));
+	}
 	QDomDocument document;
-	bool result = document.setContent(&file, &errorStr, &errorLine, &errorColumn);
-	if (!result) {
-		DebugDialog::debug(QString("bad doc fzp in %1:%2 %3 %4").arg(newModuleID).arg(errorStr).arg(errorLine).arg(errorColumn));
+	QDomDocument::ParseResult parseResult = document.setContent(&file);
+	if (!parseResult) {
+		DebugDialog::debug(QString("bad doc fzp in %1:%2 %3 %4").arg(newModuleID).arg(parseResult.errorMessage).arg(parseResult.errorLine).arg(parseResult.errorColumn));
 	}
 
 	return hackFzpHoleSize(document, newModuleID, pcbFilename, newSize);
@@ -1239,13 +1340,14 @@ QString PaletteItem::hackSvgHoleSizeAux(const QString & svg, const QString & exp
 
 QString PaletteItem::hackSvgHoleSize(const QString & holeDiameter, const QString & ringThickness) {
 	QFile file(filename());
-	QString errorStr;
-	int errorLine;
-	int errorColumn;
+	if (!file.open(QIODevice::ReadOnly)) {
+		DebugDialog::debug(QString("Unable to open :%1").arg(filename()));
+	}
 
 	QDomDocument domDocument;
-	if (!domDocument.setContent(&file, true, &errorStr, &errorLine, &errorColumn)) {
-		DebugDialog::debug(QString("unable to parse pcb svg xml: %1 %2 %3").arg(errorStr).arg(errorLine).arg(errorColumn));
+	QDomDocument::ParseResult parseResult = domDocument.setContent(&file, QDomDocument::ParseOption::UseNamespaceProcessing);
+	if (!parseResult) {
+		DebugDialog::debug(QString("unable to parse pcb svg xml: %1 %2 %3").arg(parseResult.errorMessage).arg(parseResult.errorLine).arg(parseResult.errorColumn));
 		return "";
 	}
 
@@ -1271,7 +1373,7 @@ QString PaletteItem::hackSvgHoleSize(QDomDocument & domDocument, const QString &
 	for (int i = 0; i < circles.count(); i++) {
 		QDomElement circle = circles.at(i).toElement();
 		QString id = circle.attribute("id");
-		if (ConnectorFinder.indexIn(id) == 0) {
+		if (id.indexOf(ConnectorFinder) == 0) {
 			circle.setAttribute("r", QString::number(rad));
 			circle.setAttribute("stroke-width", QString::number(rt));
 		}
@@ -1311,8 +1413,8 @@ QString PaletteItem::appendHoleSize(const QString & moduleid, const QString & ho
 
 void PaletteItem::generateSwap(const QString & text, GenModuleID genModuleID, GenFzp genFzp, GenSvg makeBreadboardSvg, GenSvg makeSchematicSvg, GenSvg makePcbSvg)
 {
-	FamilyPropertyComboBox * comboBox = qobject_cast<FamilyPropertyComboBox *>(sender());
-	if (comboBox == NULL) return;
+	auto * comboBox = qobject_cast<FamilyPropertyComboBox *>(sender());
+	if (comboBox == nullptr) return;
 
 	QMap<QString, QString> propsMap(m_propsMap);
 	propsMap.insert(comboBox->prop(), text);
@@ -1325,6 +1427,14 @@ void PaletteItem::generateSwap(const QString & text, GenModuleID genModuleID, Ge
 		}
 	}
 
+	PaletteItem::generateSwapFzpSvg(newModuleID, genFzp, makeBreadboardSvg, makeSchematicSvg, makePcbSvg);
+
+	m_propsMap.insert("moduleID", newModuleID);
+
+}
+
+void PaletteItem::generateSwapFzpSvg(QString newModuleID, GenFzp genFzp, GenSvg makeBreadboardSvg, GenSvg makeSchematicSvg, GenSvg makePcbSvg)
+{
 	QString path;
 	if (!PartFactory::fzpFileExists(newModuleID, path)) {
 		QString fzp = genFzp(newModuleID);
@@ -1361,9 +1471,6 @@ void PaletteItem::generateSwap(const QString & text, GenModuleID genModuleID, Ge
 			TextUtils::writeUtf8(path, svg);
 		}
 	}
-
-	m_propsMap.insert("moduleID", newModuleID);
-
 }
 
 void PaletteItem::changeUnits(bool)
@@ -1395,20 +1502,37 @@ QString PaletteItem::changeUnits(HoleSettings & holeSettings)
 	return newVal;
 }
 
+bool PaletteItem::applyHoleSizeToSelectionIfGroup(const QString & diameter, const QString & ringThickness)
+{
+	auto * hole = dynamic_cast<Hole *>(this);
+	if (hole == nullptr) return false;
+
+	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
+	if (infoGraphicsView == nullptr) return false;
+
+	QList<Hole *> holes;
+	if (infoGraphicsView->collectSelectedHoles(holes) <= 1 || !holes.contains(hole)) return false;
+
+	infoGraphicsView->setHoleSizeForSelection(diameter, ringThickness);
+	return true;
+}
+
 void PaletteItem::changeThickness()
 {
 	if (changeThickness(m_holeSettings, sender())) {
-		QLineEdit * edit = qobject_cast<QLineEdit *>(sender());
-		changeHoleSize(m_holeSettings.holeDiameter + "," + edit->text() + m_holeSettings.currentUnits());
+		auto * edit = qobject_cast<QLineEdit *>(sender());
+		QString newThickness = QString::number(TextUtils::getLocale().toDouble(edit->text())) + m_holeSettings.currentUnits();
+		if (applyHoleSizeToSelectionIfGroup(QString(), newThickness)) return;
+		changeHoleSize(m_holeSettings.holeDiameter + "," + newThickness);
 	}
 }
 
 bool PaletteItem::changeThickness(HoleSettings & holeSettings, QObject * sender)
 {
-	QLineEdit * edit = qobject_cast<QLineEdit *>(sender);
-	if (edit == NULL) return false;
+	auto * edit = qobject_cast<QLineEdit *>(sender);
+	if (edit == nullptr) return false;
 
-	double newValue = edit->text().toDouble();
+	double newValue = TextUtils::getLocale().toDouble(edit->text());
 	QString temp = holeSettings.ringThickness;
 	temp.chop(2);
 	double oldValue = temp.toDouble();
@@ -1418,17 +1542,19 @@ bool PaletteItem::changeThickness(HoleSettings & holeSettings, QObject * sender)
 void PaletteItem::changeDiameter()
 {
 	if (changeDiameter(m_holeSettings, sender())) {
-		QLineEdit * edit = qobject_cast<QLineEdit *>(sender());
-		changeHoleSize(edit->text() + m_holeSettings.currentUnits() + "," + m_holeSettings.ringThickness);
+		auto * edit = qobject_cast<QLineEdit *>(sender());
+		QString newDiameter = QString::number(TextUtils::getLocale().toDouble(edit->text())) + m_holeSettings.currentUnits();
+		if (applyHoleSizeToSelectionIfGroup(newDiameter, QString())) return;
+		changeHoleSize(newDiameter + "," + m_holeSettings.ringThickness);
 	}
 }
 
 bool PaletteItem::changeDiameter(HoleSettings & holeSettings, QObject * sender)
 {
-	QLineEdit * edit = qobject_cast<QLineEdit *>(sender);
-	if (edit == NULL) return false;
+	auto * edit = qobject_cast<QLineEdit *>(sender);
+	if (edit == nullptr) return false;
 
-	double newValue = edit->text().toDouble();
+	double newValue = TextUtils::getLocale().toDouble(edit->text());
 	QString temp = holeSettings.holeDiameter;
 	temp.chop(2);
 	double oldValue = temp.toDouble();
@@ -1462,10 +1588,10 @@ bool PaletteItem::makeLocalModifications(QByteArray & svg, const QString & filen
 	if (m_viewID == ViewLayer::SchematicView) {
 		QString value = modelPart()->properties().value("editable pin labels", "");
 		if (value.compare("true") == 0) {
-			bool hasLayout, sip;
-			QStringList labels = sipOrDipOrLabels(hasLayout, sip);
-			if (labels.count() > 0) {
-				svg = PartFactory::makeSchematicSipOrDipOr(labels, hasLayout, sip).toUtf8();
+			QString svgString = QString::fromUtf8(svg);
+			QString newSvg = retrieveSchematicSvg(svgString);
+			if (!newSvg.isEmpty()) {
+				svg = newSvg.toUtf8();
 				modified = true;
 			}
 		}
@@ -1494,29 +1620,21 @@ bool PaletteItem::makeLocalModifications(QByteArray & svg, const QString & filen
 	return modified;
 }
 
-QStringList PaletteItem::sipOrDipOrLabels(bool & hasLayout, bool & sip) {
-	hasLayout = sip = false;
+QString PaletteItem::retrieveSchematicSvg(const QString & svg) {
+	// Experimental: Replace pin labels for each part, not only
+	// mystery and generic ic
 	bool hasLocal = false;
 	QStringList labels = getPinLabels(hasLocal);
-	if (labels.count() == 0) return labels;
-
-	// part was formerly a mystery part or generic ic ...
-	QHash<QString, QString> properties = modelPart()->properties();
-	foreach (QString key, properties.keys()) {
-		QString value = properties.value(key);
-		if (key.compare("layout", Qt::CaseInsensitive) == 0) {
-			// was a mystery part
-			hasLayout = true;
-			break;
-		}
-
-		if (key.compare("package") == 0) {
-			// was a generic ic
-			sip = value.contains("sip", Qt::CaseInsensitive);
-		}
+	if (labels.count() == 0) {
+		return svg;
 	}
-
-	return labels;
+	
+	QHash<QString, QString> labelHash;
+	for (int i = 0; i < labels.count(); i++) {
+		labelHash.insert(QString("label%1").arg(i), labels.at(i));
+	}
+	
+	return TextUtils::replaceTextElements(svg, labelHash);
 }
 
 void PaletteItem::resetLayerKin(const QString & svg) {
@@ -1524,7 +1642,7 @@ void PaletteItem::resetLayerKin(const QString & svg) {
 
 	resetRenderer(svgNoText);
 
-	foreach (ItemBase * lkpi, layerKin()) {
+	Q_FOREACH (ItemBase * lkpi, layerKin()) {
 		if (lkpi->viewLayerID() == ViewLayer::SchematicText) {
 			bool hasText;
 			QString svgText = SvgFileSplitter::showText3(svg, hasText);
@@ -1544,7 +1662,7 @@ QTransform PaletteItem::untransform() {
 	if (!identity) {
 		QTransform invert = chiefTransform.inverted();
 		transformItem(invert, false);
-		foreach (ItemBase * lkpi, layerKin()) {
+		Q_FOREACH (ItemBase * lkpi, layerKin()) {
 			lkpi->transformItem(invert, false);
 		}
 	}
@@ -1556,7 +1674,7 @@ void PaletteItem::retransform(const QTransform & chiefTransform) {
 	//DebugDialog::debug("retransform");
 	if (!chiefTransform.isIdentity()) {
 		transformItem(chiefTransform, false);
-		foreach (ItemBase * lkpi, layerKin()) {
+		Q_FOREACH (ItemBase * lkpi, layerKin()) {
 			lkpi->transformItem(chiefTransform, false);
 		}
 	}

@@ -39,29 +39,38 @@ public:
 };
 
 struct ViewThing {
-	ItemBase * itemBase;
-	QDomDocument * document;
-	int svgChangeCount;
-	bool everZoomed;
-	SketchWidget * sketchWidget;
+	ItemBase * itemBase = nullptr;
+	QDomDocument * document = nullptr;
+	int svgChangeCount = 0;
+	bool everZoomed = false;
+	SketchWidget * sketchWidget = nullptr;
 	QString referenceFile;
 	QString originalSvgPath;
-	bool firstTime;
-	bool busMode;
-
-	ViewThing();
+	bool firstTime = false;
+	bool busMode = false;
 };
 
+class ReferenceModel;
+class PaletteItem;
+class PEMetadataView;
+class PEConnectorsView;
+class PEToolView;
+class PESvgView;
+class PEGraphicsItem;
+class Wire;
+class WireAction;
+class IconSketchWidget;
 class PEMainWindow : public MainWindow
 {
 	Q_OBJECT
 
 public:
-	PEMainWindow(class ReferenceModel * referenceModel, QWidget * parent);
+	PEMainWindow(ReferenceModel * referenceModel, QWidget * parent);
 	~PEMainWindow();
 
-	bool setInitialItem(class PaletteItem *);
+	bool setInitialItem(PaletteItem *);
 	void changeTags(const QStringList &, bool updateDisplay);
+	void changeHistory(const QList<HistoryEntry> &, bool updateDisplay);
 	void changeProperties(const QHash<QString, QString> &, bool updateDisplay);
 	void changeMetadata(const QString & name, const QString & value, bool updateDisplay);
 	void changeConnectorMetadata(ConnectorMetadata *, bool updateDisplay);
@@ -76,20 +85,21 @@ public:
 	void changeReferenceFile(ViewLayer::ViewID viewID, const QString referenceFile);
 	void changeOriginalFile(ViewLayer::ViewID viewID, const QString originalFile, int changeCount);
 
-signals:
+Q_SIGNALS:
 	void addToMyPartsSignal(ModelPart *, const QStringList &);
 
-public slots:
+public Q_SLOTS:
 	void metadataChanged(const QString & name, const QString & value);
 	void propertiesChanged(const QHash<QString, QString> &);
 	void tagsChanged(const QStringList &);
+	void historyChanged(const QList<HistoryEntry> &);
 	void connectorMetadataChanged(struct ConnectorMetadata *);
 	void removedConnectors(QList<ConnectorMetadata *> &);
-	void highlightSlot(class PEGraphicsItem *);
-	void pegiMousePressed(class PEGraphicsItem *, bool & ignore);
-	void pegiMouseReleased(class PEGraphicsItem *);
-	void pegiTerminalPointMoved(class PEGraphicsItem *, QPointF);
-	void pegiTerminalPointChanged(class PEGraphicsItem *, QPointF before, QPointF after);
+	void highlightSlot(PEGraphicsItem *);
+	void pegiMousePressed(PEGraphicsItem *, bool & ignore);
+	void pegiMouseReleased(PEGraphicsItem *);
+	void pegiTerminalPointMoved(PEGraphicsItem *, QPointF);
+	void pegiTerminalPointChanged(PEGraphicsItem *, QPointF before, QPointF after);
 	void switchedConnector(int);
 	void removedConnector(const QDomElement &);
 	void terminalPointChanged(const QString & how);
@@ -100,7 +110,7 @@ public slots:
 	void connectorCountChanged(int);
 	void deleteBusConnection();
 	void newWireSlot(Wire *);
-	void wireChangedSlot(class Wire*, const QLineF & oldLine, const QLineF & newLine, QPointF oldPos, QPointF newPos, ConnectorItem * from, ConnectorItem * to);
+	void wireChangedSlot(Wire*, const QLineF & oldLine, const QLineF & newLine, QPointF oldPos, QPointF newPos, ConnectorItem * from, ConnectorItem * to);
 	void connectorsTypeChanged(Connector::ConnectorType);
 	void smdChanged(const QString &);
 	void showing(SketchWidget *);
@@ -119,7 +129,6 @@ protected:
 	void setInitialView();
 	void createActions();
 	void createMenus();
-	QList<QWidget*> getButtonsForView(ViewLayer::ViewID);
 	void connectPairs();
 	QMenu *breadboardItemMenu();
 	QMenu *schematicItemMenu();
@@ -133,6 +142,12 @@ protected:
 	void createViewMenu();
 	void createEditMenu();
 	QHash<QString, QString> getOldProperties();
+	// Read/write the flat <history> children of an FZP module root. readHistory synthesizes
+	// a single oldest entry from <date>/<author> for legacy parts that have no <history> yet;
+	// writeHistory rewrites the <history> children sorted oldest->newest and mirrors the newest entry
+	// into the top-level <author>/<date> for backward compat.
+	static QList<HistoryEntry> readHistory(const QDomElement & root);
+	static void writeHistory(QDomElement & root, const QList<HistoryEntry> & history);
 	QDomElement findConnector(const QString & id, int & index);
 	void changeConnectorElement(QDomElement & connector, ConnectorMetadata *);
 	void initSvgTree(SketchWidget *, ItemBase *, QDomDocument &);
@@ -144,7 +159,7 @@ protected:
 	void reload(bool firstTime);
 	void createFileMenu();
 	void updateChangeCount(SketchWidget * sketchWidget, int changeDirection);
-	class PEGraphicsItem * findConnectorItem();
+	PEGraphicsItem * findConnectorItem();
 	void terminalPointChangedAux(PEGraphicsItem * pegi, QPointF before, QPointF after);
 	void showInOS(QWidget *parent, const QString &pathIn);
 	void switchedConnector(int, SketchWidget *);
@@ -192,7 +207,7 @@ protected:
 	QString makeDirName();
 	void initWelcomeView();
 
-protected slots:
+protected Q_SLOTS:
 	void initZoom();
 	void showMetadataView();
 	void showConnectorsView();
@@ -227,23 +242,23 @@ protected:
 	QDomDocument m_schematicDocument;
 	QDomDocument m_pcbDocument;
 
-	QAction * m_showMetadataViewAct;
-	QAction * m_showConnectorsViewAct;
-	QAction * m_showIconAct;
-	QAction * m_showInOSAct;
-	class WireAction * m_deleteBusConnectionAct;
-	QAction * m_reuseBreadboardAct;
-	QAction * m_reuseSchematicAct;
-	QAction * m_reusePCBAct;
-	QAction * m_hideOtherViewsAct;
-	QAction * m_convertToTenthAct;
+	QAction * m_showMetadataViewAct = nullptr;
+	QAction * m_showConnectorsViewAct = nullptr;
+	QAction * m_showIconAct = nullptr;
+	QAction * m_showInOSAct = nullptr;
+	WireAction * m_deleteBusConnectionAct = nullptr;
+	QAction * m_reuseBreadboardAct = nullptr;
+	QAction * m_reuseSchematicAct = nullptr;
+	QAction * m_reusePCBAct = nullptr;
+	QAction * m_hideOtherViewsAct = nullptr;
+	QAction * m_convertToTenthAct = nullptr;
 
 	QPointer<SketchAreaWidget> m_iconWidget;
-	QPointer<class IconSketchWidget> m_iconGraphicsView;
-	class PEMetadataView * m_metadataView;
-	class PEConnectorsView * m_connectorsView;
-	class PEToolView * m_peToolView;
-	class PESvgView * m_peSvgView;
+	QPointer<IconSketchWidget> m_iconGraphicsView;
+	PEMetadataView * m_metadataView = nullptr;
+	PEConnectorsView * m_connectorsView = nullptr;
+	PEToolView * m_peToolView = nullptr;
+	PESvgView * m_peSvgView = nullptr;
 	QString m_guid;
 	QString m_prefix;
 	int m_fileIndex;

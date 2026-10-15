@@ -47,7 +47,7 @@ QComboBox * TraceWire::createWidthComboBox(double m, QWidget * parent)
 {
 	QComboBox * comboBox = new FocusOutComboBox(parent);  // new QComboBox(parent);
 	comboBox->setEditable(true);
-	QIntValidator * intValidator = new QIntValidator(comboBox);
+	auto * intValidator = new QIntValidator(comboBox);
 	intValidator->setRange(MinTraceWidthMils, MaxTraceWidthMils);
 	comboBox->setValidator(intValidator);
 	comboBox->setToolTip(tr("Select from the dropdown, or type in any value from %1 to %2").arg(MinTraceWidthMils).arg(MaxTraceWidthMils));
@@ -55,9 +55,9 @@ QComboBox * TraceWire::createWidthComboBox(double m, QWidget * parent)
 	int ix = 0;
 	if (!Wire::widths.contains(m)) {
 		Wire::widths.append(m);
-		qSort(Wire::widths.begin(), Wire::widths.end());
+		std::sort(Wire::widths.begin(), Wire::widths.end());
 	}
-	foreach(long widthValue, Wire::widths) {
+	Q_FOREACH(long widthValue, Wire::widths) {
 		QString widthName = Wire::widthTrans.value(widthValue, "");
 		QVariant val((int) widthValue);
 		comboBox->addItem(widthName.isEmpty() ? QString::number(widthValue) : widthName, val);
@@ -86,7 +86,19 @@ bool TraceWire::collectExtraInfo(QWidget * parent, const QString & family, const
 		comboBox->setEnabled(swappingEnabled);
 		comboBox->setObjectName("infoViewComboBox");
 
-		connect(comboBox, SIGNAL(currentIndexChanged(const QString &)), this, SLOT(widthEntry(const QString &)));
+		// Group mode: if multiple wires are selected with differing widths, blank the combo
+		// (a chosen width still applies to all via changeWireWidthMils).
+		InfoGraphicsView * groupIgv = InfoGraphicsView::getInfoGraphicsView(this);
+		QList<Wire *> groupWires;
+		if ((groupIgv != nullptr) && groupIgv->collectSelectedWires(groupWires) > 1 && groupWires.contains(this)) {
+			bool mixed = false;
+			Q_FOREACH (Wire * w, groupWires) {
+				if (qAbs(w->mils() - mils()) >= 0.01) { mixed = true; break; }
+			}
+			if (mixed) comboBox->setCurrentIndex(-1);
+		}
+
+		connect(comboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(widthEntry(int)));
 		returnWidget = comboBox;
 		returnValue = comboBox->currentText();
 
@@ -94,11 +106,11 @@ bool TraceWire::collectExtraInfo(QWidget * parent, const QString & family, const
 	}
 
 	bool result =  ClipableWire::collectExtraInfo(parent, family, prop, value, swappingEnabled, returnProp, returnValue, returnWidget, hide);
-	if (prop.compare("layer") == 0 && returnWidget != NULL) {
+	if (prop.compare("layer") == 0 && (returnWidget != nullptr)) {
 		bool disabled = !canSwitchLayers();
 		if (!disabled) {
 			InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-			if (infoGraphicsView == NULL || infoGraphicsView->boardLayers() == 1) disabled = true;
+			if (infoGraphicsView == nullptr || infoGraphicsView->boardLayers() == 1) disabled = true;
 		}
 		returnWidget->setDisabled(disabled);
 	}
@@ -107,21 +119,24 @@ bool TraceWire::collectExtraInfo(QWidget * parent, const QString & family, const
 }
 
 
-void TraceWire::widthEntry(const QString & text) {
+void TraceWire::widthEntry(int index) {
+	auto * comboBox = qobject_cast<QComboBox *>(sender());
+	if (comboBox == nullptr) return;
+	QString text = comboBox->itemText(index);
 
 	int w = widthEntry(text, sender());
 	if (w == 0) return;
 
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView != NULL) {
+	if (infoGraphicsView != nullptr) {
 		infoGraphicsView->changeWireWidthMils(QString::number(w));
 	}
 }
 
 int TraceWire::widthEntry(const QString & text, QObject * sender) {
 
-	QComboBox * comboBox = qobject_cast<QComboBox *>(sender);
-	if (comboBox == NULL) return 0;
+	auto * comboBox = qobject_cast<QComboBox *>(sender);
+	if (comboBox == nullptr) return 0;
 
 	int w = comboBox->itemData(comboBox->currentIndex()).toInt();
 	if (w == 0) {
@@ -130,7 +145,7 @@ int TraceWire::widthEntry(const QString & text, QObject * sender) {
 	}
 	if (!Wire::widths.contains(w)) {
 		Wire::widths.append(w);
-		qSort(Wire::widths.begin(), Wire::widths.end());
+		std::sort(Wire::widths.begin(), Wire::widths.end());
 	}
 
 	return w;
@@ -158,8 +173,8 @@ bool TraceWire::canSwitchLayers() {
 	QList<ConnectorItem *> ends;
 	collectChained(wires, ends);
 
-	foreach (ConnectorItem * end, ends) {
-		if (end->getCrossLayerConnectorItem() == NULL) return false;
+	Q_FOREACH (ConnectorItem * end, ends) {
+		if (end->getCrossLayerConnectorItem() == nullptr) return false;
 	}
 
 	return true;
@@ -180,6 +195,11 @@ TraceWire * TraceWire::getTrace(ConnectorItem * connectorItem)
 
 void TraceWire::setSchematic(bool schematic) {
 	m_viewGeometry.setSchematicTrace(schematic);
+}
+
+bool TraceWire::stickyEnabled()
+{
+	return true;
 }
 
 QHash<QString, QString> TraceWire::prepareProps(ModelPart * modelPart, bool wantDebug, QStringList & keys)

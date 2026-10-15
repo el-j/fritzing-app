@@ -1,7 +1,7 @@
 /*******************************************************************
 
 Part of the Fritzing project - http://fritzing.org
-Copyright (c) 2007-2019 Fritzing
+Copyright (c) 2007-2019 Fritzing, 2020-2025 Fritzing GmbH
 
 Fritzing is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,11 +27,11 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "layerkinpaletteitem.h"
 #include "../connectors/connectoritem.h"
 #include "../connectors/svgidlayer.h"
+#include "utils/misc.h"
 #include "wire.h"
 #include "partlabel.h"
-#include "../utils/textutils.h"
 #include "../utils/graphicsutils.h"
-#include "../utils/cursormaster.h"
+#include "../utils/svgcursorbuilder.h"
 
 #include <QBrush>
 #include <QPen>
@@ -41,11 +41,13 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QLineEdit>
 #include <QApplication>
 #include <QEvent>
+#include <QRegularExpressionValidator>
 #include <qmath.h>
 
 static QPointF RotationCenter;
 static QPointF RotationAxis;
 static QTransform OriginalTransform;
+static QTransform OriginalPartLabelTransform;
 
 
 PaletteItemBase::PaletteItemBase(ModelPart * modelPart, ViewLayer::ViewID viewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu ) :
@@ -61,12 +63,19 @@ PaletteItemBase::PaletteItemBase(ModelPart * modelPart, ViewLayer::ViewID viewID
 	setAcceptHoverEvents(true);
 
 	if (hasPartNumberProperty()) {
-		QString savedValue = modelPart->localProp(ModelPartShared::PartNumberPropertyName).toString();
-		if (savedValue.isEmpty()) {
-			savedValue = modelPart->properties().value(ModelPartShared::PartNumberPropertyName, "");
-			if (!savedValue.isEmpty()) {
-				modelPart->setLocalProp(ModelPartShared::PartNumberPropertyName, savedValue);
-			}
+		for (auto&& propertyName : {ModelPartShared::MNPropertyName, ModelPartShared::MPNPropertyName, ModelPartShared::PartNumberPropertyName}) {
+			initLocalProperty(propertyName, modelPart);
+		}
+	}
+}
+
+void PaletteItemBase::initLocalProperty(const QString & propertyName, ModelPart * modelPart)
+{
+	QString savedValue = modelPart->localProp(propertyName).toString();
+	if (savedValue.isEmpty()) {
+		savedValue = modelPart->properties().value(propertyName, "");
+		if (!savedValue.isEmpty()) {
+			modelPart->setLocalProp(propertyName, savedValue);
 		}
 	}
 }
@@ -94,7 +103,7 @@ QPainterPath PaletteItemBase::hoverShape() const
 
 	if (!hasRubberBandLeg()) return path;
 
-	foreach (ConnectorItem * connectorItem, cachedConnectorItemsConst()) {
+	Q_FOREACH (ConnectorItem * connectorItem, cachedConnectorItemsConst()) {
 		if (connectorItem->hasRubberBandLeg()) {
 			path.addPath(connectorItem->mapToParent(connectorItem->hoverShape()));
 		}
@@ -114,7 +123,7 @@ QPainterPath PaletteItemBase::shape() const
 
 	if (!hasRubberBandLeg()) return path;
 
-	foreach (ConnectorItem * connectorItem, cachedConnectorItemsConst()) {
+	Q_FOREACH (ConnectorItem * connectorItem, cachedConnectorItemsConst()) {
 		if (connectorItem->hasRubberBandLeg()) {
 			path.addPath(connectorItem->mapToParent(connectorItem->shape()));
 		}
@@ -135,7 +144,7 @@ bool PaletteItemBase::itemMoved() {
 }
 
 void PaletteItemBase::moveItem(ViewGeometry & viewGeometry) {
-	this->setPos(viewGeometry.loc());
+	this->setLocation(viewGeometry.loc());
 	QList<ConnectorItem *> already;
 	updateConnections(false, already);
 }
@@ -205,7 +214,7 @@ void PaletteItemBase::paintSelected(QPainter *painter, const QStyleOptionGraphic
 
 void PaletteItemBase::mousePressConnectorEvent(ConnectorItem * connectorItem, QGraphicsSceneMouseEvent * event) {
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView != NULL) {
+	if (infoGraphicsView != nullptr) {
 		infoGraphicsView->mousePressConnectorEvent(connectorItem, event);
 	}
 }
@@ -223,6 +232,12 @@ bool PaletteItemBase::mousePressEventK(PaletteItemBase * originalItem, QGraphics
 {
 	Q_UNUSED(originalItem);
 
+	if (layerKinChief()->moveLock()) {
+		// locked: let the press fall through to items beneath or to the scene background
+		event->ignore();
+		return false;
+	}
+
 	setInRotation(false);
 
 	QPointF corner;
@@ -232,6 +247,11 @@ bool PaletteItemBase::mousePressEventK(PaletteItemBase * originalItem, QGraphics
 		RotationCenter = mapToScene(this->boundingRectWithoutLegs().center());
 		RotationAxis = event->scenePos();
 		OriginalTransform = this->transform();
+		ItemBase * chief = layerKinChief();
+		PartLabel * partLabel = chief->partLabel();
+		if (partLabel != nullptr) {
+			OriginalPartLabelTransform = partLabel->transform();
+		}
 		/*
 		DebugDialog::debug(QString("%11:in rotation:%1,%2 a:%3,%4 t:%5,%6,%7,%8 %9,%10")
 			.arg(RotationCenter.x()).arg(RotationCenter.y())
@@ -243,14 +263,14 @@ bool PaletteItemBase::mousePressEventK(PaletteItemBase * originalItem, QGraphics
 			*/
 		this->debugInfo("in rotation");
 		InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-		if (infoGraphicsView) infoGraphicsView->setAnyInRotation();
+		if (infoGraphicsView != nullptr) infoGraphicsView->setAnyInRotation();
 		return false;
 	}
 
 	ItemBase::mousePressEvent(event);
 	if (canFindConnectorsUnder()) {
-		foreach (ConnectorItem * connectorItem, cachedConnectorItems()) {
-			connectorItem->setOverConnectorItem(NULL);
+		Q_FOREACH (ConnectorItem * connectorItem, cachedConnectorItems()) {
+			connectorItem->setOverConnectorItem(nullptr);
 		}
 	}
 
@@ -302,17 +322,30 @@ void PaletteItemBase::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 	}
 
 	ItemBase * chief = layerKinChief();
-	// restore viewGeometry to original angle
+	// restore viewGeometry to original angle	
 	chief->getViewGeometry().setTransform(OriginalTransform);
-	foreach (ItemBase * itemBase, chief->layerKin()) {
+	Q_FOREACH (ItemBase * itemBase, chief->layerKin()) {
 		itemBase->getViewGeometry().setTransform(OriginalTransform);
 	}
 
-	//DebugDialog::debug(QString("rotating item %1 da:%2 oa:%3 %4").arg(QTime::currentTime().toString("HH:mm:ss.zzz")).arg(deltaAngle).arg(originalAngle).arg((long) this, 0, 16));
-	chief->rotateItem(deltaAngle, true);
+	chief->rotateItem(deltaAngle, true);	
+	PartLabel *partLabel = chief->partLabel();
+	if (m_viewID == ViewLayer::PCBView && partLabel != nullptr) {
+		partLabel->setTransform(OriginalPartLabelTransform);
+		QPointF center = partLabel->mapFromScene(RotationCenter);
+		QTransform rotationTransform = QTransform()
+										   .translate(center.x(), center.y())
+										   .rotate(deltaAngle)
+										   .translate(-center.x(), -center.y())
+									   * OriginalPartLabelTransform;
+		partLabel->setTransform(rotationTransform);
+	}
+
+	// Update hover states during interactive rotation
+	chief->findConnectorsUnder(true, true); // Enable hover feedback during drag
 
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(chief);
-	if (infoGraphicsView) infoGraphicsView->updateRotation(chief);
+	if (infoGraphicsView != nullptr) infoGraphicsView->updateRotation(chief);
 }
 
 void PaletteItemBase::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
@@ -322,16 +355,24 @@ void PaletteItemBase::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 		return;
 	}
 
-	setInRotation(false);
+	setInRotation(false);	
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView) {
+	if (infoGraphicsView != nullptr) {
 		// TODO: doesn't account for scaling
 		// see: http://www.gamedev.net/topic/441695-transform-matrix-decomposition/
 		double originalAngle = atan2(OriginalTransform.m12(), OriginalTransform.m11()) * 180 / M_PI;
 		double currentAngle = atan2(transform().m12(), transform().m11()) * 180 / M_PI;
-		this->layerKinChief()->rotateItem(originalAngle - currentAngle, true);		// put it back; undo command will redo it
+		double deltaAngle = currentAngle - originalAngle;
+		ItemBase * chief = layerKinChief();
+
+		chief->rotateItem(-deltaAngle, true);
+		PartLabel *partLabel = chief->partLabel();
+		if (partLabel != nullptr) {
+			partLabel->setTransform(OriginalPartLabelTransform);
+		}
+
 		saveGeometry();
-		infoGraphicsView->triggerRotate(this->layerKinChief(), currentAngle - originalAngle);
+		infoGraphicsView->triggerRotate(chief, deltaAngle);
 	}
 }
 
@@ -339,10 +380,10 @@ bool PaletteItemBase::canFindConnectorsUnder() {
 	return true;
 }
 
-void PaletteItemBase::findConnectorsUnder() {
+void PaletteItemBase::findConnectorsUnder(bool enableHoverFeedback, bool allowAlready) {
 	if (!canFindConnectorsUnder()) return;
 
-	foreach (ConnectorItem * connectorItem, cachedConnectorItems()) {
+	Q_FOREACH (ConnectorItem * connectorItem, cachedConnectorItems()) {
 		switch (connectorItem->connector()->connectorType()) {
 		case Connector::Female:
 		case Connector::Pad:
@@ -351,13 +392,13 @@ void PaletteItemBase::findConnectorsUnder() {
 			break;
 		}
 
-		connectorItem->findConnectorUnder(true, false, ConnectorItem::emptyConnectorItemList, false, NULL);
+		connectorItem->findConnectorUnder(true, allowAlready, ConnectorItem::emptyConnectorItemList, false, nullptr, enableHoverFeedback);
 	}
 }
 
 bool PaletteItemBase::collectFemaleConnectees(QSet<ItemBase *> & items) {
 	bool hasMale = false;
-	foreach (ConnectorItem * item, cachedConnectorItems()) {
+	Q_FOREACH (ConnectorItem * item, cachedConnectorItems()) {
 		if (item->connectorType() == Connector::Male) {
 			hasMale = true;
 			continue;
@@ -365,7 +406,7 @@ bool PaletteItemBase::collectFemaleConnectees(QSet<ItemBase *> & items) {
 
 		if (item->connectorType() != Connector::Female) continue;
 
-		foreach (ConnectorItem * toConnectorItem, item->connectedToItems()) {
+		Q_FOREACH (ConnectorItem * toConnectorItem, item->connectedToItems()) {
 			if (toConnectorItem->attachedToItemType() == ModelPart::Wire) continue;
 			if (!toConnectorItem->attachedTo()->isVisible()) continue;
 
@@ -377,8 +418,8 @@ bool PaletteItemBase::collectFemaleConnectees(QSet<ItemBase *> & items) {
 }
 
 void PaletteItemBase::collectWireConnectees(QSet<Wire *> & wires) {
-	foreach (ConnectorItem * item, cachedConnectorItems()) {
-		foreach (ConnectorItem * toConnectorItem, item->connectedToItems()) {
+	Q_FOREACH (ConnectorItem * item, cachedConnectorItems()) {
+		Q_FOREACH (ConnectorItem * toConnectorItem, item->connectedToItems()) {
 			if (toConnectorItem->attachedToItemType() == ModelPart::Wire) {
 				if (toConnectorItem->attachedTo()->isVisible()) {
 					wires.insert(qobject_cast<Wire *>(toConnectorItem->attachedTo()));
@@ -391,7 +432,7 @@ void PaletteItemBase::collectWireConnectees(QSet<Wire *> & wires) {
 bool PaletteItemBase::setUpImage(ModelPart * modelPart, const LayerHash & viewLayers, LayerAttributes & layerAttributes)
 {
 	FSvgRenderer * renderer = ItemBase::setUpImage(modelPart, layerAttributes);
-	if (renderer == NULL) {
+	if (renderer == nullptr) {
 		return false;
 	}
 
@@ -429,17 +470,12 @@ void PaletteItemBase::setUpConnectors(FSvgRenderer * renderer, bool ignoreTermin
 	clearConnectorItemCache();
 
 	if (m_viewID == ViewLayer::PCBView && ViewLayer::isNonCopperLayer(m_viewLayerID)) {
-		//DebugDialog::debug(QString("skip connectors: %1 vid:%2 vlid:%3")
-		//				   .arg(this->title())
-		//				   .arg(m_viewID)
-		//				   .arg(m_viewLayerID)
-		//	);
 		// don't waste time
 		return;
 	}
 
-	foreach (Connector * connector, m_modelPart->connectors().values()) {
-		if (connector == NULL) continue;
+	Q_FOREACH (Connector * connector, m_modelPart->connectors().values()) {
+		if (connector == nullptr) continue;
 
 		//DebugDialog::debug(QString("id:%1 vid:%2 vlid:%3")
 		//				   .arg(connector->connectorSharedID())
@@ -449,7 +485,7 @@ void PaletteItemBase::setUpConnectors(FSvgRenderer * renderer, bool ignoreTermin
 
 
 		SvgIdLayer * svgIdLayer = connector->fullPinInfo(m_viewID, m_viewLayerID);
-		if (svgIdLayer == NULL) {
+		if (svgIdLayer == nullptr) {
 			DebugDialog::debug(QString("svgidlayer fail %1 vid:%2 vlid:%3 %4")
 			                   .arg(connector->connectorSharedID())
 			                   .arg(m_viewID)
@@ -487,10 +523,10 @@ void PaletteItemBase::setUpConnectors(FSvgRenderer * renderer, bool ignoreTermin
 
 	}
 
-	foreach (SvgIdLayer * svgIdLayer, renderer->setUpNonConnectors(viewLayerPlacement())) {
-		if (svgIdLayer == NULL) continue;
+	Q_FOREACH (SvgIdLayer * svgIdLayer, renderer->setUpNonConnectors(viewLayerPlacement())) {
+		if (svgIdLayer == nullptr) continue;
 
-		NonConnectorItem * nonConnectorItem = new NonConnectorItem(this);
+		auto * nonConnectorItem = new NonConnectorItem(this);
 
 		//DebugDialog::debug(	QString("in layer %1 with z %2")
 		//.arg(ViewLayer::viewLayerNameFromID(m_viewLayerID))
@@ -539,15 +575,16 @@ void PaletteItemBase::hoverEnterEvent ( QGraphicsSceneHoverEvent * event ) {
 	if (event->isAccepted()) {
 		if (hasRubberBandLeg()) {
 			//DebugDialog::debug("---pab set override cursor");
-			CursorMaster::instance()->addCursor(this, cursor());
+			SvgCursorBuilder::instance()->addCursor(this, cursor());
 
 			bool connected = false;
-			foreach (ConnectorItem * connectorItem, cachedConnectorItems()) {
+			Q_FOREACH (ConnectorItem * connectorItem, cachedConnectorItems()) {
 				if (connectorItem->connectionsCount() > 0) {
 					connected = true;
 					break;
 				}
 			}
+			(void)connected;
 		}
 
 		checkFreeRotation(event->modifiers(), event->scenePos());
@@ -564,7 +601,7 @@ void PaletteItemBase::hoverLeaveEvent ( QGraphicsSceneHoverEvent * event ) {
 		//DebugDialog::debug("------pab restore override cursor");
 	}
 
-	CursorMaster::instance()->removeCursor(this);
+	SvgCursorBuilder::instance()->removeCursor(this);
 
 	ItemBase::hoverLeaveEvent(event);
 }
@@ -577,12 +614,12 @@ void PaletteItemBase::cursorKeyEvent(Qt::KeyboardModifiers modifiers)
 	if (hasRubberBandLeg()) {
 		QCursor cursor;
 		if (modifiers & altOrMetaModifier()) {
-			cursor = *CursorMaster::RubberbandCursor;
+			cursor = *SvgCursorBuilder::RubberbandCursor;
 		}
 		else {
-			cursor = *CursorMaster::MoveCursor;
+			cursor = Qt::SizeAllCursor;
 		}
-		CursorMaster::instance()->addCursor(this, cursor);
+		SvgCursorBuilder::instance()->addCursor(this, cursor);
 	}
 }
 
@@ -595,7 +632,7 @@ LayerKinPaletteItem *PaletteItemBase::newLayerKinPaletteItem(PaletteItemBase * c
         const ViewGeometry & viewGeometry, long id,
         QMenu* itemMenu, const LayerHash & viewLayers, LayerAttributes & layerAttributes)
 {
-	LayerKinPaletteItem *lk = NULL;
+	LayerKinPaletteItem *lk = nullptr;
 	if (layerAttributes.viewLayerID == ViewLayer::SchematicText) {
 		lk = new SchematicTextLayerKinPaletteItem(chief, modelPart, layerAttributes.viewID, viewGeometry, id, itemMenu);
 	}
@@ -613,7 +650,7 @@ QString PaletteItemBase::retrieveSvg(ViewLayer::ViewLayerID viewLayerID, QHash<Q
 
 	Qt::Orientations orientation = Qt::Vertical;
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView) {
+	if (infoGraphicsView != nullptr) {
 		orientation = infoGraphicsView->smdOrientation();
 	}
 
@@ -622,7 +659,7 @@ QString PaletteItemBase::retrieveSvg(ViewLayer::ViewLayerID viewLayerID, QHash<Q
 
 	//DebugDialog::debug(QString("path: %1").arg(path));
 
-	QString svg = svgHash.value(path + xmlName, "");
+	QString svg = svgHash.value(path + xmlName + QString::number(m_viewLayerPlacement), "");
 	if (!svg.isEmpty()) return svg;
 
 	SvgFileSplitter splitter;
@@ -641,7 +678,7 @@ QString PaletteItemBase::retrieveSvg(ViewLayer::ViewLayerID viewLayerID, QHash<Q
 	}
 
 	if (hasRubberBandLeg()) {
-		foreach (ConnectorItem * connectorItem, cachedConnectorItems()) {
+		Q_FOREACH (ConnectorItem * connectorItem, cachedConnectorItems()) {
 			if (!connectorItem->hasRubberBandLeg()) continue;
 
 			splitter.gReplace(connectorItem->legID(m_viewID, m_viewLayerID));
@@ -653,7 +690,7 @@ QString PaletteItemBase::retrieveSvg(ViewLayer::ViewLayerID viewLayerID, QHash<Q
 		return "";
 	}
 	svg = splitter.elementString(xmlName);
-	svgHash.insert(path + xmlName, svg);
+	svgHash.insert(path + xmlName + QString::number(m_viewLayerPlacement), svg);
 	return svg;
 }
 
@@ -665,41 +702,58 @@ bool PaletteItemBase::canEditPart() {
 
 bool PaletteItemBase::collectExtraInfo(QWidget * parent, const QString & family, const QString & prop, const QString & value, bool swappingEnabled, QString & returnProp, QString & returnValue, QWidget * & returnWidget, bool & hide)
 {
-	if (prop.compare(ModelPartShared::PartNumberPropertyName, Qt::CaseInsensitive) == 0) {
+	for (auto&& propertyName : {ModelPartShared::MNPropertyName, ModelPartShared::MPNPropertyName, ModelPartShared::PartNumberPropertyName}) {
+		if (collectExtraInfoPartNumber(propertyName, prop, swappingEnabled, returnProp, returnValue, returnWidget)) return true;
+	}
+	return ItemBase::collectExtraInfo(parent, family, prop, value, swappingEnabled, returnProp, returnValue, returnWidget, hide);
+}
+
+bool PaletteItemBase::collectExtraInfoPartNumber(const QString & propertyName, const QString & prop, bool swappingEnabled, QString & returnProp, QString & returnValue, QWidget * & returnWidget)
+{
+	if (prop.compare(propertyName, Qt::CaseInsensitive) == 0) {
 		returnProp = TranslatedPropertyNames.value(prop);
 
-		QLineEdit * lineEdit = new QLineEdit();
+		auto * lineEdit = new QLineEdit();
+		QRegularExpressionValidator *validator = new QRegularExpressionValidator(QRegularExpression("([^ \t].*[^ \t]|[^ \t])"), this);
+		lineEdit->setValidator(validator);
 		lineEdit->setEnabled(swappingEnabled);
-		QString current = m_modelPart->localProp(ModelPartShared::PartNumberPropertyName).toString();
+		QString current = m_modelPart->localProp(propertyName).toString();
 		lineEdit->setText(current);
+		lineEdit->setProperty("property name for entry", propertyName);
 		connect(lineEdit, SIGNAL(editingFinished()), this, SLOT(partPropertyEntry()));
 		lineEdit->setObjectName("infoViewLineEdit");
 		returnWidget = lineEdit;
 		returnValue = current;
 		return true;
 	}
-
-	return ItemBase::collectExtraInfo(parent, family, prop, value, swappingEnabled, returnProp, returnValue, returnWidget, hide);
+	return false;
 }
 
 void PaletteItemBase::setProp(const QString & prop, const QString & value)
 {
-	if (prop.compare(ModelPartShared::PartNumberPropertyName) == 0) {
-		modelPart()->setLocalProp(ModelPartShared::PartNumberPropertyName, value);
-		if (m_partLabel) m_partLabel->displayTextsIf();
-		return;
+	for (auto&& propertyName : {ModelPartShared::MNPropertyName, ModelPartShared::MPNPropertyName, ModelPartShared::PartNumberPropertyName}) {
+		setLocalProp(prop, value, propertyName);
 	}
-
 	ItemBase::setProp(prop, value);
 }
 
+void PaletteItemBase::setLocalProp(const QString & prop, const QString & value, const QString & propertyName)
+{
+	if (prop.compare(propertyName) == 0) {
+		modelPart()->setLocalProp(propertyName, value);
+		if (m_partLabel != nullptr) m_partLabel->displayTextsIf();
+		return;
+	}
+}
+
 void PaletteItemBase::partPropertyEntry() {
-	QLineEdit * lineEdit = qobject_cast<QLineEdit *>(sender());
-	if (lineEdit == NULL) return;
+	auto * lineEdit = qobject_cast<QLineEdit *>(sender());
+	if (lineEdit == nullptr) return;
 
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView != NULL) {
-		infoGraphicsView->setProp(this, ModelPartShared::PartNumberPropertyName, "", m_modelPart->localProp(ModelPartShared::PartNumberPropertyName).toString(), lineEdit->text(), true);
+	if (infoGraphicsView != nullptr) {
+		QString propertyName = lineEdit->property("property name for entry").toString();
+		infoGraphicsView->setProp(this, propertyName, "", m_modelPart->localProp(propertyName).toString(), lineEdit->text(), true);
 	}
 }
 
@@ -707,17 +761,18 @@ void PaletteItemBase::partPropertyEntry() {
 const QCursor * PaletteItemBase::getCursor(Qt::KeyboardModifiers modifiers)
 {
 	if (hasRubberBandLeg()) {
-		if ((modifiers & altOrMetaModifier())) {
-			foreach (ConnectorItem * connectorItem, cachedConnectorItems()) {
+		if ((modifiers & altOrMetaModifier()) != 0u) {
+			Q_FOREACH (ConnectorItem * connectorItem, cachedConnectorItems()) {
 				if (connectorItem->connectionsCount() > 0) {
-					return CursorMaster::RubberbandCursor;
+					return SvgCursorBuilder::RubberbandCursor;
 				}
 			}
 		}
 	}
 
 	//DebugDialog::debug("returning move cursor");
-	return CursorMaster::MoveCursor;
+	static QCursor moveCursor(Qt::SizeAllCursor);
+	return &moveCursor;
 }
 
 bool PaletteItemBase::freeRotationAllowed(Qt::KeyboardModifiers modifiers) {
@@ -746,7 +801,7 @@ bool PaletteItemBase::inRotationLocation(QPointF scenePos, Qt::KeyboardModifiers
 	polygon.append(mapToScene(r.topRight()));
 	polygon.append(mapToScene(r.bottomRight()));
 	polygon.append(mapToScene(r.bottomLeft()));
-	foreach (QPointF p, polygon) {
+	Q_FOREACH (QPointF p, polygon) {
 		double dsqd = GraphicsUtils::distanceSqd(p, scenePos);
 		if (dsqd < 9) {
 			returnPoint = p;
@@ -765,10 +820,10 @@ void PaletteItemBase::checkFreeRotation(Qt::KeyboardModifiers modifiers, QPointF
 	bool inCorner = inRotationLocation(scenePos, modifiers, returnPoint);
 
 	if (inCorner) {
-		CursorMaster::instance()->addCursor(this, *CursorMaster::RotateCursor);
+		SvgCursorBuilder::instance()->addCursor(this, *SvgCursorBuilder::RotateCursor);
 	}
 	else {
-		CursorMaster::instance()->addCursor(this, cursor());
+		SvgCursorBuilder::instance()->addCursor(this, cursor());
 	}
 }
 

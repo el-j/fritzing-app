@@ -45,12 +45,13 @@ public:
 	void updateProgress(double progress);
 	void installFinished(const QString & error);
 
-signals:
+Q_SIGNALS:
 	void enableAgainSignal(bool enable);
 	void installNewParts();
 
-protected slots:
+protected Q_SLOTS:
 	void releasesAvailableSlot();
+	void partsAvailableSlot();
 	void xmlErrorSlot(QXmlStreamReader::Error errorCode);
 	void httpErrorSlot(QNetworkReply::NetworkError);
 	void jsonPartsErrorSlot(QString error);
@@ -58,6 +59,7 @@ protected slots:
 	void stopClose();
 	void updateParts();
 	void onCleanRepo(class ModFileDialog *modFileDialog);
+	void openInBrowser();
 
 protected:
 	bool setAvailableReleases(const QList<struct AvailableRelease *> & availableReleases);
@@ -67,17 +69,20 @@ protected:
 	void closeEvent(QCloseEvent *);
 
 protected:
-	class VersionChecker * m_versionChecker;
-	bool m_atUserRequest;
+	class VersionChecker * m_versionChecker = nullptr;
+	bool m_atUserRequest = false;
 	QString m_repoPath;
 	QString m_shaFromDataBase;
 	QString m_remoteSha;
-	QLabel * m_feedbackLabel;
-	QDialogButtonBox * m_buttonBox;
-	QProgressBar * m_progressBar;
+	QString m_updateUrl;
+	QLabel * m_feedbackLabel = nullptr;
+	QDialogButtonBox * m_buttonBox = nullptr;
+	QProgressBar * m_progressBar = nullptr;
 	PartsCheckerResult m_partsCheckerResult;
-	bool m_doQuit;
-	bool m_doClose;
+	bool m_doQuit = false;
+	bool m_doClose = false;
+
+
 };
 
 

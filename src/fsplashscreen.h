@@ -23,6 +23,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QSplashScreen>
 #include <QPainter>
 #include <QHash>
+#include <QMouseEvent>
 
 struct MessageThing {
 	QString message;
@@ -39,7 +40,7 @@ struct PixmapThing {
 class FSplashScreen : public QSplashScreen {
 	Q_OBJECT
 public:
-	FSplashScreen(const QPixmap & pixmap = QPixmap(), Qt::WindowFlags f = 0);
+	FSplashScreen(const QPixmap & pixmap = QPixmap(), Qt::WindowFlags f = Qt::WindowFlags());
 	~FSplashScreen();
 
 	void showMessage(const QString &message, const QString & id, int alignment = Qt::AlignLeft);
@@ -48,8 +49,10 @@ public:
 
 protected:
 	void drawContents ( QPainter * painter );
+	void mousePressEvent(QMouseEvent *event) override;
+	void mouseReleaseEvent(QMouseEvent *event) override;
 
-public slots:
+public Q_SLOTS:
 	void displaySlice();
 
 protected:

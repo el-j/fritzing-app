@@ -44,6 +44,7 @@ public:
 	static const QString & fullDate();
 	static const QString & shortDate();
 	static const QString & year();
+	static QString shortVersion();
 	static bool candidateGreaterThanCurrent(const VersionThing &);
 	static bool greaterThan(const VersionThing & myVersionThing, const VersionThing & yourVersionThing);
 	static bool greaterThan(const QString & myVersionStr, const QString & yourVersionStr);
@@ -52,8 +53,6 @@ public:
 	static void cleanup();
 	static QString makeRequestParamsString(bool withID);
 
-public:
-	static QString FirstVersionWithDetachedUserData;
 
 protected:
 	Version();

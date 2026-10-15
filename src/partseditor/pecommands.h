@@ -23,6 +23,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "../commands.h"
 #include "peutils.h"
+#include "../model/modelpartshared.h"   // HistoryEntry
 
 
 /////////////////////////////////////////////
@@ -107,6 +108,23 @@ protected:
 protected:
 	QStringList m_old;
 	QStringList m_new;
+};
+
+/////////////////////////////////////////////
+
+class ChangeHistoryCommand : public PEBaseCommand
+{
+public:
+	ChangeHistoryCommand(class PEMainWindow *, const QList<HistoryEntry> & oldHistory, const QList<HistoryEntry>  & newHistory, QUndoCommand *parent);
+	void undo();
+	void redo();
+
+protected:
+	QString getParamString() const;
+
+protected:
+	QList<HistoryEntry> m_old;
+	QList<HistoryEntry> m_new;
 };
 
 /////////////////////////////////////////////

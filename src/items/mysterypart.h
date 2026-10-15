@@ -34,7 +34,7 @@ class MysteryPart : public PaletteItem
 
 public:
 	// after calling this constructor if you want to render the loaded svg (either from model or from file), MUST call <renderImage>
-	MysteryPart(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
+	explicit MysteryPart(ModelPart *, ViewLayer::ViewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel);
 	~MysteryPart();
 
 	QString retrieveSvg(ViewLayer::ViewLayerID, QHash<QString, QString> & svgHash, bool blackOnly, double dpi, double & factor);
@@ -47,9 +47,9 @@ public:
 	bool hasCustomSVG();
 	PluralType isPlural();
 	void addedToScene(bool temporary);
-	bool changePinLabels(bool singleRow, bool sip);
+	bool changePinLabels(bool sip);
 
-public slots:
+public Q_SLOTS:
 	void chipLabelEntry();
 	void swapEntry(const QString & text);
 
@@ -66,12 +66,12 @@ public:
 	static QString makePcbDipSvg(const QString & expectedFileName);
 
 protected:
-	QString makeSvg(const QString & chipLabel, bool replace);
+	virtual QString makeSvg(const QString & chipLabel, bool replace);
 	QStringList collectValues(const QString & family, const QString & prop, QString & value);
 	virtual bool isDIP();
 	virtual bool otherPropsChange(const QMap<QString, QString> & propsMap);
 	virtual const QStringList & spacings();
-	virtual QString retrieveSchematicSvg(QString & svg);
+	virtual QString retrieveSchematicSvg(const QString & svg);
 
 protected:
 	static QString hackFzpHoleSize(const QString & fzp, const QString & moduleid);

@@ -1,7 +1,7 @@
 /*******************************************************************
 
 Part of the Fritzing project - http://fritzing.org
-Copyright (c) 2007-2019 Fritzing
+Copyright (c) 2007-2019,2025 Fritzing
 
 Fritzing is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -32,18 +32,21 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "stacktabwidget.h"
 #include "stacktabbar.h"
 
-#include "../../model/modelpart.h"
-#include "../../mainwindow/mainwindow.h"
-#include "../../model/palettemodel.h"
-#include "../../waitpushundostack.h"
-#include "../../debugdialog.h"
-#include "../../utils/folderutils.h"
-#include "../../utils/textutils.h"
-#include "../../utils/fileprogressdialog.h"
-#include "../../referencemodel/referencemodel.h"
-#include "../../items/partfactory.h"
-#include "../partsbinpalettewidget.h"
-#include "../partsbinview.h"
+#include "model/modelpart.h"
+#include "mainwindow/mainwindow.h"
+#include "model/palettemodel.h"
+#include "waitpushundostack.h"
+#include "debugdialog.h"
+#include "utils/folderutils.h"
+#include "utils/textutils.h"
+#include "utils/fileprogressdialog.h"
+#include "referencemodel/referencemodel.h"
+#include "items/partfactory.h"
+#include "partsbinpalette/partsbinpalettewidget.h"
+#include "partsbinpalette/searchbinpalettewidget.h"
+#include "partsbinpalette/partsbinview.h"
+#include "utils/fmessagebox.h"
+#include "mainwindow/fprobeactions.h"
 
 ///////////////////////////////////////////////////////////
 
@@ -104,29 +107,29 @@ BinManager::BinManager(class ReferenceModel *referenceModel, class HtmlInfoView 
 {
 	BinManager::Title = tr("Parts");
 
-	m_combinedMenu = NULL;
-	m_showListViewAction = m_showIconViewAction = NULL;
+	m_combinedMenu = nullptr;
+	m_showListViewAction = m_showIconViewAction = nullptr;
 
 	m_referenceModel = referenceModel;
 	m_infoView = infoView;
 	m_undoStack = undoStack;
 	m_defaultSaveFolder = FolderUtils::getUserBinsPath();
 	m_mainWindow = parent;
-	m_currentBin = NULL;
+	m_currentBin = nullptr;
+	m_searchBin = nullptr;
 
 	connect(this, SIGNAL(savePartAsBundled(const QString &)), m_mainWindow, SLOT(saveBundledPart(const QString &)));
 
 	m_unsavedBinsCount = 0;
 
-	QVBoxLayout *lo = new QVBoxLayout(this);
+	auto *lo = new QVBoxLayout(this);
 
 	m_stackTabWidget = new StackTabWidget(this);
 	m_stackTabWidget->setTabPosition(QTabWidget::West);
 	lo->addWidget(m_stackTabWidget);
 
-	lo->setMargin(0);
+	lo->setContentsMargins(0, 0, 0, 0);
 	lo->setSpacing(0);
-	setMaximumHeight(500);
 }
 
 BinManager::~BinManager() {
@@ -137,6 +140,8 @@ void BinManager::initStandardBins()
 	createCombinedMenu();
 	createContextMenus();
 
+	new FProbeActions("BinMenu", m_combinedMenu);
+
 	//DebugDialog::debug("init bin manager");
 	QList<BinLocation *> actualLocations;
 	findAllBins(actualLocations);
@@ -144,12 +149,26 @@ void BinManager::initStandardBins()
 	hackLocalContrib(actualLocations);
 
 	restoreStateAndGeometry(actualLocations);
-	foreach (BinLocation * location, actualLocations) {
-		PartsBinPaletteWidget* bin = newBin();
+	Q_FOREACH (BinLocation * location, actualLocations) {
+		// Check if this is a Search bin location
+		bool isSearchBin = (location->path.contains("search", Qt::CaseInsensitive) && 
+		                   location->path.endsWith(".fzb", Qt::CaseInsensitive)) ||
+		                   location->title.compare("Search", Qt::CaseInsensitive) == 0;
+		
+		
+		PartsBinPaletteWidget* bin = newBin(isSearchBin);
 		bin->load(location->path, m_mainWindow->fileProgressDialog(), true);
+		
+		// Add all bins (including search bins) to the tab widget
 		m_stackTabWidget->addTab(bin, bin->icon(), bin->title());
 		m_stackTabWidget->stackTabBar()->setTabToolTip(m_stackTabWidget->count() - 1, bin->title());
 		registerBin(bin);
+		
+		// Keep reference to search bin for convenience
+		if (isSearchBin) {
+			m_searchBin = qobject_cast<SearchBinPaletteWidget*>(bin);
+		}
+		
 		delete location;
 	}
 	actualLocations.clear();
@@ -158,6 +177,10 @@ void BinManager::initStandardBins()
 	openCoreBinIn();
 
 	//DebugDialog::debug("after core bin");
+	
+	// Ensure Search bin is at position 0 if it exists
+	moveSearchBinToTop();
+
 	currentChanged(m_stackTabWidget->currentIndex());
 
 	connectTabWidget();
@@ -213,8 +236,8 @@ bool BinManager::beforeClosing() {
 	bool retval = true;
 
 	for(int j = 0; j < m_stackTabWidget->count(); j++) {
-		PartsBinPaletteWidget *bin = qobject_cast<PartsBinPaletteWidget*>(m_stackTabWidget->widget(j));
-		if (bin && !bin->fastLoaded()) {
+		auto *bin = qobject_cast<PartsBinPaletteWidget*>(m_stackTabWidget->widget(j));
+		if ((bin != nullptr) && !bin->fastLoaded()) {
 			setAsCurrentTab(bin);
 			retval = retval && bin->beforeClosing();
 			if(!retval) break;
@@ -255,7 +278,7 @@ PartsBinPaletteWidget* BinManager::getOrOpenMyPartsBin() {
 
 PartsBinPaletteWidget* BinManager::getOrOpenSearchBin() {
 	PartsBinPaletteWidget * bin = getOrOpenBin(SearchBinLocation, SearchBinTemplateLocation);
-	if (bin) {
+	if (bin != nullptr) {
 		bin->setSaveQuietly(true);
 	}
 	return bin;
@@ -265,11 +288,11 @@ PartsBinPaletteWidget* BinManager::getOrOpenBin(const QString & binLocation, con
 
 	PartsBinPaletteWidget* partsBin = findBin(binLocation);
 
-	if(!partsBin) {
+	if(partsBin == nullptr) {
 		QString fileToOpen = QFileInfo(binLocation).exists() ? binLocation : createIfBinNotExists(binLocation, binTemplateLocation);
 		partsBin = openBinIn(fileToOpen, false);
 	}
-	if (partsBin != NULL && partsBin->fastLoaded()) {
+	if ((partsBin != nullptr) && partsBin->fastLoaded()) {
 		partsBin->load(partsBin->fileName(), partsBin, false);
 	}
 
@@ -278,13 +301,13 @@ PartsBinPaletteWidget* BinManager::getOrOpenBin(const QString & binLocation, con
 
 PartsBinPaletteWidget* BinManager::findBin(const QString & binLocation) {
 	for (int i = 0; i < m_stackTabWidget->count(); i++) {
-		PartsBinPaletteWidget* bin = (PartsBinPaletteWidget *) m_stackTabWidget->widget(i);
+		auto* bin = (PartsBinPaletteWidget *) m_stackTabWidget->widget(i);
 		if(bin->fileName() == binLocation) {
 			return bin;
 		}
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 QString BinManager::createIfMyPartsNotExists() {
@@ -304,13 +327,13 @@ QString BinManager::createIfBinNotExists(const QString & dest, const QString & s
 }
 
 void BinManager::addPartToBin(ModelPart *modelPart, int position) {
-	PartsBinPaletteWidget *bin = m_currentBin? m_currentBin: getOrOpenMyPartsBin();
+	PartsBinPaletteWidget *bin = m_currentBin != nullptr? m_currentBin: getOrOpenMyPartsBin();
 	addPartToBinAux(bin,modelPart,position);
 }
 
 void BinManager::addToMyParts(ModelPart *modelPart) {
 	PartsBinPaletteWidget *bin = getOrOpenMyPartsBin();
-	if (bin) {
+	if (bin != nullptr) {
 		addPartToBinAux(bin,modelPart);
 		setAsCurrentTab(bin);
 	}
@@ -318,7 +341,7 @@ void BinManager::addToMyParts(ModelPart *modelPart) {
 
 void BinManager::addToTempPartsBin(ModelPart *modelPart) {
 	PartsBinPaletteWidget *bin = getOrOpenBin(m_tempPartsBinLocation, TempPartsBinTemplateLocation);
-	if (bin) {
+	if (bin != nullptr) {
 		addPartToBinAux(bin,modelPart);
 		setAsCurrentTab(bin);
 		bin->setDirty(false);
@@ -327,7 +350,7 @@ void BinManager::addToTempPartsBin(ModelPart *modelPart) {
 
 void BinManager::hideTempPartsBin() {
 	for (int i = 0; i < m_stackTabWidget->count(); i++) {
-		PartsBinPaletteWidget* bin = (PartsBinPaletteWidget *) m_stackTabWidget->widget(i);
+		auto* bin = (PartsBinPaletteWidget *) m_stackTabWidget->widget(i);
 		if (bin->fileName().compare(m_tempPartsBinLocation) == 0) {
 			m_stackTabWidget->removeTab(i);
 			break;
@@ -336,7 +359,7 @@ void BinManager::hideTempPartsBin() {
 }
 
 void BinManager::addPartToBinAux(PartsBinPaletteWidget *bin, ModelPart *modelPart, int position) {
-	if(bin) {
+	if(bin != nullptr) {
 		if (bin->fastLoaded()) {
 			bin->load(bin->fileName(), bin, false);
 		}
@@ -361,21 +384,21 @@ void BinManager::setDirtyTab(PartsBinPaletteWidget* w, bool dirty) {
 	}
 	*/
 	w->setWindowModified(dirty);
-	if(m_stackTabWidget != NULL) {
+	if(m_stackTabWidget != nullptr) {
 		int tabIdx = m_stackTabWidget->indexOf(w);
 		m_stackTabWidget->setTabText(tabIdx, w->title()+(dirty? " *": ""));
 	} else {
-		qWarning() << tr("BinManager::setDirtyTab: Couldn't set the bin '%1' as dirty").arg(w->title());
+		qWarning() << QString("BinManager::setDirtyTab: Couldn't set the bin '%1' as dirty").arg(w->title());
 	}
 }
 
 void BinManager::updateTitle(PartsBinPaletteWidget* w, const QString& newTitle) {
-	if(m_stackTabWidget != NULL) {
+	if(m_stackTabWidget != nullptr) {
 		m_stackTabWidget->setTabText(m_stackTabWidget->indexOf(w), newTitle+" *");
 		setDirtyTab(w);
 	}
 	else {
-		qWarning() << tr("BinManager::updateTitle: Couldn't set the bin '%1' as dirty").arg(w->title());
+		qWarning() << QString("BinManager::updateTitle: Couldn't set the bin '%1' as dirty").arg(w->title());
 	}
 }
 
@@ -398,13 +421,13 @@ PartsBinPaletteWidget* BinManager::openBinIn(QString fileName, bool fastLoad) {
 		               tr("Fritzing Bin Files (*%1 *%2);;Fritzing Bin (*%1);;Fritzing Shareable Bin (*%2)")
 		               .arg(FritzingBinExtension).arg(FritzingBundledBinExtension)
 		           );
-		if (fileName.isNull()) return NULL;
+		if (fileName.isNull()) return nullptr;
 	}
-	PartsBinPaletteWidget* bin = NULL;
+	PartsBinPaletteWidget* bin = nullptr;
 	bool createNewOne = false;
 	if(m_openedBins.contains(fileName)) {
 		bin = m_openedBins[fileName];
-		if(m_stackTabWidget) {
+		if(m_stackTabWidget != nullptr) {
 			m_stackTabWidget->setCurrentWidget(bin);
 		} else {
 			m_openedBins.remove(fileName);
@@ -434,7 +457,7 @@ PartsBinPaletteWidget* BinManager::openBinIn(QString fileName, bool fastLoad) {
 
 PartsBinPaletteWidget* BinManager::openCoreBinIn() {
 	PartsBinPaletteWidget* bin = findBin(CorePartsBinLocation);
-	if (bin != NULL) {
+	if (bin != nullptr) {
 		setAsCurrentTab(bin);
 	}
 	else {
@@ -448,7 +471,18 @@ PartsBinPaletteWidget* BinManager::openCoreBinIn() {
 }
 
 PartsBinPaletteWidget* BinManager::newBin() {
-	PartsBinPaletteWidget* bin = new PartsBinPaletteWidget(m_referenceModel, m_infoView, m_undoStack,this);
+	return newBin(false);
+}
+
+PartsBinPaletteWidget* BinManager::newBin(bool isSearchBin) {
+	PartsBinPaletteWidget* bin;
+	
+	if (isSearchBin) {
+		bin = new SearchBinPaletteWidget(m_referenceModel, m_infoView, m_undoStack, this);
+	} else {
+		bin = new PartsBinPaletteWidget(m_referenceModel, m_infoView, m_undoStack, this);
+	}
+	
 	connect(
 	    bin, SIGNAL(fileNameUpdated(PartsBinPaletteWidget*, const QString&, const QString&)),
 	    this, SLOT(updateFileName(PartsBinPaletteWidget*, const QString&, const QString&))
@@ -465,8 +499,8 @@ PartsBinPaletteWidget* BinManager::newBin() {
 
 void BinManager::currentChanged(int index) {
 	for (int i = 0; i < m_stackTabWidget->count(); i++) {
-		PartsBinPaletteWidget* bin = (PartsBinPaletteWidget *) m_stackTabWidget->widget(i);
-		if (bin == NULL) continue;
+		auto* bin = (PartsBinPaletteWidget *) m_stackTabWidget->widget(i);
+		if (bin == nullptr) continue;
 		if (!bin->hasMonoIcon()) continue;
 
 		if (i == index) {
@@ -483,12 +517,12 @@ void BinManager::currentChanged(int index) {
 
 
 	PartsBinPaletteWidget *bin = getBin(index);
-	if (bin) setAsCurrentBin(bin);
+	if (bin != nullptr) setAsCurrentBin(bin);
 }
 
 void BinManager::setAsCurrentBin(PartsBinPaletteWidget* bin) {
-	if (bin == NULL) {
-		qWarning() << tr("Cannot set a NULL bin as the current one");
+	if (bin == nullptr) {
+		qWarning() << QString("Cannot set a NULL bin as the current one");
 		return;
 	}
 
@@ -498,31 +532,22 @@ void BinManager::setAsCurrentBin(PartsBinPaletteWidget* bin) {
 
 	if (m_currentBin == bin) return;
 
+	m_currentBin = bin;
+
 	if (bin->fileName().compare(SearchBinLocation) == 0) {
 		bin->focusSearch();
 	}
 
-	/*
-
-	// jrc 3-july-2013 commented out this stylesheet change:
-	//      it causes the tab bar to lose its scroll position
-	//      the stylesheet change is commented out in the qss file, so visually it's a no-op
-
-	QString style = m_mainWindow->styleSheet();
-	if(m_currentBin && m_stackTabWidget) {
-		StackTabBar *currTabBar = m_stackTabWidget->stackTabBar();
-		currTabBar->setProperty("current","false");
-		currTabBar->setStyleSheet("");
-		currTabBar->setStyleSheet(style);
+	// Control tab movability based on whether search bin is active
+	if (m_stackTabWidget && m_stackTabWidget->stackTabBar()) {
+		bool isSearchBin = (bin == m_searchBin);
+		m_stackTabWidget->stackTabBar()->setMovable(!isSearchBin);
 	}
-	if(m_stackTabWidget) {
-		m_currentBin = bin;
-		StackTabBar *currTabBar = m_stackTabWidget->stackTabBar();
-		currTabBar->setProperty("current","true");
-		currTabBar->setStyleSheet("");
-		currTabBar->setStyleSheet(style);
+
+	// Set as current tab in the stack widget
+	if (m_stackTabWidget) {
+		m_stackTabWidget->setCurrentWidget(bin);
 	}
-	*/
 }
 
 void BinManager::closeBinIn(int index) {
@@ -530,7 +555,7 @@ void BinManager::closeBinIn(int index) {
 
 	int realIndex = index == -1? m_stackTabWidget->currentIndex(): index;
 	PartsBinPaletteWidget *w = getBin(realIndex);
-	if(w && w->beforeClosing()) {
+	if((w != nullptr) && w->beforeClosing()) {
 		m_stackTabWidget->removeTab(realIndex);
 		m_openedBins.remove(w->fileName());
 	}
@@ -544,6 +569,10 @@ PartsBinPaletteWidget* BinManager::currentBin() {
 	return qobject_cast<PartsBinPaletteWidget*>(m_stackTabWidget->currentWidget());
 }
 
+PartsBinPaletteWidget* BinManager::searchBin() const {
+	return m_searchBin;
+}
+
 void BinManager::updateFileName(PartsBinPaletteWidget* bin, const QString &newFileName, const QString &oldFilename) {
 	m_openedBins.remove(oldFilename);
 	m_openedBins[newFileName] = bin;
@@ -552,11 +581,12 @@ void BinManager::updateFileName(PartsBinPaletteWidget* bin, const QString &newFi
 void BinManager::saveStateAndGeometry() {
 	QSettings settings;
 	settings.remove("bins2"); // clean up previous state
+	DebugDialog::debug("saveStateAndGeometry", settings.status());
 	settings.beginGroup("bins2");
 
 	for(int j = m_stackTabWidget->count() - 1; j >= 0; j--) {
-		PartsBinPaletteWidget *bin = qobject_cast<PartsBinPaletteWidget*>(m_stackTabWidget->widget(j));
-		if (bin) {
+		auto *bin = qobject_cast<PartsBinPaletteWidget*>(m_stackTabWidget->widget(j));
+		if (bin != nullptr) {
 			settings.beginGroup(QString::number(j));
 			settings.setValue("location", BinLocation::toString(bin->location()));
 			settings.setValue("title", bin->title());
@@ -572,6 +602,7 @@ void BinManager::restoreStateAndGeometry(QList<BinLocation *> & actualLocations)
 	QList<BinLocation *> theoreticalLocations;
 
 	QSettings settings;
+	DebugDialog::debug("restoreStateAndGeometry", settings.status());
 	settings.beginGroup("bins2");
 	int size = settings.childGroups().size();
 	if (size == 0) {
@@ -581,7 +612,7 @@ void BinManager::restoreStateAndGeometry(QList<BinLocation *> & actualLocations)
 	else {
 		for (int i = 0; i < size; ++i) {
 			settings.beginGroup(QString::number(i));
-			BinLocation  * location = new BinLocation;
+			auto  * location = new BinLocation;
 			location->location = BinLocation::fromString(settings.value("location").toString());
 			location->path = settings.value("path").toString();
 			location->title = settings.value("title").toString();
@@ -590,11 +621,11 @@ void BinManager::restoreStateAndGeometry(QList<BinLocation *> & actualLocations)
 		}
 	}
 
-	foreach (BinLocation * location, actualLocations) {
+	Q_FOREACH (BinLocation * location, actualLocations) {
 		location->marked = false;
 	}
-	foreach (BinLocation * tLocation, theoreticalLocations) {
-		foreach (BinLocation * aLocation, actualLocations) {
+	Q_FOREACH (BinLocation * tLocation, theoreticalLocations) {
+		Q_FOREACH (BinLocation * aLocation, actualLocations) {
 			if (aLocation->title.compare(tLocation->title) == 0 && aLocation->location == tLocation->location) {
 				aLocation->marked = true;
 				break;
@@ -605,7 +636,7 @@ void BinManager::restoreStateAndGeometry(QList<BinLocation *> & actualLocations)
 	QList<BinLocation *> tempLocations(actualLocations);
 	actualLocations.clear();
 
-	foreach (BinLocation * tLocation, theoreticalLocations) {
+	Q_FOREACH (BinLocation * tLocation, theoreticalLocations) {
 		tLocation->marked = false;
 		bool gotOne = false;
 
@@ -645,7 +676,7 @@ void BinManager::restoreStateAndGeometry(QList<BinLocation *> & actualLocations)
 		}
 	}
 
-	foreach (BinLocation * tLocation, theoreticalLocations) {
+	Q_FOREACH (BinLocation * tLocation, theoreticalLocations) {
 		if (!tLocation->marked) {
 			delete tLocation;
 		}
@@ -663,19 +694,20 @@ void BinManager::restoreStateAndGeometry(QList<BinLocation *> & actualLocations)
 void BinManager::readTheoreticalLocations(QList<BinLocation *> & theoreticalLocations)
 {
 	QFile file(":/resources/bins/order.xml");
-	QString errorStr;
-	int errorLine;
-	int errorColumn;
+	if (!file.open(QIODevice::ReadOnly)) {
+		DebugDialog::debug(QString("Unable to open :%1").arg(":/resources/bins/order.xml"));
+	}
 	QDomDocument domDocument;
 
-	if (!domDocument.setContent(&file, true, &errorStr, &errorLine, &errorColumn)) {
-		DebugDialog::debug(QString("unable to parse order.xml: %1 %2 %3").arg(errorStr).arg(errorLine).arg(errorColumn));
+	QDomDocument::ParseResult parseResult = domDocument.setContent(&file, QDomDocument::ParseOption::UseNamespaceProcessing);
+	if (!parseResult) {
+		DebugDialog::debug(QString("unable to parse order.xml: %1 %2 %3").arg(parseResult.errorMessage).arg(parseResult.errorLine).arg(parseResult.errorColumn));
 		return;
 	}
 
 	QDomElement bin = domDocument.documentElement().firstChildElement("bin");
 	while (!bin.isNull()) {
-		BinLocation * location = new BinLocation;
+		auto * location = new BinLocation;
 		location->title = bin.attribute("title", "");
 		location->location = BinLocation::fromString(bin.attribute("location", ""));
 		theoreticalLocations.append(location);
@@ -688,9 +720,10 @@ void BinManager::hackLocalContrib(QList<BinLocation *> & locations)
 	// with release 0.7.12, there is no more local contrib bin
 	// so clear out existing local contrib bins by copying parts to mine bin
 
-	BinLocation * localContrib = NULL;
-	BinLocation * myParts = NULL;
-	foreach (BinLocation * location, locations) {
+	BinLocation * localContrib = nullptr;
+	BinLocation * myParts = nullptr;
+	Q_FOREACH (BinLocation * location, locations) {
+		DebugDialog::debug(QString("Bin location %1").arg(location->title));
 		if (location->location == BinLocation::User) {
 			if (location->title == "Contributed Parts") {
 				localContrib = location;
@@ -701,9 +734,27 @@ void BinManager::hackLocalContrib(QList<BinLocation *> & locations)
 		}
 	}
 
-	if (localContrib == NULL) return;
+	if (localContrib == nullptr)
+		return;
 
-	if (myParts == NULL) {
+	QMessageBox::StandardButton reply;
+	DebugDialog::debug("Ask to migrate to MY PARTS");
+	reply = FMessageBox::question(nullptr,
+								  tr("Confirmation"),
+								  tr("The 'Contributed Parts' bin has been replaced with 'My Parts' since Fritzing 0.7.12.") +
+								  tr("Would you like Fritzing to move the parts over?"),
+								  QMessageBox::Yes | QMessageBox::No);
+
+	if (reply == QMessageBox::Yes) {
+		DebugDialog::debug("User confirmed migrating bins  < 0.7.12");
+	} else {
+		DebugDialog::debug("User declined migrating bins < 0.7.12");
+		return;
+	}
+
+	DebugDialog::debug("Found a legacy 'Contributed Parts' bin. Moving content to 'My Parts' bin.");
+
+	if (myParts == nullptr) {
 		createIfBinNotExists(MyPartsBinLocation, MyPartsBinTemplateLocation);
 		myParts = new BinLocation;
 		myParts->location = BinLocation::User;
@@ -713,13 +764,13 @@ void BinManager::hackLocalContrib(QList<BinLocation *> & locations)
 		locations.append(myParts);
 	}
 
-	QString errorStr;
-	int errorLine;
-	int errorColumn;
-
 	QFile contribFile(localContrib->path);
+	if (!contribFile.open(QIODevice::ReadOnly)) {
+		DebugDialog::debug(QString("Unable to open :%1").arg(localContrib->path));
+	}
 	QDomDocument contribDoc;
-	bool result = contribDoc.setContent(&contribFile, true, &errorStr, &errorLine, &errorColumn);
+	QDomDocument::ParseResult parseResult = contribDoc.setContent(&contribFile, QDomDocument::ParseOption::UseNamespaceProcessing);
+	bool result = parseResult.operator bool();
 	locations.removeOne(localContrib);
 	contribFile.close();
 	bool removed = contribFile.remove();
@@ -730,8 +781,12 @@ void BinManager::hackLocalContrib(QList<BinLocation *> & locations)
 	if (!result) return;
 
 	QFile myPartsFile(myParts->path);
+	if (!myPartsFile.open(QIODevice::ReadOnly)) {
+		DebugDialog::debug(QString("Unable to open :%1").arg(myParts->path));
+	}
 	QDomDocument myPartsDoc;
-	if (!myPartsDoc.setContent(&myPartsFile, true, &errorStr, &errorLine, &errorColumn)) {
+	QDomDocument::ParseResult myPartsParseResult = myPartsDoc.setContent(&myPartsFile, QDomDocument::ParseOption::UseNamespaceProcessing);
+	if (!myPartsParseResult) {
 		return;
 	}
 
@@ -772,7 +827,7 @@ void BinManager::hackLocalContrib(QList<BinLocation *> & locations)
 
 void BinManager::findAllBins(QList<BinLocation *> & locations)
 {
-	BinLocation * location = new BinLocation;
+	auto * location = new BinLocation;
 	location->location = BinLocation::App;
 	location->path = CorePartsBinLocation;
 	QString icon;
@@ -798,8 +853,8 @@ void BinManager::findBins(QDir & dir, QList<BinLocation *> & locations, BinLocat
 	QStringList filters;
 	filters << "*"+FritzingBinExtension;
 	QFileInfoList files = dir.entryInfoList(filters);
-	foreach(QFileInfo info, files) {
-		BinLocation * location = new BinLocation;
+	Q_FOREACH(QFileInfo info, files) {
+		auto * location = new BinLocation;
 		location->path = info.absoluteFilePath();
 		location->location = loc;
 		QString icon;
@@ -839,7 +894,7 @@ void BinManager::tabCloseRequested(int index) {
 }
 
 void BinManager::addPartTo(PartsBinPaletteWidget* bin, ModelPart* mp, bool setDirty) {
-	if(mp) {
+	if(mp != nullptr) {
 		bool alreadyIn = bin->contains(mp->moduleID());
 		bin->addPart(mp);
 		if(!alreadyIn && setDirty) {
@@ -867,7 +922,7 @@ QList<QAction*> BinManager::openedBinsActions(const QString &moduleId) {
 	QMap<QString,QAction*> titlesAndActions; // QMap sorts values by key
 
 	for (int i = 0; i < m_stackTabWidget->count(); i++) {
-		PartsBinPaletteWidget* pppw = (PartsBinPaletteWidget *) m_stackTabWidget->widget(i);
+		auto* pppw = (PartsBinPaletteWidget *) m_stackTabWidget->widget(i);
 		if (pppw->readOnly()) continue;
 
 		QAction *act = pppw->addPartToMeAction();
@@ -903,18 +958,30 @@ void BinManager::initNames() {
 
 void BinManager::search(const QString & searchText) {
 	PartsBinPaletteWidget * searchBin = getOrOpenSearchBin();
-	if (searchBin == NULL) return;
+	if (searchBin == nullptr) return;
 
 	FileProgressDialog progress(tr("Searching..."), 0, this);
 	progress.setIncValueMod(10);
 	connect(m_referenceModel, SIGNAL(addSearchMaximum(int)), &progress, SLOT(addMaximum(int)));
 	connect(m_referenceModel, SIGNAL(incSearch()), &progress, SLOT(incValue()));
 
-	QList<ModelPart *> modelParts = m_referenceModel->search(searchText, false);
+	QString effectiveSearchText = searchText;
+	bool allowObsolete = false;
+	QRegularExpression obsoleteRx("\\bobsolete\\b", QRegularExpression::CaseInsensitiveOption);
+	if (obsoleteRx.match(searchText).hasMatch()) {
+		allowObsolete = true;
+		QString stripped = searchText;
+		stripped.remove(obsoleteRx);
+		stripped = stripped.simplified();
+		if (!stripped.isEmpty()) {
+			effectiveSearchText = stripped;
+		}
+	}
+	QList<ModelPart *> modelParts = m_referenceModel->search(effectiveSearchText, allowObsolete);
 
 	progress.setIncValueMod(1);
 	searchBin->removeParts();
-	foreach (ModelPart * modelPart, modelParts) {
+	Q_FOREACH (ModelPart * modelPart, modelParts) {
 		//DebugDialog::debug(modelPart->title());
 		if (modelPart->itemType() == ModelPart::SchematicSubpart) {
 		}
@@ -931,41 +998,41 @@ void BinManager::search(const QString & searchText) {
 
 bool BinManager::currentViewIsIconView() {
 	PartsBinPaletteWidget * bin = currentBin();
-	if (bin == NULL) return true;
+	if (bin == nullptr) return true;
 
 	return bin->currentViewIsIconView();
 }
 
 void BinManager::toIconView() {
 	PartsBinPaletteWidget * bin = currentBin();
-	if (bin == NULL) return;
+	if (bin == nullptr) return;
 
 	bin->toIconView();
 }
 
 void BinManager::toListView() {
 	PartsBinPaletteWidget * bin = currentBin();
-	if (bin == NULL) return;
+	if (bin == nullptr) return;
 
 	bin->toListView();
 }
 
 void BinManager::updateBinCombinedMenuCurrent() {
 	PartsBinPaletteWidget * bin = currentBin();
-	if (bin == NULL) return;
+	if (bin == nullptr) return;
 
 	updateBinCombinedMenu(bin);
 }
 
 void BinManager::updateBinCombinedMenu(PartsBinPaletteWidget * bin) {
-	if (m_combinedMenu == NULL) return;
+	if (m_combinedMenu == nullptr) return;
 
 	m_saveBinAction->setEnabled(bin->allowsChanges());
 	m_renameBinAction->setEnabled(bin->canClose());
 	m_closeBinAction->setEnabled(bin->canClose());
 	m_deleteBinAction->setEnabled(bin->canClose());
 	ItemBase *itemBase = bin->selectedItemBase();
-	bool enabled = (itemBase != NULL);
+	bool enabled = (itemBase) != nullptr;
 	m_editPartNewAction->setEnabled(enabled && itemBase->canEditPart());
 
 	bool enableAnyway = false;
@@ -1091,11 +1158,11 @@ void BinManager::closeBin() {
 
 void BinManager::deleteBin() {
 	PartsBinPaletteWidget * bin = currentBin();
-	if (bin == NULL) return;
+	if (bin == nullptr) return;
 
 	QMessageBox::StandardButton answer = QMessageBox::question(
 	        this,
-	        tr("Delete bin"),
+	        tr("Delete bin", "dialog title"),
 	        tr("Do you really want to delete bin '%1'?  This action cannot be undone.").arg(bin->title()),
 	        QMessageBox::Yes | QMessageBox::No,
 	        QMessageBox::No
@@ -1112,7 +1179,7 @@ void BinManager::importPartToMineBin(const QString & filename) {
 
 	if (!filename.isEmpty() && !filename.isNull()) {
 		PartsBinPaletteWidget * bin = getOrOpenBin(MyPartsBinLocation, MyPartsBinTemplateLocation);
-		if (bin == NULL) return;
+		if (bin == nullptr) return;
 
 		setAsCurrentTab(bin);
 		importPart(filename, bin);
@@ -1123,16 +1190,18 @@ void BinManager::importPartToCurrentBin(const QString & filename) {
 
 	if (!filename.isEmpty() && !filename.isNull()) {
 		PartsBinPaletteWidget * bin = currentBin();
-		if (bin == NULL) return;
+		if (bin == nullptr) return;
 
 		importPart(filename, bin);
 	}
 }
 
 void BinManager::importPart(const QString & filename, PartsBinPaletteWidget * bin) {
-	ModelPart *mp = m_mainWindow->loadBundledPart(filename, !bin->allowsChanges());
+	QList<ModelPart*> mps = m_mainWindow->loadBundledPart(filename, !bin->allowsChanges());
 	if (bin->allowsChanges()) {
-		addPartTo(bin, mp, true);
+		for (auto * mp : mps) {
+			addPartTo(bin, mp, true);
+		}
 	}
 }
 
@@ -1142,11 +1211,11 @@ void BinManager::editSelectedNew() {
 
 void BinManager::renameBin() {
 	PartsBinPaletteWidget * bin = currentBin();
-	if (bin == NULL) return;
+	if (bin == nullptr) return;
 
 	if (!currentBin()->allowsChanges()) {
 		// TODO: disable menu item instead
-		QMessageBox::warning(this, tr("Read-only bin"), tr("This bin cannot be renamed."));
+		QMessageBox::warning(this, tr("Read-only bin", "dialog title"), tr("This bin cannot be renamed."));
 		return;
 	}
 
@@ -1169,7 +1238,7 @@ void BinManager::renameBin() {
 
 void BinManager::saveBin() {
 	PartsBinPaletteWidget * bin = currentBin();
-	if (bin == NULL) return;
+	if (bin == nullptr) return;
 
 	bool result = bin->save();
 	if (result) setDirtyTab(currentBin(),false);
@@ -1177,15 +1246,15 @@ void BinManager::saveBin() {
 
 void BinManager::saveBinAs() {
 	PartsBinPaletteWidget * bin = currentBin();
-	if (bin == NULL) return;
+	if (bin == nullptr) return;
 
 	bin->saveAs();
 }
 
 
 void BinManager::updateViewChecks(bool iconView) {
-	if (m_showListViewAction == NULL) return;
-	if (m_showIconViewAction == NULL) return;
+	if (m_showListViewAction == nullptr) return;
+	if (m_showIconViewAction == nullptr) return;
 
 	if (iconView) {
 		m_showListViewAction->setChecked(false);
@@ -1218,19 +1287,19 @@ QMenu * BinManager::combinedMenu() {
 
 bool BinManager::removeSelected() {
 	PartsBinPaletteWidget * bin = currentBin();
-	if (bin == NULL) return false;
+	if (bin == nullptr) return false;
 
 	ModelPart * mp = bin->selectedModelPart();
-	if (mp == NULL) return false;
+	if (mp == nullptr) return false;
 
 	if (m_mainWindow->anyUsePart(mp->moduleID())) {
-		QMessageBox::warning(this, tr("Remove from Bin"), tr("Unable to remove part '%1'--it is in use in a sketch").arg(mp->title()));
+		QMessageBox::warning(this, tr("Remove from Bin", "dialog title"), tr("Unable to remove part '%1'--it is in use in a sketch").arg(mp->title()));
 		return false;
 	}
 
 	QMessageBox::StandardButton answer = QMessageBox::question(
 	        this,
-	        tr("Remove from bin"),
+			tr("Remove from Bin", "dialog title"),
 	        tr("Do you really want to remove '%1' from the bin? This operation cannot be undone.").arg(mp->title()),
 	        QMessageBox::Yes | QMessageBox::No,
 	        QMessageBox::No
@@ -1248,10 +1317,10 @@ bool BinManager::removeSelected() {
 
 void BinManager::findSelected() {
 	PartsBinPaletteWidget * bin = currentBin();
-	if (bin == NULL) return;
+	if (bin == nullptr) return;
 
 	ModelPart * mp = bin->selectedModelPart();
-	if (mp == NULL) return;
+	if (mp == nullptr) return;
 
 	m_mainWindow->selectPartsWithModuleID(mp);
 }
@@ -1259,57 +1328,57 @@ void BinManager::findSelected() {
 
 void BinManager::exportSelected() {
 	PartsBinPaletteWidget * bin = currentBin();
-	if (bin == NULL) return;
+	if (bin == nullptr) return;
 
 	ModelPart * mp = bin->selectedModelPart();
-	if (mp == NULL) return;
+	if (mp == nullptr) return;
 
-	emit savePartAsBundled(mp->moduleID());
+	Q_EMIT savePartAsBundled(mp->moduleID());
 }
 
 void BinManager::saveBundledBin() {
 	PartsBinPaletteWidget * bin = currentBin();
-	if (bin == NULL) return;
+	if (bin == nullptr) return;
 
 	bin->saveBundledBin();
 }
 
 void BinManager::setTabIcon(PartsBinPaletteWidget* w, QIcon * icon)
 {
-	if (m_stackTabWidget != NULL) {
+	if (m_stackTabWidget != nullptr) {
 		int tabIdx = m_stackTabWidget->indexOf(w);
 		m_stackTabWidget->setTabIcon(tabIdx, *icon);
 	}
 }
 
 void BinManager::copyFilesToContrib(ModelPart * mp, QWidget * originator) {
-	PartsBinPaletteWidget * bin = qobject_cast<PartsBinPaletteWidget *>(originator);
-	if (bin == NULL) return;
+	auto * bin = qobject_cast<PartsBinPaletteWidget *>(originator);
+	if (bin == nullptr) return;
 
 	if (bin->fileName().compare(m_tempPartsBinLocation) != 0) return;				// only copy from temp bin
 
 	QString path = mp->path();
 	if (path.isEmpty()) return;
 
+	QString moduleID = FolderUtils::sanitizeForFolder(mp->moduleID());
+	if (moduleID.isEmpty()) return;
+
+	QString destDir = FolderUtils::getLocalPartsPath() + "/contrib/" + moduleID;
+	QDir().mkpath(destDir);
+
 	QFileInfo info(path);
 	QFile fzp(path);
+	FolderUtils::slamCopy(fzp, destDir + "/" + info.fileName());
 
-	QString parts = FolderUtils::getUserPartsPath();
-	FolderUtils::slamCopy(fzp, parts + "/contrib/" + info.fileName());
-	QString prefix = parts + "/svg/contrib/";
-
-	QDir dir = info.absoluteDir();
-	dir.cdUp();
-	dir.cd("svg");
-	dir.cd("contrib");
-
+	QDir srcDir = info.absoluteDir();
 	QList<ViewLayer::ViewID> viewIDs;
-	viewIDs << ViewLayer::IconView << ViewLayer::BreadboardView << ViewLayer::SchematicView << ViewLayer::PCBView;
-	foreach (ViewLayer::ViewID viewID, viewIDs) {
+	viewIDs << ViewLayer::IconView << ViewLayer::BreadboardView
+	        << ViewLayer::SchematicView << ViewLayer::PCBView;
+	for (ViewLayer::ViewID viewID : viewIDs) {
 		QString fn = mp->hasBaseNameFor(viewID);
 		if (!fn.isEmpty()) {
-			QFile svg(dir.absoluteFilePath(fn));
-			FolderUtils::slamCopy(svg, prefix + fn);
+			QFile svg(srcDir.absoluteFilePath(fn));
+			FolderUtils::slamCopy(svg, destDir + "/" + fn);
 		}
 	}
 }
@@ -1328,7 +1397,7 @@ void BinManager::mainLoad() {
 
 	QString fileName = FolderUtils::getOpenFileName(
 	                       this,
-	                       tr("Select a Fritzing File to Open"),
+						   tr("Select a Fritzing file to open"),
 	                       path,
 	                       tr("Fritzing Files (*%1 *%2 *%3);;Fritzing Part (*%1);;Fritzing Bin (*%2);;Fritzing Shareable Bin (*%3)")
 	                       .arg(FritzingBundledPartExtension)
@@ -1356,21 +1425,30 @@ void BinManager::hideTabBar()
 void BinManager::reloadPart(const QString & moduleID) {
 	PartsBinView::removePartReference(moduleID);
 	for(int j = 0; j < m_stackTabWidget->count(); j++) {
-		PartsBinPaletteWidget *bin = qobject_cast<PartsBinPaletteWidget*>(m_stackTabWidget->widget(j));
-		if (bin == NULL) continue;
+		auto *bin = qobject_cast<PartsBinPaletteWidget*>(m_stackTabWidget->widget(j));
+		if (bin == nullptr) continue;
 
 		bin->reloadPart(moduleID);
 	}
 }
 
+void BinManager::moveSearchBinToTop() {
+	if (m_searchBin && m_stackTabWidget) {
+		int searchIndex = m_stackTabWidget->indexOf(m_searchBin);
+		if (searchIndex != -1 && searchIndex != 0) {
+			m_stackTabWidget->stackTabBar()->moveTab(searchIndex, 0);
+		}
+	}
+}
+
 void BinManager::copyToSketch() {
 	PartsBinPaletteWidget * bin = currentBin();
-	if (bin == NULL) return;
+	if (bin == nullptr) return;
 
 	QList<ModelPart *> modelParts = bin->getAllParts();
 	if (modelParts.count() == 0) return;
 
-	if (m_mainWindow) {
+	if (m_mainWindow != nullptr) {
 		m_mainWindow->addToSketch(modelParts);
 	}
 }
@@ -1378,7 +1456,7 @@ void BinManager::copyToSketch() {
 void BinManager::copyAllToSketch() {
 	QList<ModelPart *> modelParts;
 
-	if (m_mainWindow) {
+	if (m_mainWindow != nullptr) {
 		m_mainWindow->addToSketch(modelParts);
 	}
 }

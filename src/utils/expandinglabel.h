@@ -25,8 +25,6 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QScrollBar>
 #include <QAbstractTextDocumentLayout>
 
-#include "../debugdialog.h"
-
 class ExpandingLabel : public QTextEdit {
 	Q_OBJECT
 
@@ -34,10 +32,10 @@ public:
 	ExpandingLabel(QWidget *parent, int minSize=100);
 	void setLabelText(const QString& theText);
 
-public slots:
+public Q_SLOTS:
 	void allTextVisible();
 
-signals:
+Q_SIGNALS:
 	void mousePressSignal(QMouseEvent *event);
 	void mouseReleaseSignal(QMouseEvent *event);
 

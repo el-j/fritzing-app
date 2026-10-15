@@ -25,7 +25,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QSvgRenderer>
 #include <QXmlStreamReader>
 #include <QDomDocument>
-#include <QMatrix>
+#include <QTransform>
 #include <QStringList>
 
 #include "viewlayer.h"
@@ -34,10 +34,10 @@ struct ConnectorInfo {
 	bool gotCircle;
 	double radius;
 	double strokeWidth;
-	QMatrix matrix;
+	QTransform matrix;
 	//QRectF cbounds;
-	QMatrix terminalMatrix;
-	QMatrix legMatrix;
+	QTransform terminalMatrix;
+	QTransform legMatrix;
 	QString legColor;
 	QLineF legLine;
 	double legStrokeWidth;
@@ -53,12 +53,11 @@ struct LoadInfo {
 	QStringList legIDs;
 	QString setColor;
 	QString colorElementID;
-	bool findNonConnectors;
-	bool parsePaths;
+	bool findNonConnectors = false;
+	bool parsePaths = false;;
 
-	LoadInfo() {
-		findNonConnectors = parsePaths = false;
-	}
+	LoadInfo() = default;
+    LoadInfo(const QString& file, bool _findNonConnector = false) : filename(file), findNonConnectors(_findNonConnector) { }
 };
 
 class FSvgRenderer : public QSvgRenderer
@@ -70,14 +69,15 @@ public:
 
 	QByteArray loadSvg(const LoadInfo &);
 	QByteArray loadSvg(const QString & filename);
-	QByteArray loadSvg( const QByteArray & contents, const LoadInfo &);     // for SvgSplitter loads
-	QByteArray loadSvg( const QByteArray & contents, const QString & filename, bool findNonConnectors);						// for SvgSplitter loads
+	QByteArray loadSvg(const QByteArray & contents, const LoadInfo &);     // for SvgSplitter loads
+	QByteArray loadSvg(const QByteArray & contents, const QString & filename, bool findNonConnectors);						// for SvgSplitter loads
 	bool loadSvgString(const QString & svg);
 	bool loadSvgString(const QString & svg, QString & newSvg);
 	bool fastLoad(const QByteArray & contents);
 	QByteArray finalLoad(QByteArray & cleanContents, const QString & filename);
-	const QString & filename();
+	constexpr const QString & filename() const noexcept { return m_filename; }
 	QSizeF defaultSizeF();
+	QList<QPointF> lockAnchorsItem() const;		// faction="lock" positions, converted to item-local coords, ordered by id
 	bool setUpConnector(class SvgIdLayer * svgIdLayer, bool ignoreTerminalPoint, ViewLayer::ViewLayerPlacement);
 	QList<SvgIdLayer *> setUpNonConnectors(ViewLayer::ViewLayerPlacement);
 
@@ -97,10 +97,11 @@ protected:
 	bool initConnectorInfoPath(QDomElement & element, ConnectorInfo * connectorInfo, const QString & filename);
 	void initNonConnectorInfo(QDomDocument & domDocument, const QString & filename);
 	void initNonConnectorInfoAux(QDomElement & element, const QString & filename);
+	bool initLockInfo(QDomDocument & domDocument);		// extract + remove faction="lock" position markers
 	void initTerminalInfoAux(QDomElement & element, const LoadInfo &);
 	void initLegInfoAux(QDomElement & element, const LoadInfo &, bool & gotOne);
 	void initConnectorInfoAux(QDomElement & element, const LoadInfo &);
-	QPointF calcTerminalPoint(const QString & terminalId, const QRectF & connectorRect, bool ignoreTerminalPoint, const QRectF & viewBox, QMatrix & terminalMatrix);
+	QPointF calcTerminalPoint(const QString & terminalId, const QRectF & connectorRect, bool ignoreTerminalPoint, const QRectF & viewBox, QTransform & terminalMatrix);
 	bool initLegInfoAux(QDomElement & element, ConnectorInfo * connectorInfo);
 	void calcLeg(SvgIdLayer *, const QRectF & viewBox, ConnectorInfo * connectorInfo);
 	ConnectorInfo * getConnectorInfo(const QString & connectorID);
@@ -111,11 +112,13 @@ protected:
 	QSizeF m_defaultSizeF;
 	QHash<QString, ConnectorInfo *> m_connectorInfoHash;
 	QHash<QString, ConnectorInfo *> m_nonConnectorInfoHash;
+	QList<QPointF> m_lockAnchorsSvg;		// faction="lock" anchor points in viewBox units, ordered by id
 
 public:
 	static QString NonConnectorName;
 
+private:
+	QPointF autoTerminalPoint(const QRectF &);
 };
-
 
 #endif

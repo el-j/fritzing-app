@@ -21,15 +21,18 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef TEXTUTILS_H
 #define TEXTUTILS_H
 
+#include <optional>
 #include <QPointF>
 #include <QDomElement>
 #include <QSet>
-#include <QMatrix>
 #include <QTransform>
 #include <QXmlStreamReader>
+#include <QFont>
+#include <QFontMetricsF>
 
 typedef QString (*CopyPinFunction)(int pin, const QString & argString, void * userData);
 typedef QString (*MultiplyPinFunction)(int pin, double increment, double value);
+
 
 class TextUtils
 {
@@ -39,15 +42,20 @@ public:
 	static QDomElement findElementWithAttribute(QDomElement element, const QString & attributeName, const QString & attributeValue);
 	static void findElementsWithAttribute(QDomElement & element, const QString & att, QList<QDomElement> & elements);
 	static double convertToInches(const QString & string, bool * ok, bool isIllustrator);
+	static std::optional<double> convertToInches(const QString & string, bool isIllustrator);
 	static double convertToInches(const QString & string);
-	static QString convertToPowerPrefix(double);
+	template <int DecimalPlaces> static double roundDecimal(double value);
+	static double roundDecimal(double value, int decimal);
+	static double roundDecimal(double value, double decimal);
+	static QString convertToPowerPrefix(double, char f='g', int prec=6);
+	static QString convertToPowerPrefixByThousands(double, char f='g', int prec=6);
 	static double convertFromPowerPrefix(const QString & val, const QString & symbol);
 	static double convertFromPowerPrefixU(QString & val, const QString & symbol);
 
 	static QString replaceTextElement(const QString & svg, const QString & id, const QString &  newValue);
 	static QByteArray replaceTextElement(const QByteArray & svg, const QString & id, const QString &  newValue);
 	static QString replaceTextElements(const QString & svg, const QHash<QString, QString> &);
-	static bool squashElement(QDomDocument &, const QString & elementName, const QString & attName, const QRegExp & matchContent);
+	static bool squashElement(QDomDocument &, const QString & elementName, const QString & attName, const QRegularExpression & matchContent);
 	static QString mergeSvg(const QString & svg1, const QString & svg2, const QString & id, bool flip);
 	static QString mergeSvgFinish(QDomDocument & doc);
 	static bool mergeSvg(QDomDocument & doc1, const QString & svg, const QString & id);
@@ -59,8 +67,7 @@ public:
 	static bool cleanSodipodi(QString &bytes);
 	static bool fixPixelDimensionsIn(QString &fileContent);
 	static bool addCopper1(const QString & filename, QDomDocument & doc, const QString & srcAtt, const QString & destAtt);
-	static void setSVGTransform(QDomElement &, QMatrix &);
-	static QString svgMatrix(const QMatrix &);
+	static void setSVGTransform(QDomElement &, QTransform &);
 	static QString svgMatrix(const QTransform &);
 	static QString svgTransform(const QString & svg, QTransform & transform, bool translate, const QString extra);
 	static bool getSvgSizes(QDomDocument & doc, double & sWidth, double & sHeight, double & vbWidth, double & vbHeight);
@@ -68,8 +75,8 @@ public:
 	static QString stripNonValidXMLCharacters(const QString & str);
 	static QString convertExtendedChars(const QString & str);
 	static QString escapeAnd(const QString &);
-	static QMatrix elementToMatrix(QDomElement & element);
-	static QMatrix transformStringToMatrix(const QString & transform);
+	static QTransform elementToTransform(QDomElement & element);
+	static QTransform transformStringToTransform(const QString & transform);
 	static QList<double> getTransformFloats(QDomElement & element);
 	static QList<double> getTransformFloats(const QString & transform);
 	static QString svgNSOnly(QString svgContent);
@@ -97,9 +104,10 @@ public:
 	static QString removeSVGHeader(QString & string);
 	//static QString getMacAddress();
 	static QString expandAndFill(const QString & svg, const QString & color, double expandBy);
-	static void expandAndFillAux(QDomElement &, const QString & color, double expandBy);
+	static void expandAndFillAux(QDomElement &, const QString & color, double expandBy, const QTransform & parentTransform);
 	static bool writeUtf8(const QString & fileName, const QString & text);
 	static int getPinsAndSpacing(const QString & expectedFileName, QString & spacingString);
+	static bool extractViewBox(QString viewBoxString, QRectF & viewBox);
 	static QSizeF parseForWidthAndHeight(QXmlStreamReader &, QRectF & viewBox, bool getViewBox);
 	static QSizeF parseForWidthAndHeight(QXmlStreamReader &);
 	static QSizeF parseForWidthAndHeight(const QString & svg, QRectF & viewBox, bool getViewBox);
@@ -111,43 +119,69 @@ public:
 	static bool fixFonts(QString & svg, const QString & destFont, bool & reallyFixed);
 	static void fixStyleAttribute(QDomElement & element);
 	static QString parseForModuleID(const QString & fzpXmlString);
-	static QString parseFileForModuleID(const QString & fzpPath);
 	static QString getRandText();
 	static bool ensureViewBox(QDomDocument doc, double dpi, QRectF & rect, bool toInches, double & w, double & h, bool getwh);
 	static QString findAnchor(const QDomElement & text);
 	static double getStrokeWidth(QDomElement &, double defaultValue);
+	static QString getStrokeColor(QDomElement &, const QString & defaultColor);
 	static void resplit(QStringList & names, const QString & split);
 	static QString elementToString(const QDomElement &);
+	template<typename T> static std::optional<double> optToDouble(const T & param)
+	{
+		bool ok;
+		double result = param.toDouble(&ok);
+		if (ok) {
+			return result;
+		}
+		return std::nullopt;
+	}
+	static QString setToString(const QSet<QString> & set);
+	static QString setOfSetsToString(const QSet<QSet<QString>> & setOfSets);
+	static QLocale getLocale();
 
 public:
-	static const QRegExp FindWhitespace;
+	static const QRegularExpression FindWhitespace;
 	static const QString SMDFlipSuffix;
 	static const QString MicroSymbol;
-	static const ushort MicroSymbolCode;
+	static constexpr int MicroSymbolCode = 181;
+	static const QString AltMicroSymbol;
+	static constexpr int AltMicroSymbolCode = 956;
 	static const QString PowerPrefixesString;
 	static const QString CreatedWithFritzingString;
 	static const QString CreatedWithFritzingXmlComment;
 	static void collectLeaves(QDomElement & element, int & index, QVector<QDomElement> & leaves);
 	static void collectLeaves(QDomElement & element, QList<QDomElement> & leaves);
-	static const QRegExp floatingPointMatcher;
+	static const QRegularExpression floatingPointMatcher;
+	static const QRegularExpression positiveIntegerMatcher;
 	static const QString RegexFloatDetector;
 	static const QString AdobeIllustratorIdentifier;
+	static constexpr double FontMetricsScaleFactor = 0.77;
+
+	static QMap<QString, QString> parseFileForViewImages(const QString &fzpPath);
 
 protected:
 	static bool pxToInches(QDomElement &elem, const QString &attrName, bool isIllustrator);
-	static void squashNotElement(QDomElement & element, const QString & elementName, const QString & attName, const QRegExp & matchContent, bool & result);
+	static QString convertToPowerPrefix(double, double prefixThreshold, char f, int prec);
+	static void squashNotElement(QDomElement & element, const QString & elementName, const QString & attName, const QRegularExpression & matchContent, bool & result);
 	static void initPowerPrefixes();
-	static QDomElement copyText(QDomDocument & svgDom, QDomElement & parent, QDomElement & text, const QString & defaultX, const QString & defaultY, bool copyAttributes);
+	static QDomElement copyText(QDomDocument & svgDom, QDomElement & parent, QDomElement & text, double defaultX, double defaultY, bool copyAttributes);
+	static QDomElement createTextElement(QDomDocument & svgDom, QDomElement & parent, const QString & text, double x, double y);
 	static void gornTreeAux(QDomElement &);
 	static bool noPatternAux(QDomDocument & svgDom, const QString & tag);
 	static bool noUseAux(QDomDocument & svgDom);
+	static void applyAnchorTransform(const QList<QDomElement> & anchorElements, const QString & textAnchor, double anchorBaseX, double minX, double maxX);
+#ifdef QT_DEBUG
+	static void addDebugAnchorPoint(QDomDocument & svgDom, QDomElement & parent, double x, double y, double fontSize);
+#endif
 	static bool tspanRemoveAux(QDomDocument & svgDom);
 	static void fixStyleAttribute(QDomElement & element, QString & style, const QString & attributeName);
 	static bool fixStrokeWidth(QDomDocument & svgDoc);
 	static bool fixViewBox(QDomElement & root);
 	static void chopNotDigits(QString &);
 	static void collectTransforms(QDomElement & root, QList<QDomElement> & transforms);
-
+	static QFont textMetrics(const QDomElement & element);
+private:
+	static bool removeFontFamilySingleQuotes(QString &fileContent);
 };
 
 #endif

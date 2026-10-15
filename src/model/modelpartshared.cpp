@@ -19,14 +19,16 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 ********************************************************************/
 
 #include "modelpartshared.h"
+#include "palettemodel.h"
 #include "../connectors/connectorshared.h"
 #include "../debugdialog.h"
 #include "../connectors/busshared.h"
+#include "utils/misc.h"
 
 
 #include <QHash>
 #include <QMessageBox>
-#include <math.h>
+#include <QFile>
 
 void copyPinAttributes(QDomElement & from, QDomElement & to)
 {
@@ -73,6 +75,8 @@ void ModelPartSharedRoot::setSearchTerm(const QString & searchTerm) {
 
 ///////////////////////////////////////////////
 
+const QString ModelPartShared::MNPropertyName = "mn";
+const QString ModelPartShared::MPNPropertyName = "mpn";
 const QString ModelPartShared::PartNumberPropertyName = "part number";
 
 ModelPartShared::ModelPartShared() {
@@ -94,23 +98,23 @@ void ModelPartShared::commonInit() {
 	m_moduleID = "";
 	m_dbid = 0;
 	m_ownerCount = 0;
-	m_hasZeroConnector = m_flippedSMD = m_connectorsInitialized = m_ignoreTerminalPoints = m_needsCopper1 = false;
-	m_superpart = NULL;
+	m_flippedSMD = m_connectorsInitialized = m_ignoreTerminalPoints = m_needsCopper1 = false;
+	m_superpart = nullptr;
 }
 
 ModelPartShared::~ModelPartShared() {
-	foreach (ConnectorShared * connectorShared, m_connectorSharedHash.values()) {
+	Q_FOREACH (ConnectorShared * connectorShared, m_connectorSharedHash.values()) {
 		delete connectorShared;
 	}
 	m_connectorSharedHash.clear();
 
-	foreach (ViewImage * viewImage, m_viewImages.values()) {
+	Q_FOREACH (ViewImage * viewImage, m_viewImages.values()) {
 		delete viewImage;
 	}
 	m_viewImages.clear();
 
 
-	foreach (BusShared * busShared, m_buses.values()) {
+	Q_FOREACH (BusShared * busShared, m_buses.values()) {
 		delete busShared;
 	}
 	m_buses.clear();
@@ -135,12 +139,17 @@ bool ModelPartShared::setDomDocument(QDomDocument & domDocument) {
 	loadTagText(root, "author", m_author);
 	loadTagText(root, "description", m_description);
 	loadTagText(root, "url", m_url);
+	m_url = m_url.trimmed();
 	loadTagText(root, "taxonomy", m_taxonomy);
 	loadTagText(root, "date", m_date);
 	QDomElement version = root.firstChildElement("version");
 	if (!version.isNull()) {
 		m_replacedby = version.attribute("replacedby");
 	}
+
+	// Parse history entries for soft migration. (parseHistory may drop them in a dev build if they
+	// use a legacy mode token; we keep parsing the rest of the part regardless.)
+	parseHistory(root);
 
 	QDomElement spice = root.firstChildElement("spice");
 	QDomElement line = spice.firstChildElement("line");
@@ -171,7 +180,7 @@ bool ModelPartShared::setDomDocument(QDomDocument & domDocument) {
 		QDomElement view = views.firstChildElement();
 		while (!view.isNull()) {
 			ViewLayer::ViewID viewID = ViewLayer::idFromXmlName(view.nodeName());
-			ViewImage * viewImage = new ViewImage(viewID);
+			auto * viewImage = new ViewImage(viewID);
 			m_viewImages.insert(viewID, viewImage);
 			viewImage->canFlipHorizontal = view.attribute("fliphorizontal","").compare("true") == 0;
 			viewImage->canFlipVertical = view.attribute("flipvertical","").compare("true") == 0;
@@ -221,7 +230,7 @@ void ModelPartShared::populateProperties(QDomElement parent, QHash<QString,QStri
 		QString value = prop.text();
 		hash.insert(name.toLower().trimmed(),value);
 		if (prop.attribute("showInLabel", "").compare("yes", Qt::CaseInsensitive) == 0) {
-			displayKeys.append(name);
+			displayKeys.append(name.toLower().trimmed());
 		}
 		prop = prop.nextSiblingElement("property");
 	}
@@ -374,8 +383,8 @@ const QList< QPointer<ConnectorShared> > ModelPartShared::connectorsShared() {
 }
 
 void ModelPartShared::setConnectorsShared(QList< QPointer<ConnectorShared> > connectors) {
-	for (int i = 0; i < connectors.size(); i++) {
-		ConnectorShared* cs = connectors[i];
+	for (auto & connector : connectors) {
+		ConnectorShared* cs = connector;
 		m_connectorSharedHash[cs->id()] = cs;
 	}
 }
@@ -388,14 +397,27 @@ void ModelPartShared::initConnectors() {
 	if (m_connectorsInitialized)
 		return;
 
-	QFile file(m_path);
-	QString errorStr;
-	int errorLine;
-	int errorColumn;
+	bool isSubpart = !m_subpartID.isEmpty() && m_superpart;
+
+	QString pathToUse = isSubpart ? m_superpart->path() : m_path;
+	QFile file(pathToUse);
+	if (!file.open(QIODevice::ReadOnly)) {
+		DebugDialog::debug(QString("Unable to open :%1").arg(pathToUse));
+	}
 	QDomDocument doc;
-	doc.setContent(&file, &errorStr, &errorLine, &errorColumn);
+	QDomDocument::ParseResult parseResult = doc.setContent(&file);
 
 	m_connectorsInitialized = true;
+
+	if (isSubpart) {
+		// Replace the superpart document with the subpart document
+		doc = PaletteModel::makeSubpartDoc(m_subpartID, doc);
+		if (doc.isNull()) {
+			DebugDialog::debug(QString("Failed to create subpart document for subpart ID %1").arg(m_subpartID));
+			return;
+		}
+	}
+
 	QDomElement root = doc.documentElement();
 	if (root.isNull()) {
 		return;
@@ -410,18 +432,17 @@ void ModelPartShared::initConnectors() {
 	//DebugDialog::debug(QString("part:%1 %2").arg(m_moduleID).arg(m_title));
 	QDomElement connector = connectors.firstChildElement("connector");
 	while (!connector.isNull()) {
-		ConnectorShared * connectorShared = new ConnectorShared(connector);
+		auto * connectorShared = new ConnectorShared(connector);
 		m_connectorSharedHash.insert(connectorShared->id(), connectorShared);
 
 		connector = connector.nextSiblingElement("connector");
 	}
-	lookForZeroConnector();
 
 	QDomElement buses = root.firstChildElement("buses");
-	if (!buses.isNull()) {
+	if (!buses.isNull() && !isSubpart) {
 		QDomElement busElement = buses.firstChildElement("bus");
 		while (!busElement.isNull()) {
-			BusShared * busShared = new BusShared(busElement, m_connectorSharedHash);
+			auto * busShared = new BusShared(busElement, m_connectorSharedHash);
 			m_buses.insert(busShared->id(), busShared);
 
 			busElement = busElement.nextSiblingElement("bus");
@@ -460,9 +481,9 @@ void ModelPartShared::copy(ModelPartShared* other) {
 	setVersion(other->version());
 	setSuperpart(other->superpart());
 
-	foreach (ViewLayer::ViewID viewID, other->m_viewImages.keys()) {
+	Q_FOREACH (ViewLayer::ViewID viewID, other->m_viewImages.keys()) {
 		ViewImage * otherViewImage = other->m_viewImages.value(viewID);
-		ViewImage * viewImage = new ViewImage(viewID);
+		auto * viewImage = new ViewImage(viewID);
 		viewImage->layers = otherViewImage->layers;
 		viewImage->sticky = otherViewImage->sticky;
 		viewImage->canFlipHorizontal = otherViewImage->canFlipHorizontal;
@@ -487,6 +508,60 @@ void ModelPartShared::setReplacedby(const QString & replacedby) {
 	m_replacedby = replacedby;
 }
 
+const QList<HistoryEntry> & ModelPartShared::history() const {
+	return m_history;
+}
+
+bool ModelPartShared::hasHistory() const {
+	return !m_history.isEmpty();
+}
+
+bool ModelPartShared::loadHistoryFromFile() {
+	// If history is already loaded, nothing to do
+	if (!m_history.isEmpty()) {
+		return true;
+	}
+
+	// Try to load history from the FZP file
+	if (m_path.isEmpty()) {
+		return false;
+	}
+
+	QFile file(m_path);
+	if (!file.open(QIODevice::ReadOnly)) {
+		return false;
+	}
+
+	QDomDocument doc;
+	if (!doc.setContent(&file)) {
+		file.close();
+		return false;
+	}
+	file.close();
+
+	QDomElement root = doc.documentElement();
+	if (root.isNull()) {
+		return false;
+	}
+
+	parseHistory(root);
+
+	return !m_history.isEmpty();
+}
+
+void ModelPartShared::parseHistory(const QDomElement & root) {
+	QDomElement historyElement = root.firstChildElement("history");
+	while (!historyElement.isNull()) {
+		HistoryEntry entry;
+		entry.date = historyElement.attribute("date");
+		entry.author = historyElement.attribute("author");
+		entry.mode = historyElement.attribute("mode", "optional");   // default when mode= omitted
+		entry.description = historyElement.text().trimmed();
+		m_history.append(entry);
+		historyElement = historyElement.nextSiblingElement("history");
+	}
+}
+
 void ModelPartShared::setFlippedSMD(bool f) {
 	m_flippedSMD = f;
 }
@@ -500,9 +575,9 @@ bool ModelPartShared::needsCopper1() {
 }
 
 void ModelPartShared::connectorIDs(ViewLayer::ViewID viewID, ViewLayer::ViewLayerID viewLayerID, QStringList & connectorIDs, QStringList & terminalIDs, QStringList & legIDs) {
-	foreach (ConnectorShared * connectorShared, m_connectorSharedHash.values()) {
+	Q_FOREACH (ConnectorShared * connectorShared, m_connectorSharedHash.values()) {
 		SvgIdLayer * svgIdLayer = connectorShared->fullPinInfo(viewID, viewLayerID);
-		if (svgIdLayer == NULL) {
+		if (svgIdLayer == nullptr) {
 			continue;
 		}
 		else {
@@ -589,16 +664,16 @@ void ModelPartShared::flipSMDAnd() {
 	copyPins(ViewLayer::Copper1, ViewLayer::Copper0);
 }
 
-bool ModelPartShared::hasViewFor(ViewLayer::ViewID viewID) {
+bool ModelPartShared::hasViewFor(ViewLayer::ViewID viewID) const {
 	ViewImage * viewImage = m_viewImages.value(viewID, NULL);
-	if (viewImage == NULL) return false;
+	if (viewImage == nullptr) return false;
 
 	return viewImage->layers != 0;
 }
 
-bool ModelPartShared::hasViewFor(ViewLayer::ViewID viewID, ViewLayer::ViewLayerID viewLayerID) {
+bool ModelPartShared::hasViewFor(ViewLayer::ViewID viewID, ViewLayer::ViewLayerID viewLayerID) const {
 	ViewImage * viewImage = m_viewImages.value(viewID, NULL);
-	if (viewImage == NULL) return false;
+	if (viewImage == nullptr) return false;
 
 	qulonglong one = 1;
 	return (viewImage->layers & (one << viewLayerID)) != 0;
@@ -606,7 +681,7 @@ bool ModelPartShared::hasViewFor(ViewLayer::ViewID viewID, ViewLayer::ViewLayerI
 
 QString ModelPartShared::hasBaseNameFor(ViewLayer::ViewID viewID) {
 	ViewImage * viewImage = m_viewImages.value(viewID, NULL);
-	if (viewImage == NULL) return "";
+	if (viewImage == nullptr) return "";
 
 	return viewImage->image;
 }
@@ -616,9 +691,11 @@ const QStringList & ModelPartShared::displayKeys() {
 }
 
 void ModelPartShared::ensurePartNumberProperty() {
-	if (!m_properties.keys().contains(PartNumberPropertyName)) {
-		m_properties.insert(PartNumberPropertyName, "");
-		m_displayKeys.append(PartNumberPropertyName);
+	for (auto&& propertyName : {MNPropertyName, MPNPropertyName, PartNumberPropertyName}) {
+		if (!m_properties.keys().contains(propertyName)) {
+			m_properties.insert(propertyName, "");
+			m_displayKeys.append(propertyName);
+		}
 	}
 }
 
@@ -652,7 +729,7 @@ const QList<ViewImage *> ModelPartShared::viewImages() {
 
 QString ModelPartShared::imageFileName(ViewLayer::ViewID viewID, ViewLayer::ViewLayerID viewLayerID) {
 	ViewImage * viewImage = m_viewImages.value(viewID);
-	if (viewImage == NULL) return "";
+	if (viewImage == nullptr) return "";
 
 	qulonglong one = 1;
 	if ((viewImage->layers & (one << viewLayerID)) == 0) return "";
@@ -664,28 +741,28 @@ QString ModelPartShared::imageFileName(ViewLayer::ViewID viewID, ViewLayer::View
 
 QString ModelPartShared::imageFileName(ViewLayer::ViewID viewID) {
 	ViewImage * viewImage = m_viewImages.value(viewID);
-	if (viewImage == NULL) return "";
+	if (viewImage == nullptr) return "";
 
 	return viewImage->image;
 }
 
 void ModelPartShared::setImageFileName(ViewLayer::ViewID viewID, const QString & filename) {
 	ViewImage * viewImage = m_viewImages.value(viewID);
-	if (viewImage == NULL) return;
+	if (viewImage == nullptr) return;
 
 	viewImage->image = filename;
 }
 
 bool ModelPartShared::hasViewID(ViewLayer::ViewID viewID) {
 	ViewImage * viewImage = m_viewImages.value(viewID);
-	if (viewImage == NULL) return false;
+	if (viewImage == nullptr) return false;
 
 	return viewImage->layers != 0;
 }
 
 bool ModelPartShared::hasMultipleLayers(ViewLayer::ViewID viewID) {
 	ViewImage * viewImage = m_viewImages.value(viewID);
-	if (viewImage == NULL) return false;
+	if (viewImage == nullptr) return false;
 
 	// http://eli.thegreenplace.net/2004/07/30/a-cool-algorithm-for-counting-ones-in-a-bitstring/
 
@@ -701,21 +778,21 @@ qulonglong flipped(ViewImage * viewImage) {
 	return viewImage->flipped;
 }
 
-LayerList ModelPartShared::viewLayersFlipped(ViewLayer::ViewID viewID) {
+LayerList ModelPartShared::viewLayersFlipped(ViewLayer::ViewID viewID) const {
 	return viewLayersAux(viewID, flipped);
 }
 
-LayerList ModelPartShared::viewLayers(ViewLayer::ViewID viewID) {
+LayerList ModelPartShared::viewLayers(ViewLayer::ViewID viewID) const {
 	return viewLayersAux(viewID, layers);
 }
 
-LayerList ModelPartShared::viewLayersAux(ViewLayer::ViewID viewID, qulonglong (*accessor)(ViewImage *)) {
+LayerList ModelPartShared::viewLayersAux(ViewLayer::ViewID viewID, qulonglong (*accessor)(ViewImage *)) const {
 
 	static QHash<qulonglong, ViewLayer::ViewLayerID> ToLayerIDs;
 
 	LayerList layerList;
 	ViewImage * viewImage = m_viewImages.value(viewID);
-	if (viewImage == NULL) return layerList;
+	if (viewImage == nullptr) return layerList;
 
 	// http://eli.thegreenplace.net/2004/07/30/a-cool-algorithm-for-counting-ones-in-a-bitstring/
 
@@ -741,21 +818,21 @@ LayerList ModelPartShared::viewLayersAux(ViewLayer::ViewID viewID, qulonglong (*
 
 bool ModelPartShared::canFlipHorizontal(ViewLayer::ViewID viewID) {
 	ViewImage * viewImage = m_viewImages.value(viewID);
-	if (viewImage == NULL) return false;
+	if (viewImage == nullptr) return false;
 
 	return viewImage->canFlipHorizontal;
 }
 
 bool ModelPartShared::canFlipVertical(ViewLayer::ViewID viewID) {
 	ViewImage * viewImage = m_viewImages.value(viewID);
-	if (viewImage == NULL) return false;
+	if (viewImage == nullptr) return false;
 
 	return viewImage->canFlipVertical;
 }
 
 bool ModelPartShared::anySticky(ViewLayer::ViewID viewID) {
 	ViewImage * viewImage = m_viewImages.value(viewID);
-	if (viewImage == NULL) return false;
+	if (viewImage == nullptr) return false;
 
 	return (viewImage->sticky != 0);
 }
@@ -766,7 +843,7 @@ void ModelPartShared::addConnector(ConnectorShared * connectorShared)
 }
 
 void ModelPartShared::copyPins(ViewLayer::ViewLayerID from, ViewLayer::ViewLayerID to) {
-	foreach (ConnectorShared * connectorShared, m_connectorSharedHash.values()) {
+	Q_FOREACH (ConnectorShared * connectorShared, m_connectorSharedHash.values()) {
 		SvgIdLayer * svgIdLayer = connectorShared->fullPinInfo(ViewLayer::PCBView, to);
 		if (svgIdLayer) {
 			// already there
@@ -774,7 +851,7 @@ void ModelPartShared::copyPins(ViewLayer::ViewLayerID from, ViewLayer::ViewLayer
 		}
 
 		svgIdLayer = connectorShared->fullPinInfo(ViewLayer::PCBView, from);
-		if (svgIdLayer == NULL) {
+		if (svgIdLayer == nullptr) {
 			DebugDialog::debug(QString("missing connector in %1").arg(moduleID()));
 			continue;
 		}
@@ -787,22 +864,6 @@ void ModelPartShared::copyPins(ViewLayer::ViewLayerID from, ViewLayer::ViewLayer
 
 void ModelPartShared::insertBus(BusShared * busShared) {
 	m_buses.insert(busShared->id(), busShared);
-}
-
-void ModelPartShared::lookForZeroConnector() {
-	foreach (QString key, m_connectorSharedHash.keys()) {
-		int ix = IntegerFinder.indexIn(key);
-		if (ix >= 0) {
-			if (IntegerFinder.cap(0) == "0") {
-				m_hasZeroConnector = true;
-				return;
-			}
-		}
-	}
-}
-
-bool ModelPartShared::hasZeroConnector() {
-	return m_hasZeroConnector;
 }
 
 void ModelPartShared::addOwner(QObject * owner) {
@@ -839,7 +900,7 @@ const QList< QPointer<ModelPartShared> > & ModelPartShared::subparts() {
 }
 
 void ModelPartShared::addSubpart(ModelPartShared * subpart) {
-	if (subpart == NULL) return;
+	if (subpart == nullptr) return;
 
 	m_subparts.append(subpart);
 	subpart->setSuperpart(this);

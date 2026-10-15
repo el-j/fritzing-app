@@ -14,6 +14,9 @@
 # ********************************************************************/
 
 HEADERS += \
+	$$PWD/../src/utils/duplicatetracker.h \
+	$$PWD/../src/utils/fpsmonitor.h \
+	$$PWD/../src/utils/ftooltip.h \
 src/utils/abstractstatesbutton.h \
 src/utils/autoclosemessagebox.h \
 src/utils/bendpointaction.h \
@@ -22,7 +25,7 @@ src/utils/bezierdisplay.h \
 src/utils/boundedregexpvalidator.h \
 src/utils/bundler.h \
 src/utils/clickablelabel.h \
-src/utils/cursormaster.h \
+src/utils/svgcursorbuilder.h \
 src/utils/expandinglabel.h \
 src/utils/familypropertycombobox.h \
 src/utils/fileprogressdialog.h \
@@ -34,21 +37,27 @@ src/utils/lockmanager.h \
 src/utils/misc.h \
 src/utils/resizehandle.h \
 src/utils/folderutils.h \
+src/utils/sanitizeforpath.h \
 src/utils/graphicsutils.h \
 src/utils/graphutils.h \
 src/utils/ratsnestcolors.h \
 src/utils/schematicrectconstants.h \
 src/utils/s2s.h \
 src/utils/textutils.h \
-src/utils/zoomslider.h
+src/utils/textmetrics.h \
+src/utils/zoomslider.h \
+src/utils/FMessageLogProbe.h \
+src/utils/uploadpair.h
 
 SOURCES += \
+	$$PWD/../src/utils/fpsmonitor.cpp \
+	$$PWD/../src/utils/ftooltip.cpp \
 src/utils/autoclosemessagebox.cpp \
 src/utils/bendpointaction.cpp \
 src/utils/bezier.cpp \
 src/utils/bezierdisplay.cpp \
 src/utils/clickablelabel.cpp \
-src/utils/cursormaster.cpp \
+src/utils/svgcursorbuilder.cpp \
 src/utils/expandinglabel.cpp \
 src/utils/fileprogressdialog.cpp \
 src/utils/flineedit.cpp \
@@ -59,10 +68,14 @@ src/utils/lockmanager.cpp \
 src/utils/misc.cpp \
 src/utils/resizehandle.cpp \
 src/utils/folderutils.cpp \
+src/utils/sanitizeforpath.cpp \
 src/utils/graphicsutils.cpp \
 src/utils/graphutils.cpp \
 src/utils/ratsnestcolors.cpp \
 src/utils/schematicrectconstants.cpp \
 src/utils/s2s.cpp \
 src/utils/textutils.cpp \
-src/utils/zoomslider.cpp
+src/utils/textmetrics.cpp \
+src/utils/zoomslider.cpp \
+src/utils/FMessageLogProbe.cpp \
+src/utils/uploadpair.cpp

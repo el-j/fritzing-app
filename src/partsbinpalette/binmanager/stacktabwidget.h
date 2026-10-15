@@ -1,7 +1,7 @@
 /*******************************************************************
 
 Part of the Fritzing project - http://fritzing.org
-Copyright (c) 2007-2019 Fritzing
+Copyright (c) 2007-2019,2025 Fritzing
 
 Fritzing is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -34,11 +34,11 @@ public:
 	StackTabWidget(QWidget *parent);
 	class StackTabBar *stackTabBar();
 
-public slots:
+public Q_SLOTS:
 	void informCurrentChanged(int index);
 	void informTabCloseRequested(int index);
 
-signals:
+Q_SIGNALS:
 	void currentChanged(StackTabWidget *, int index);
 	void tabCloseRequested(StackTabWidget *, int index);
 

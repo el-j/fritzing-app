@@ -22,15 +22,11 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "../utils/graphicsutils.h"
 #include "../utils/familypropertycombobox.h"
 #include "../utils/schematicrectconstants.h"
-#include "../fsvgrenderer.h"
 #include "../sketch/infographicsview.h"
-#include "../commands.h"
 #include "../utils/textutils.h"
-#include "../layerattributes.h"
 #include "partlabel.h"
 #include "pinheader.h"
 #include "partfactory.h"
-#include "../connectors/connectoritem.h"
 #include "../svg/svgfilesplitter.h"
 
 #include <QDomNodeList>
@@ -39,13 +35,13 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QLineEdit>
 
 static QStringList Spacings;
-static QRegExp Digits("(\\d)+");
-static QRegExp DigitsMil("(\\d)+mil");
+static QRegularExpression Digits("(\\d)+");
+static QRegularExpression DigitsMil("(\\d)+mil");
 
-static const int MinSipPins = 1;
-static const int MaxSipPins = 128;
-static const int MinDipPins = 4;
-static const int MaxDipPins = 128;
+static constexpr int MinSipPins = 1;
+static constexpr int MaxSipPins = 128;
+static constexpr int MinDipPins = 4;
+static constexpr int MaxDipPins = 128;
 
 static HoleClassThing TheHoleThing;
 
@@ -81,6 +77,9 @@ void MysteryPart::setChipLabel(QString chipLabel, bool force) {
 
 	if (!force && m_chipLabel.compare(chipLabel) == 0) return;
 
+	chipLabel.replace("&nbsp;", QChar(0x00A0));
+	chipLabel.replace("&nnbsp;", QChar(0x202F));
+
 	m_chipLabel = chipLabel;
 
 	QString svg;
@@ -97,7 +96,13 @@ void MysteryPart::setChipLabel(QString chipLabel, bool force) {
 		svg = makeSvg(chipLabel, false);
 		svg = retrieveSchematicSvg(svg);
 		resetLayerKin(svg);
+		// changing the chip label might change the size, so we also update the connectors.
+		resetConnectors();
+
 		retransform(transform);
+
+		QList<ConnectorItem *> already;
+		updateConnections(true, already);
 	}
 	break;
 	default:
@@ -106,7 +111,7 @@ void MysteryPart::setChipLabel(QString chipLabel, bool force) {
 
 	modelPart()->setLocalProp("chip label", chipLabel);
 
-	if (m_partLabel) m_partLabel->displayTextsIf();
+	if (m_partLabel != nullptr) m_partLabel->displayTextsIf();
 }
 
 QString MysteryPart::retrieveSvg(ViewLayer::ViewLayerID viewLayerID, QHash<QString, QString> & svgHash, bool blackOnly, double dpi, double & factor)
@@ -118,9 +123,19 @@ QString MysteryPart::retrieveSvg(ViewLayer::ViewLayerID viewLayerID, QHash<QStri
 		return TextUtils::replaceTextElement(svg, "label", m_chipLabel);
 
 	case ViewLayer::Schematic:
+	{
 		svg = retrieveSchematicSvg(svg);
+		SvgFileSplitter splitter;
+		bool result = splitter.splitString(svg, "schematic");
+		if (result) {
+			double factor;
+			result = splitter.normalize(dpi, "schematic", blackOnly, factor);
+			if (result) {
+				svg = splitter.elementString("schematic");
+			}
+		}
 		return TextUtils::removeSVGHeader(svg);
-
+	}
 	default:
 		break;
 	}
@@ -128,16 +143,13 @@ QString MysteryPart::retrieveSvg(ViewLayer::ViewLayerID viewLayerID, QHash<QStri
 	return svg;
 }
 
-QString MysteryPart::retrieveSchematicSvg(QString & svg) {
-
+QString MysteryPart::retrieveSchematicSvg(const QString & svg) {
 	bool hasLocal = false;
 	QStringList labels = getPinLabels(hasLocal);
 
-	if (hasLocal) {
-		svg = makeSchematicSvg(labels, false);
-	}
+	QString newSvg = makeSchematicSvg(labels, false);
 
-	return TextUtils::replaceTextElement(svg, "label", m_chipLabel);
+	return TextUtils::replaceTextElement(newSvg, "label", m_chipLabel);
 }
 
 
@@ -170,7 +182,7 @@ QStringList MysteryPart::collectValues(const QString & family, const QString & p
 		QString spacing;
 		TextUtils::getPinsAndSpacing(moduleID(), spacing);
 		if (isDIP()) {
-			foreach (QString f, spacings()) {
+			Q_FOREACH (QString f, spacings()) {
 				values.append(f);
 			}
 		}
@@ -210,7 +222,7 @@ bool MysteryPart::collectExtraInfo(QWidget * parent, const QString & family, con
 		returnProp = tr("label");
 		returnValue = m_chipLabel;
 
-		QLineEdit * e1 = new QLineEdit(parent);
+		auto * e1 = new QLineEdit(parent);
 		e1->setEnabled(swappingEnabled);
 		e1->setText(m_chipLabel);
 		connect(e1, SIGNAL(editingFinished()), this, SLOT(chipLabelEntry()));
@@ -243,7 +255,7 @@ QString MysteryPart::chipLabel() {
 
 void MysteryPart::addedToScene(bool temporary)
 {
-	if (this->scene()) {
+	if (this->scene() != nullptr) {
 		setChipLabel(m_chipLabel, true);
 	}
 
@@ -267,13 +279,13 @@ bool MysteryPart::hasCustomSVG() {
 }
 
 void MysteryPart::chipLabelEntry() {
-	QLineEdit * edit = qobject_cast<QLineEdit *>(sender());
-	if (edit == NULL) return;
+	auto * edit = qobject_cast<QLineEdit *>(sender());
+	if (edit == nullptr) return;
 
 	if (edit->text().compare(this->chipLabel()) == 0) return;
 
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView != NULL) {
+	if (infoGraphicsView != nullptr) {
 		infoGraphicsView->setProp(this, "chip label", tr("chip label"), this->chipLabel(), edit->text(), true);
 	}
 }
@@ -432,7 +444,7 @@ QString MysteryPart::obsoleteMakeSchematicSvg(const QStringList & labels, bool s
 	QFont font("Droid Sans", labelFontSize * 72 / GraphicsUtils::StandardFritzingDPI, QFont::Normal);
 	QFontMetricsF fm(font);
 	for (int i = 0; i < labels.count(); i++) {
-		double w = fm.width(labels.at(i));
+		double w = fm.horizontalAdvance(labels.at(i));
 		if (w > textMax) textMax = w;
 	}
 	textMax = textMax * GraphicsUtils::StandardFritzingDPI / 72;
@@ -536,7 +548,7 @@ QString MysteryPart::makeBreadboardDipSvg(const QString & expectedFileName)
 	               "</svg>\n");
 
 
-	header = TextUtils::incrementTemplateString(header, 1, spacing - increment, TextUtils::incMultiplyPinFunction, TextUtils::noCopyPinFunction, NULL);
+	header = TextUtils::incrementTemplateString(header, 1, spacing - increment, TextUtils::incMultiplyPinFunction, TextUtils::noCopyPinFunction, nullptr);
 	header = header.arg(TextUtils::getViewBoxCoord(header, 3) / 100.0);
 	if (spacing == 10) {
 		header.replace("{{6.0}}", "8.0");
@@ -552,9 +564,9 @@ QString MysteryPart::makeBreadboardDipSvg(const QString & expectedFileName)
 	header.replace("{", "[");
 	header.replace("}", "]");
 
-	QString svg = TextUtils::incrementTemplateString(header, 1, increment * ((pins - 4) / 2), TextUtils::incMultiplyPinFunction, TextUtils::noCopyPinFunction, NULL);
+	QString svg = TextUtils::incrementTemplateString(header, 1, increment * ((pins - 4) / 2), TextUtils::incMultiplyPinFunction, TextUtils::noCopyPinFunction, nullptr);
 
-	repeatB = TextUtils::incrementTemplateString(repeatB, 1, spacing - increment, TextUtils::incMultiplyPinFunction, TextUtils::noCopyPinFunction, NULL);
+	repeatB = TextUtils::incrementTemplateString(repeatB, 1, spacing - increment, TextUtils::incMultiplyPinFunction, TextUtils::noCopyPinFunction, nullptr);
 	repeatB.replace("{", "[");
 	repeatB.replace("}", "]");
 
@@ -562,7 +574,7 @@ QString MysteryPart::makeBreadboardDipSvg(const QString & expectedFileName)
 	userData[0] = pins;
 	userData[1] = 1;
 	QString repeatTs = TextUtils::incrementTemplateString(repeatT, pins / 2, increment, TextUtils::standardMultiplyPinFunction, TextUtils::negIncCopyPinFunction, userData);
-	QString repeatBs = TextUtils::incrementTemplateString(repeatB, pins / 2, increment, TextUtils::standardMultiplyPinFunction, TextUtils::standardCopyPinFunction, NULL);
+	QString repeatBs = TextUtils::incrementTemplateString(repeatB, pins / 2, increment, TextUtils::standardMultiplyPinFunction, TextUtils::standardCopyPinFunction, nullptr);
 
 	return svg.arg(TextUtils::getViewBoxCoord(svg, 2) / 100).arg(repeatTs).arg(repeatBs);
 }
@@ -588,32 +600,30 @@ QString MysteryPart::makeBreadboardSipSvg(const QString & expectedFileName)
 	               "</g>\n"
 	               "</svg>\n");
 
-	QString svg = TextUtils::incrementTemplateString(header, 1, increment * (pins - 1), TextUtils::incMultiplyPinFunction, TextUtils::noCopyPinFunction, NULL);
+	QString svg = TextUtils::incrementTemplateString(header, 1, increment * (pins - 1), TextUtils::incMultiplyPinFunction, TextUtils::noCopyPinFunction, nullptr);
 
 	QString repeat("<rect id='connector%1terminal' stroke='none' stroke-width='0' x='[1.87]' y='25.586' fill='#8C8C8C' width='2.3' height='2.0'/>\n"
 	               "<rect id='connector%1pin' stroke='none' stroke-width='0' x='[1.87]' y='23.336' fill='#8C8C8C' width='2.3' height='4.25'/>\n");
 
-	QString repeats = TextUtils::incrementTemplateString(repeat, pins, increment, TextUtils::standardMultiplyPinFunction, TextUtils::standardCopyPinFunction, NULL);
+	QString repeats = TextUtils::incrementTemplateString(repeat, pins, increment, TextUtils::standardMultiplyPinFunction, TextUtils::standardCopyPinFunction, nullptr);
 
 	return svg.arg(TextUtils::getViewBoxCoord(svg, 2) / 100).arg(repeats);
 }
 
-bool MysteryPart::changePinLabels(bool singleRow, bool sip) {
-	Q_UNUSED(singleRow);
-
+bool MysteryPart::changePinLabels(bool sip) {
 	if (m_viewID != ViewLayer::SchematicView) return true;
 
 	bool hasLocal = false;
 	QStringList labels = getPinLabels(hasLocal);
 	if (labels.count() == 0) return true;
 
-	QTransform  transform = untransform();
+	QTransform transform = untransform();
 
 	QString svg = MysteryPart::makeSchematicSvg(labels, sip);
 
 	QString chipLabel = modelPart()->localProp("chip label").toString();
 	if (!chipLabel.isEmpty()) {
-		svg =TextUtils::replaceTextElement(svg, "label", chipLabel);
+		svg = TextUtils::replaceTextElement(svg, "label", chipLabel);
 	}
 
 	resetLayerKin(svg);
@@ -625,8 +635,8 @@ bool MysteryPart::changePinLabels(bool singleRow, bool sip) {
 
 void MysteryPart::swapEntry(const QString & text) {
 
-	FamilyPropertyComboBox * comboBox = qobject_cast<FamilyPropertyComboBox *>(sender());
-	if (comboBox == NULL) return;
+	auto * comboBox = qobject_cast<FamilyPropertyComboBox *>(sender());
+	if (comboBox == nullptr) return;
 
 	QString layout = m_propsMap.value("layout");
 
@@ -659,11 +669,11 @@ QString MysteryPart::makePcbDipSvg(const QString & expectedFileName)
 	               "<svg baseProfile='tiny' version='1.2' width='%1in' height='%2in' viewBox='0 0 %3 %4' xmlns='http://www.w3.org/2000/svg'>\n"
 	               "<desc>Fritzing footprint SVG</desc>\n"
 	               "<g id='silkscreen'>\n"
-	               "<line stroke='white' stroke-width='10' x1='10' x2='10' y1='10' y2='%5'/>\n"
-	               "<line stroke='white' stroke-width='10' x1='10' x2='%6' y1='%5' y2='%5'/>\n"
-	               "<line stroke='white' stroke-width='10' x1='%6' x2='%6' y1='%5' y2='10'/>\n"
-	               "<line stroke='white' stroke-width='10' x1='10' x2='%7' y1='10' y2='10'/>\n"
-	               "<line stroke='white' stroke-width='10' x1='%8' x2='%6' y1='10' y2='10'/>\n"
+		       "<line stroke='black' stroke-width='10' x1='10' x2='10' y1='10' y2='%5'/>\n"
+		       "<line stroke='black' stroke-width='10' x1='10' x2='%6' y1='%5' y2='%5'/>\n"
+		       "<line stroke='black' stroke-width='10' x1='%6' x2='%6' y1='%5' y2='10'/>\n"
+		       "<line stroke='black' stroke-width='10' x1='10' x2='%7' y1='10' y2='10'/>\n"
+		       "<line stroke='black' stroke-width='10' x1='%8' x2='%6' y1='10' y2='10'/>\n"
 	               "</g>\n"
 	               "<g id='copper1'><g id='copper0'>\n"
 	               "<rect id='square' fill='none' height='55' stroke='rgb(255, 191, 0)' stroke-width='20' width='55' x='32.5' y='32.5'/>\n");

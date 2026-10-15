@@ -18,11 +18,19 @@
 #
 # ********************************************************************
 
-lessThan(QT_MAJOR_VERSION, 5) {
-    error(Fritzing does not build with Qt 4 or earlier)
-}
+QT_LEAST=6.5.3
+QT_MOST=6.10.10
+!versionAtLeast(QT_VERSION, $${QT_LEAST}):error("Use at least Qt version $${QT_LEAST}")
+!versionAtMost(QT_VERSION, $${QT_MOST}):error("Use at most Qt version $${QT_MOST}")
 
 CONFIG += debug_and_release
+CONFIG += c++20
+
+unix {
+    QMAKE_CXXFLAGS += -fno-omit-frame-pointer
+    QMAKE_CXXFLAGS_RELEASE -= -O2
+    QMAKE_CXXFLAGS_RELEASE += -O3
+}
 
 unix:!macx {
     CONFIG += link_pkgconfig
@@ -77,27 +85,25 @@ macx {
     Debug:UI_DIR = $${DEBDIR}
 
     #QMAKE_MAC_SDK = macosx10.11            # uncomment/adapt for your version of OSX
-    CONFIG += x86_64 # x86 ppc
+    # CONFIG += x86_64 # x86 ppc
     QMAKE_INFO_PLIST = FritzingInfo.plist
     #DEFINES += QT_NO_DEBUG                # uncomment this for xcode
     LIBS += -lz
-    LIBS += /usr/lib/libz.dylib
-    LIBS += /System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation
-    LIBS += /System/Library/Frameworks/Carbon.framework/Carbon
-    LIBS += /System/Library/Frameworks/IOKit.framework/Versions/A/IOKit
+    LIBS += -framework CoreFoundation
+    LIBS += -framework Carbon
+    LIBS += -framework IOKit
     LIBS += -liconv
+    QMAKE_APPLE_DEVICE_ARCHS = x86_64 arm64
 }
 unix {
     !macx { # unix is defined on mac
         HARDWARE_PLATFORM = $$system(uname -m)
-        contains(HARDWARE_PLATFORM, x86_64) {
+        contains(HARDWARE_PLATFORM, x86_64)|contains(HARDWARE_PLATFORM, aarch64) {
             DEFINES += LINUX_64
         } else {
             DEFINES += LINUX_32
         }
-        !contains(DEFINES, QUAZIP_INSTALLED) {
-            LIBS += -lz
-        }
+        LIBS += -lz
     }
 
     isEmpty(PREFIX) {
@@ -160,17 +166,17 @@ macx {
     QMAKE_BUNDLE_DATA += FILE_ICONS
 }
 
-QT += concurrent core gui network printsupport serialport sql svg widgets xml
+QT += concurrent core gui network printsupport serialport sql svg widgets xml svgwidgets openglwidgets
 
 RC_FILE = fritzing.rc
 RESOURCES += phoenixresources.qrc
 
-# Disable this if you have (and want) libgit2 dynamically
-LIBGIT_STATIC = true
+include(pri/openssl3.pri)
 include(pri/libgit2detect.pri)
-
 include(pri/boostdetect.pri)
-
+include(pri/spicedetect.pri)
+include(pri/quazipdetect.pri)
+include(pri/svgppdetect.pri)
 include(pri/kitchensink.pri)
 include(pri/mainwindow.pri)
 include(pri/partsbinpalette.pri)
@@ -184,23 +190,20 @@ include(pri/utils.pri)
 include(pri/dock.pri)
 include(pri/items.pri)
 include(pri/autoroute.pri)
-include(pri/dialogs.pri)
+include(src/dialogs/dialogs.pri)
+include(src/ipc/ipc.pri)
 include(pri/connectors.pri)
 include(pri/infoview.pri)
 include(pri/model.pri)
 include(pri/sketch.pri)
 include(pri/translations.pri)
 include(pri/program.pri)
-include(pri/qtsysteminfo.pri)
-
-contains(DEFINES, QUAZIP_INSTALLED) {
-    INCLUDEPATH += /usr/include/quazip
-    LIBS += -lquazip
-} else {
-    include(pri/quazip.pri)
-}
+include(pri/testing.pri)
+include(pri/simulation.pri)
+include(test/version.pri)
+include(pri/clipper1detect.pri)
 
 TARGET = Fritzing
 TEMPLATE = app
 
-message("libs $$LIBS")
+!build_pass:message("libs $$LIBS")

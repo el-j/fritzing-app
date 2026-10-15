@@ -20,32 +20,27 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "ruler.h"
 #include "../utils/graphicsutils.h"
-#include "../fsvgrenderer.h"
 #include "../sketch/infographicsview.h"
-#include "../svg/svgfilesplitter.h"
-#include "moduleidnames.h"
 #include "../utils/textutils.h"
-#include "../utils/boundedregexpvalidator.h"
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QFrame>
 #include <QLabel>
 #include <QLineEdit>
-#include <QRegExp>
 #include <qmath.h>
 
-static const int IndexCm = 0;
-static const int IndexIn = 1;
+static constexpr int IndexCm = 0;
+static constexpr int IndexIn = 1;
 
 static QString DefaultWidth = "";
 
 Ruler::Ruler( ModelPart * modelPart, ViewLayer::ViewID viewID, const ViewGeometry & viewGeometry, long id, QMenu * itemMenu, bool doLabel)
 	: PaletteItem(modelPart, viewID, viewGeometry, id, itemMenu, doLabel)
 {
-	m_widthEditor = NULL;
-	m_unitsEditor = NULL;
-	m_widthValidator = NULL;
+	m_widthEditor = nullptr;
+	m_unitsEditor = nullptr;
+
 	QString w = modelPart->localProp("width").toString();
 	if (w.isEmpty()) {
 		if (DefaultWidth.isEmpty()) {
@@ -110,8 +105,8 @@ QString Ruler::retrieveSvg(ViewLayer::ViewLayerID viewLayerID, QHash<QString, QS
 }
 
 QString Ruler::makeSvg(double inches) {
-	const double cm = 1 / 2.54;
-	const double offset = 0.125;
+	constexpr double cm = 1 / 2.54;
+	constexpr double offset = 0.125;
 	const double mmW = inches * 25.4;// 1/10 centimeter constant
 	const double mmmW = inches * 254;// 1/100 centimeter constant
 
@@ -122,13 +117,11 @@ QString Ruler::makeSvg(double inches) {
 	int counter;
 
 	if (units == IndexCm) {
-		counter = 0;
 		svg += "<g font-family='Droid Sans' text-anchor='middle' font-size='100' stroke-width='1' style='stroke: rgb(100,100,100)'>";
 
 		// 1/100 centimeter spacing
 		for (int i = 0; i <= qCeil(mmmW); i++) {
 			double h = cm / 12;
-			double h2 = h - (cm / 12);
 			double x = (offset + ((double)i / 254)) * GraphicsUtils::StandardFritzingDPI;
 			if (i % 5 == 0) {
 				h = cm / 6;
@@ -162,7 +155,7 @@ QString Ruler::makeSvg(double inches) {
 				       .arg(y)
 				       .arg(QString::number(counter++));
 				if (counter == 1) {
-					svg += QString("<text x='%1' y='%2'>cm</text>").arg(x + 103).arg(y);
+					svg += QString("<text text-anchor='start' x='%1' y='%2'>cm</text>").arg(x + 50).arg(y);
 				}
 			}
 			else if (i % 5 == 0) {
@@ -201,7 +194,8 @@ QString Ruler::makeSvg(double inches) {
 				       .arg(y)
 				       .arg(QString::number(counter++));
 				if (counter == 1) {
-					svg += QString("<text x='%1' y='%2'>in</text>").arg(x + 103).arg(y);
+					svg += QString("<text text-anchor='start' x='%1' y='%2'>%3</text>")
+					.arg(x + 50).arg(y).arg(tr("inch"));
 				}
 			}
 			else if (i % 8 == 0) {
@@ -255,37 +249,40 @@ bool Ruler::hasCustomSVG() {
 
 bool Ruler::collectExtraInfo(QWidget * parent, const QString & family, const QString & prop, const QString & value, bool swappingEnabled, QString & returnProp, QString & returnValue, QWidget * & returnWidget, bool & hide)
 {
+	static constexpr int MaxSpinBoxWidth = 60;
+
 	bool result = PaletteItem::collectExtraInfo(parent, family, prop, value, swappingEnabled, returnProp, returnValue, returnWidget, hide);
 
 	if (prop.compare("width", Qt::CaseInsensitive) == 0) {
-		returnProp = tr("width");
+		returnProp = tr("length");  // Changed from "width" to "length"
 
 		int units = m_modelPart->localProp("width").toString().contains("cm") ? IndexCm : IndexIn;
-		QLineEdit * e1 = new QLineEdit();
-		QDoubleValidator * validator = new QDoubleValidator(e1);
-		validator->setRange(1.0, 20 * ((units == IndexCm) ? 2.54 : 1), 2);
-		validator->setNotation(QDoubleValidator::StandardNotation);
-		validator->setLocale(QLocale::C);
-		e1->setValidator(validator);
-		e1->setEnabled(swappingEnabled);
+
+		// Create QDoubleSpinBox instead of QLineEdit
+		auto * spinBox = new QDoubleSpinBox();
+		spinBox->setDecimals(2);
+		spinBox->setMinimum(1.0);
+		spinBox->setMaximum(20 * ((units == IndexCm) ? 2.54 : 1));
+		spinBox->setSingleStep(0.1);
+		spinBox->setEnabled(swappingEnabled);
+		spinBox->setLocale(TextUtils::getLocale());
 		QString temp = m_modelPart->localProp("width").toString();
 		temp.chop(2);
-		e1->setText(temp);
-		e1->setObjectName("infoViewLineEdit");
-		e1->setMaximumWidth(80);
+		spinBox->setValue(temp.toDouble());
+		spinBox->setObjectName("infoViewDoubleSpinBox");
+		spinBox->setMaximumWidth(MaxSpinBoxWidth);
+		spinBox->setMinimumWidth(MaxSpinBoxWidth);
 
-		m_widthEditor = e1;
-		m_widthValidator = validator;
+
+		m_widthEditor = spinBox;
 
 		// Radio Buttons
-		QRadioButton *radioCm = new QRadioButton(tr("&cm"));
-		QRadioButton *radioIn = new QRadioButton(tr("&in"));
+		auto *radioCm = new QRadioButton(tr("&cm"));
+		auto *radioIn = new QRadioButton(tr("&in"));
 
-		// set radio button object names
 		radioCm->setObjectName("cm");
 		radioIn->setObjectName("in");
 
-		// update pointer and set checked
 		if (units == IndexIn) {
 			radioIn->setChecked(true);
 			m_unitsEditor = radioIn;
@@ -296,24 +293,23 @@ bool Ruler::collectExtraInfo(QWidget * parent, const QString & family, const QSt
 		}
 
 		// spacer to keep radio buttons together when resizing Inspector Window
-		QSpacerItem *item = new QSpacerItem(1,1, QSizePolicy::Expanding, QSizePolicy::Fixed);
+		auto *item = new QSpacerItem(1,1, QSizePolicy::Expanding, QSizePolicy::Fixed);
 
-		QHBoxLayout * hboxLayout = new QHBoxLayout();
+		auto * hboxLayout = new QHBoxLayout();
 		hboxLayout->setAlignment(Qt::AlignRight);
 		hboxLayout->setContentsMargins(0, 0, 0, 0);
 		hboxLayout->setSpacing(5);
-		hboxLayout->setMargin(0);
 
-		hboxLayout->addWidget(e1);
+		hboxLayout->addWidget(spinBox);
 		hboxLayout->addWidget(radioCm);
 		hboxLayout->addWidget(radioIn);
 		hboxLayout->addSpacerItem(item);
 
-		QFrame * frame = new QFrame();
+		auto * frame = new QFrame();
 		frame->setLayout(hboxLayout);
 		frame->setObjectName("infoViewPartFrame");
 
-		connect(e1, SIGNAL(editingFinished()), this, SLOT(widthEntry()));
+		connect(spinBox, SIGNAL(valueChanged(double)), this, SLOT(widthEntry()));
 		connect(radioCm, SIGNAL(clicked()), this, SLOT(unitsEntry()));
 		connect(radioIn, SIGNAL(clicked()), this, SLOT(unitsEntry()));
 
@@ -326,36 +322,32 @@ bool Ruler::collectExtraInfo(QWidget * parent, const QString & family, const QSt
 	return result;
 }
 
-void Ruler::widthEntry() {
-	QLineEdit * edit = qobject_cast<QLineEdit *>(sender());
-	if (edit == NULL) return;
 
-	QString t = edit->text();
+void Ruler::widthEntry() {
+	auto * spinBox = qobject_cast<QDoubleSpinBox *>(sender());
+	if (spinBox == nullptr) return;
+
+	double value = spinBox->value();
 	QString w = prop("width");
 	w.chop(2);
-	if (t.compare(w) == 0) {
+	if (QString::number(value, 'f', 2) == w) {
 		return;
 	}
 
 	InfoGraphicsView * infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
-	if (infoGraphicsView != NULL) {
-		// get current object units
+	if (infoGraphicsView != nullptr) {
 		int units = (m_unitsEditor->objectName() == "cm") ? IndexCm : IndexIn;
-		DefaultWidth = edit->text() + m_unitsEditor->objectName();
-		infoGraphicsView->resizeBoard(edit->text().toDouble(), units, false);
+		DefaultWidth = QString::number(value) + m_unitsEditor->objectName();
+		infoGraphicsView->resizeBoard(value, units, false);
 	}
 }
 
 void Ruler::unitsEntry() {
-	// get clicked object
-	QRadioButton * obj = qobject_cast<QRadioButton *>(sender());
-	if (obj == NULL) return;
+	auto * obj = qobject_cast<QRadioButton *>(sender());
+	if (obj == nullptr) return;
 
-	// update pointer
 	m_unitsEditor = obj;
-
 	QString units = obj->objectName();
-
 	double inches = TextUtils::convertToInches(prop("width"));
 
 	// save local prop incase render fails so we can revert back to original.
@@ -364,12 +356,11 @@ void Ruler::unitsEntry() {
 	if (units == "in") {
 		// set local prop so makeSvg has the current width and units.
 		modelPart()->setLocalProp("width", QVariant(QString::number(inches) + "in"));
-
 		QString s = makeSvg(inches);
 		bool result = resetRenderer(s);
 		if (result) {
-			m_widthEditor->setText(QString::number(inches));
-			m_widthValidator->setTop(20);
+			m_widthEditor->setValue(inches);
+			m_widthEditor->setMaximum(20);
 		}
 		else {
 			// if render error restore original prop
@@ -379,12 +370,11 @@ void Ruler::unitsEntry() {
 	else {
 		// set local prop so makeSvg has the current width and units.
 		modelPart()->setLocalProp("width", QVariant(QString::number(inches * 2.54) + "cm"));
-
 		QString s = makeSvg(inches);
 		bool result = resetRenderer(s);
 		if (result) {
-			m_widthEditor->setText(QString::number(inches * 2.54));
-			m_widthValidator->setTop(20 * 2.54);
+			m_widthEditor->setValue(inches * 2.54);
+			m_widthEditor->setMaximum(20 * 2.54);
 		}
 		else {
 			// if render error restore original prop
@@ -409,7 +399,7 @@ ItemBase::PluralType Ruler::isPlural() {
 
 void Ruler::addedToScene(bool temporary)
 {
-	if (this->scene()) {
+	if (this->scene() != nullptr) {
 		LayerHash viewLayers;
 		QString w = prop("width");
 		modelPart()->setLocalProp("width", "");							// makes sure resizeMM will do the work

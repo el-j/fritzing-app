@@ -23,25 +23,68 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "../utils/graphicsutils.h"
 #include "../utils/textutils.h"
 #include "../debugdialog.h"
-#include <QMatrix>
-#include <QRegExp>
+#include <QTransform>
 #include <QTextStream>
 #include <qmath.h>
+#include <stdexcept>
 
 SvgFlattener::SvgFlattener() : SvgFileSplitter()
 {
 }
 
-void SvgFlattener::flattenChildren(QDomElement &element) {
+SvgAttributesMap SvgFlattener::mergeSvgAttributes(const SvgAttributesMap & inherited_attributes, QDomElement & element) {
+	SvgAttributesMap attributes(inherited_attributes); // copy
+	QStringList attributeNames = {"stroke-width", "fill", "stroke"};
+	for (const auto &attr : attributeNames) {
+		if (element.hasAttribute(attr)) {
+			attributes[attr] = element.attribute(attr);
+		}
+	}
+	return attributes;
+}
 
-	// recurse the children
-	QDomNodeList childList = element.childNodes();
-
-	for(int i = 0; i < childList.length(); i++) {
-		QDomElement child = childList.item(i).toElement();
-		flattenChildren(child);
+void SvgFlattener::applyAttributes(QDomElement &element, QTransform transform, const SvgAttributesMap & attributes) {
+	try {
+		QString sw(attributes.at("stroke-width"));
+		bool ok;
+		double strokeWidth = sw.toDouble(&ok);
+		// When inheriting a stroke-width, we apply any additional transformations to account for scaling.
+		if (ok) {
+			QLineF line(0, 0, strokeWidth, 0);
+			QLineF newLine = transform.map(line);
+			element.setAttribute("stroke-width", QString::number(newLine.length()));
+		}
+	} catch (std::out_of_range const&) {
+		// Expected, sometimes there is no stroke-width
 	}
 
+	static const QStringList attrs = {"fill", "stroke"};
+	for (const QString& attr : attrs) {
+		try {
+			QString value(attributes.at(attr));
+			if (!value.isEmpty()) {
+				element.setAttribute(attr, value);
+			}
+		} catch (std::out_of_range const&) {
+			// Expected, sometimes the attribute is missing
+		}
+	}
+}
+
+void SvgFlattener::flattenChildren(QDomElement &element, const SvgAttributesMap & inherited_attributes) {
+	const SvgAttributesMap attributes = mergeSvgAttributes(inherited_attributes, element);
+
+	QDomNode child = element.firstChild();
+	while (!child.isNull()) {
+		QDomElement childElement = child.toElement();
+		QDomNode nextChild = child.nextSibling(); // Get next before recursion
+		if (!childElement.isNull()) {
+			flattenChildren(childElement, attributes);
+		}
+		child = nextChild;
+	}
+
+	bool didOtherTransform = false;
 	//do translate
 	if(hasTranslate(element)) {
 		QList<double> params = TextUtils::getTransformFloats(element);
@@ -61,32 +104,28 @@ void SvgFlattener::flattenChildren(QDomElement &element) {
 		}
 	}
 	else if(hasOtherTransform(element)) {
-		QMatrix transform = TextUtils::transformStringToMatrix(element.attribute("transform"));
+		didOtherTransform = true;
+		QTransform transform = TextUtils::transformStringToTransform(element.attribute("transform"));
 
 		//DebugDialog::debug(QString("rotating %1 %2 %3 %4 %5 %6").arg(params.at(0)).arg(params.at(1)).arg(params.at(2)).arg(params.at(3)).arg(params.at(4)).arg(params.at(5)));
-		unRotateChild(element, transform);
+		unRotateChild(element, transform, attributes);
+	}
+
+	if(didOtherTransform == false && !element.hasChildNodes()) {
+		QTransform transform = TextUtils::transformStringToTransform(element.attribute("transform"));
+		applyAttributes(element, transform, attributes);
 	}
 
 	// remove transform
 	element.removeAttribute("transform");
 }
 
-void SvgFlattener::unRotateChild(QDomElement & element, QMatrix transform) {
-
+void SvgFlattener::unRotateChild(QDomElement & element, QTransform transform, const SvgAttributesMap & inherited_attributes) {
+	const SvgAttributesMap attributes( mergeSvgAttributes(inherited_attributes, element) );
 	// TODO: missing ellipse element
 
 	if(!element.hasChildNodes()) {
-
-		QString sw = element.attribute("stroke-width");
-		if (!sw.isEmpty()) {
-			bool ok;
-			double strokeWidth = sw.toDouble(&ok);
-			if (ok) {
-				QLineF line(0, 0, strokeWidth, 0);
-				QLineF newLine = transform.map(line);
-				element.setAttribute("stroke-width", QString::number(newLine.length()));
-			}
-		}
+		applyAttributes(element, transform, attributes);
 
 		// I'm a leaf node.
 		QString tag = element.nodeName().toLower();
@@ -120,7 +159,7 @@ void SvgFlattener::unRotateChild(QDomElement & element, QMatrix transform) {
 			float height = element.attribute("height").toFloat();
 			QRectF r(x, y, width, height);
 			QPolygonF poly = transform.map(r);
-			if (GraphicsUtils::isRect(poly)) {
+			if (GraphicsUtils::isFuzzyRect(poly)) {
 				QRectF rect = GraphicsUtils::getRect(poly);
 				element.setAttribute("x", QString::number(rect.left()));
 				element.setAttribute("y", QString::number(rect.top()));
@@ -178,7 +217,7 @@ void SvgFlattener::unRotateChild(QDomElement & element, QMatrix transform) {
 
 	for(int i = 0; i < childList.length(); i++) {
 		QDomElement child = childList.item(i).toElement();
-		unRotateChild(child, transform);
+		unRotateChild(child, transform, attributes);
 	}
 
 }
@@ -190,7 +229,7 @@ bool SvgFlattener::hasTranslate(QDomElement & element)
 	if (transform.startsWith("translate")) return true;
 
 	if (transform.startsWith("matrix")) {
-		QMatrix matrix = TextUtils::transformStringToMatrix(transform);
+		QTransform matrix = TextUtils::transformStringToTransform(transform);
 		matrix.translate(-matrix.dx(), -matrix.dy());
 		if (matrix.isIdentity()) return true;
 	}
@@ -211,7 +250,7 @@ void SvgFlattener::rotateCommandSlot(QChar command, bool relative, QList<double>
 
 	Q_UNUSED(relative);			// just normalizing here, so relative is not used
 
-	PathUserData * pathUserData = (PathUserData *) userData;
+	auto * pathUserData = (PathUserData *) userData;
 
 	pathUserData->string.append(command);
 	double x;
@@ -308,14 +347,14 @@ QString SvgFlattener::flipSMDElement(QDomDocument & domDocument, QDomElement & e
 	Q_UNUSED(printerScale);
 	Q_UNUSED(att);
 
-	QMatrix m;
+	QTransform m;
 	//QRectF bounds = renderer.boundsOnElement(att);
 	QRectF bounds;   // want part bounds, not layer bounds
 	double w, h;
 	TextUtils::ensureViewBox(domDocument, 1, bounds, false, w, h, false);
 	m.translate(bounds.center().x(), bounds.center().y());
-	QMatrix mMinus = m.inverted();
-	QMatrix cm = mMinus * ((orientation & Qt::Vertical) ? QMatrix().scale(-1, 1) : QMatrix().scale(1, -1)) * m;
+	QTransform mMinus = m.inverted();
+	QTransform cm = mMinus * ((orientation & Qt::Vertical) != 0u ? QTransform().scale(-1, 1) : QTransform().scale(1, -1)) * m;
 	QDomElement newElement = element.cloneNode(true).toElement();
 
 #ifndef QT_NODEBUG
@@ -327,7 +366,7 @@ QString SvgFlattener::flipSMDElement(QDomDocument & domDocument, QDomElement & e
 	newElement.removeAttribute("id");
 	QDomElement pElement = domDocument.createElement("g");
 	pElement.setAttribute("id", altAtt);
-	pElement.setAttribute("flipped", true);
+	pElement.setAttribute("flipped", 1);
 	QDomElement mElement = domDocument.createElement("g");
 	TextUtils::setSVGTransform(mElement, cm);
 	pElement.appendChild(mElement);
@@ -359,16 +398,18 @@ QString SvgFlattener::flipSMDElement(QDomDocument & domDocument, QDomElement & e
 
 bool SvgFlattener::loadDocIf(const QString & filename, const QString & svg, QDomDocument & domDocument) {
 	if (domDocument.isNull()) {
-		QString errorStr;
-		int errorLine;
-		int errorColumn;
 		bool result;
 		if (filename.isEmpty()) {
-			result = domDocument.setContent(svg, &errorStr, &errorLine, &errorColumn);
+			QDomDocument::ParseResult parseResult = domDocument.setContent(svg);
+			result = parseResult.operator bool();
 		}
 		else {
 			QFile file(filename);
-			result = domDocument.setContent(&file, &errorStr, &errorLine, &errorColumn);
+			if (!file.open(QIODevice::ReadOnly)) {
+				DebugDialog::debug(QString("Unable to open :%1").arg(filename));
+			}
+			QDomDocument::ParseResult parseResult = domDocument.setContent(&file);
+			result = parseResult.operator bool();
 		}
 		if (!result) {
 			domDocument.clear();			// probably redundant

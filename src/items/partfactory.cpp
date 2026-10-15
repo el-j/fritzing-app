@@ -25,6 +25,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "../model/modelbase.h"
 #include "paletteitem.h"
 #include "symbolpaletteitem.h"
+#include "utils/misc.h"
 #include "wire.h"
 #include "virtualwire.h"
 #include "tracewire.h"
@@ -39,6 +40,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "note.h"
 #include "ruler.h"
 #include "dip.h"
+#include "dipv2.h"
 #include "pinheader.h"
 #include "screwterminal.h"
 #include "hole.h"
@@ -50,11 +52,12 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "stripboard.h"
 #include "led.h"
 #include "schematicsubpart.h"
-#include "layerkinpaletteitem.h"
+#include "oscilloscope.h"
 #include "../utils/folderutils.h"
 #include "../utils/lockmanager.h"
 #include "../utils/textutils.h"
 #include "../utils/graphicsutils.h"
+#include "../svg/svgtext.h"
 
 #include <qmath.h>
 
@@ -69,7 +72,7 @@ ItemBase * PartFactory::createPart( ModelPart * modelPart, ViewLayer::ViewLayerP
 {
 	modelPart->setModelIndexFromMultiplied(id);			// make sure the model index is synched with the id; this is not always the case when parts are first created.
 	ItemBase * itemBase = createPartAux(modelPart, viewID, viewGeometry, id, itemMenu, wireMenu, doLabel);
-	if (itemBase) {
+	if (itemBase != nullptr) {
 		itemBase->setViewLayerPlacement(viewLayerPlacement);
 	}
 	return itemBase;
@@ -85,14 +88,14 @@ ItemBase * PartFactory::createPartAux( ModelPart * modelPart, ViewLayer::ViewID 
 			return new VirtualWire(modelPart, viewID, viewGeometry, id, wireMenu);
 		}
 		if (viewGeometry.getAnyTrace()) {
-			TraceWire * traceWire = new TraceWire(modelPart, viewID, viewGeometry, id, wireMenu);
+			auto * traceWire = new TraceWire(modelPart, viewID, viewGeometry, id, wireMenu);
 			return traceWire;
 		}
 		return new Wire(modelPart, viewID, viewGeometry, id, wireMenu, false);
 
 	}
 	case ModelPart::Note:
-		return new Note(modelPart, viewID, viewGeometry, id, NULL);
+		return new Note(modelPart, viewID, viewGeometry, id, nullptr);
 	case ModelPart::CopperFill:
 		return new GroundPlane(modelPart, viewID, viewGeometry, id, itemMenu, doLabel);
 	case ModelPart::Jumper:
@@ -184,17 +187,28 @@ ItemBase * PartFactory::createPartAux( ModelPart * modelPart, ViewLayer::ViewID 
 			if (moduleID.endsWith(ModuleIDNames::CopperBlockerModuleIDName)) {
 				return new CopperBlocker(modelPart, viewID, viewGeometry, id, itemMenu, doLabel);
 			}
+			if (moduleID.endsWith(ModuleIDNames::OscilloscopeModuleIDName)) {
+				return new Oscilloscope(modelPart, viewID, viewGeometry, id, itemMenu, doLabel);
+			}
 			// must get the subclasses first
 			if (modelPart->itemType() == ModelPart::Breadboard) {
 				return new Breadboard(modelPart, viewID, viewGeometry, id, itemMenu, doLabel);
 			}
 
 		}
-		// TODO: use the list in properties.xml
-		if (moduleID == "alps-starter-pot9mm") {
+
+		// If the moduleID ends with any of the suffixes listed in properties.xml,
+		// use the Capacitor class to be able to change the properties in the Inspector pane
+		// TODO: Otimize the code above this line, as it can be simplified
+		if (PropertyDefMaster::partPropertiesCanBeModified(moduleID)) {
 			return new Capacitor(modelPart, viewID, viewGeometry, id, itemMenu, doLabel);
 		}
+
 		QString family = modelPart->properties().value("family", "");
+		// Check for obsolete capacitor family to ensure properties are preserved during replacement
+		if (family.compare("//obsolete//capacitor", Qt::CaseInsensitive) == 0) {
+			return new Capacitor(modelPart, viewID, viewGeometry, id, itemMenu, doLabel);
+		}
 		if (family.compare("mystery part", Qt::CaseInsensitive) == 0) {
 			return new MysteryPart(modelPart, viewID, viewGeometry, id, itemMenu, doLabel);
 		}
@@ -206,6 +220,9 @@ ItemBase * PartFactory::createPartAux( ModelPart * modelPart, ViewLayer::ViewID 
 		}
 		if (family.compare("generic IC", Qt::CaseInsensitive) == 0) {
 			return new Dip(modelPart, viewID, viewGeometry, id, itemMenu, doLabel);
+		}
+		if (family.compare("generic IC v2", Qt::CaseInsensitive) == 0) {
+			return new DipV2(modelPart, viewID, viewGeometry, id, itemMenu, doLabel);
 		}
 		return new PaletteItem(modelPart, viewID, viewGeometry, id, itemMenu, doLabel);
 
@@ -219,6 +236,22 @@ QString PartFactory::getSvgFilename(ModelPart * modelPart, const QString & baseN
 	QString postfix = "/"+ SvgFilesDir +"/%1/"+ baseName;
 	QString userStore = FolderUtils::getUserPartsPath()+postfix;
 	QString pfPath = PartFactory::folderPath() + postfix;
+
+	// moduleID-based search paths (highest priority for subfolder-structured parts)
+	// SVGs are co-located with FZP in {partsRoot}/%1/{moduleID}/{baseName}
+	QString moduleID = FolderUtils::sanitizeForFolder(modelPart->moduleID());
+	if (!moduleID.isEmpty()) {
+		QString moduleIDPostfix = "/%1/" + moduleID + "/" + baseName;
+		tempPaths << FolderUtils::getLocalPartsPath() + moduleIDPostfix;
+		tempPaths << FolderUtils::getUserPartsPath() + moduleIDPostfix;
+		tempPaths << PartFactory::folderPath() + moduleIDPostfix;
+	}
+
+	// Search localPartsPath without moduleID or svg subdirectory.
+	// Used for Parts Editor temporary SVGs during editing sessions.
+	QString localPostfix = "/%1/" + baseName;
+	tempPaths << FolderUtils::getLocalPartsPath() + localPostfix;
+
 	if(!modelPart->path().isEmpty()) {
 		QString path = modelPart->path();
 		QDir dir(path);			// is a path to a filename
@@ -232,10 +265,6 @@ QString PartFactory::getSvgFilename(ModelPart * modelPart, const QString & baseN
 		if (tempPaths.at(0).compare(pfPath) != 0) {
 			tempPaths << pfPath;
 		}
-		//DebugDialog::debug("temp path");
-		//foreach (QString tempPath, tempPaths) {
-		//    DebugDialog::debug(tempPath);
-		//}
 	}
 	else {
 		DebugDialog::debug("modelPart with no path--this shouldn't happen");
@@ -248,8 +277,8 @@ QString PartFactory::getSvgFilename(ModelPart * modelPart, const QString & baseN
 
 	QString filename;
 	bool exists = false;
-	foreach (QString tempPath, tempPaths) {
-		foreach (QString possibleFolder, ModelPart::possibleFolders()) {
+	Q_FOREACH (QString tempPath, tempPaths) {
+		Q_FOREACH (QString possibleFolder, ModelPart::possibleFolders()) {
 			filename = tempPath.arg(possibleFolder);
 			if (QFileInfo(filename).exists()) {
 				exists = true;
@@ -266,37 +295,23 @@ QString PartFactory::getSvgFilename(ModelPart * modelPart, const QString & baseN
 		filename = PartFactory::getSvgFilename(baseName);
 	}
 
-	if (handleSubparts && modelPart->modelPartShared() && modelPart->modelPartShared()->hasSubparts())
+	if (handleSubparts && (modelPart->modelPartShared() != nullptr) && modelPart->modelPartShared()->hasSubparts())
 	{
-		ModelPartShared * superpart = modelPart->modelPartShared();
-		QString schematicName = superpart->imageFileName(ViewLayer::SchematicView);
-		QString originalPath = getSvgFilename(modelPart, schematicName, true, false);
-		foreach (ModelPartShared * mps, superpart->subparts()) {
-			QString schematicFileName = mps->imageFileName(ViewLayer::SchematicView);
-			if (schematicFileName.isEmpty()) continue;
+		generateSubpartSvgs(modelPart, modelPart->modelPartShared());
+	}
 
-			QString path = partPath() + schematicFileName;
-			QFileInfo info(path);
-			if (info.exists()) {
-				mps->setSubpartOffset(SubpartOffsets.value(path, QPointF(0, 0)));
-				continue;
+	// If the file was not found and this part is a subpart, generate all
+	// sibling subpart SVGs from the superpart on demand.  Previously this
+	// only happened as a side effect of icon rendering in SvgIconWidget,
+	// which is skipped when rasterized icons are cached in the database.
+	if (filename.isEmpty() && modelPart->modelPartShared() != nullptr) {
+		ModelPartShared * parentShared = modelPart->modelPartShared()->superpart();
+		if (parentShared != nullptr) {
+			generateSubpartSvgs(modelPart, parentShared);
+			QString generatedPath = partPath() + baseName;
+			if (QFileInfo(generatedPath).exists()) {
+				filename = generatedPath;
 			}
-
-			QFile file(originalPath);
-			QString errorStr;
-			int errorLine;
-			int errorColumn;
-			QDomDocument doc;
-			if (!doc.setContent(&file, &errorStr, &errorLine, &errorColumn)) {
-				DebugDialog::debug(QString("xml failure %1 %2 %3").arg(errorStr).arg(errorLine).arg(errorColumn));
-				continue;
-			}
-
-			QDomElement root = doc.documentElement();
-			QDomElement top = showSubpart(root, mps->subpartID());
-			fixSubpartBounds(top, mps);
-			SubpartOffsets.insert(path, mps->subpartOffset());
-			TextUtils::writeUtf8(path, doc.toString(4));
 		}
 	}
 
@@ -351,10 +366,16 @@ QString PartFactory::getSvgFilename(const QString & fileName)
 		return getSvgFilenameAux(fileName, &PinHeader::makePcbSvg);
 	}
 
+	if (osFileName.startsWith("schematic/generic_ic_dip_v2_", Qt::CaseInsensitive)) {
+		return getSvgFilenameAux(fileName, &DipV2::makeSchematicV2Svg);
+	}
 	if (osFileName.startsWith("schematic/generic_ic_dip_", Qt::CaseInsensitive)) {
 		return getSvgFilenameAux(fileName, &Dip::makeSchematicSvg);
 	}
 
+	if (osFileName.startsWith("breadboard/generic_ic_dip_v2_", Qt::CaseInsensitive)) {
+		return getSvgFilenameAux(fileName, &DipV2::makeBreadboardDipV2Svg);
+	}
 	if (osFileName.startsWith("breadboard/generic_ic_dip_", Qt::CaseInsensitive)) {
 		return getSvgFilenameAux(fileName, &Dip::makeBreadboardSvg);
 	}
@@ -483,6 +504,9 @@ QString PartFactory::getFzpFilename(const QString & moduleID)
 		return getFzpFilenameAux(moduleID, &Stripboard::genFZP);
 	}
 
+	if (moduleID.startsWith("generic_ic_dip_v2")) {
+		return getFzpFilenameAux(moduleID, &DipV2::genDipV2FZP);
+	}
 	if (moduleID.startsWith("generic_ic_dip")) {
 		return getFzpFilenameAux(moduleID, &Dip::genDipFZP);
 	}
@@ -511,6 +535,44 @@ QString PartFactory::getFzpFilename(const QString & moduleID)
 	return "";
 }
 
+void PartFactory::generateSubpartSvgs(ModelPart * modelPart, ModelPartShared * parentShared)
+{
+	QString schematicName = parentShared->imageFileName(ViewLayer::SchematicView);
+	if (schematicName.isEmpty()) return;
+
+	QString originalPath = getSvgFilename(modelPart, schematicName, true, false);
+	if (originalPath.isEmpty()) return;
+
+	for (ModelPartShared * mps : parentShared->subparts()) {
+		QString schematicFileName = mps->imageFileName(ViewLayer::SchematicView);
+		if (schematicFileName.isEmpty()) continue;
+
+		QString path = partPath() + schematicFileName;
+		QFileInfo info(path);
+		if (info.exists()) {
+			mps->setSubpartOffset(SubpartOffsets.value(path, QPointF(0, 0)));
+			continue;
+		}
+
+		QFile file(originalPath);
+		if (!file.open(QIODevice::ReadOnly)) {
+			DebugDialog::debug(QString("Unable to open :%1").arg(originalPath));
+		}
+		QDomDocument doc;
+		QDomDocument::ParseResult parseResult = doc.setContent(&file);
+		if (!parseResult) {
+			DebugDialog::debug(QString("xml failure %1 %2 %3").arg(parseResult.errorMessage).arg(parseResult.errorLine).arg(parseResult.errorColumn));
+			continue;
+		}
+
+		QDomElement root = doc.documentElement();
+		QDomElement top = showSubpart(root, mps->subpartID());
+		fixSubpartBounds(top, mps);
+		SubpartOffsets.insert(path, mps->subpartOffset());
+		TextUtils::writeUtf8(path, doc.toString(4));
+	}
+}
+
 void PartFactory::initFolder()
 {
 	LockManager::initLockedFiles("partfactory", PartFactoryFolderPath, LockedFiles, LockManager::SlowTime);
@@ -529,7 +591,7 @@ ModelPart * PartFactory::fixObsoleteModuleID(QDomDocument & domDocument, QDomEle
 	// TODO: less hard-coding
 	if (moduleIDRef.startsWith("generic_male")) {
 		ModelPart * modelPart = referenceModel->retrieveModelPart(moduleIDRef);
-		if (modelPart != NULL) {
+		if (modelPart != nullptr) {
 			instance.setAttribute("moduleIdRef", moduleIDRef);
 			QDomElement prop = domDocument.createElement("property");
 			instance.appendChild(prop);
@@ -541,7 +603,7 @@ ModelPart * PartFactory::fixObsoleteModuleID(QDomDocument & domDocument, QDomEle
 
 	if (moduleIDRef.startsWith("generic_rounded_female")) {
 		ModelPart * modelPart = referenceModel->retrieveModelPart(moduleIDRef);
-		if (modelPart != NULL) {
+		if (modelPart != nullptr) {
 			instance.setAttribute("moduleIdRef", moduleIDRef);
 			QDomElement prop = domDocument.createElement("property");
 			instance.appendChild(prop);
@@ -551,7 +613,7 @@ ModelPart * PartFactory::fixObsoleteModuleID(QDomDocument & domDocument, QDomEle
 		}
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 QString PartFactory::folderPath() {
@@ -566,18 +628,6 @@ QString PartFactory::partPath() {
 	return PartFactoryFolderPath + "/svg/core/";
 }
 
-QString PartFactory::makeSchematicSipOrDipOr(const QStringList & labels, bool hasLayout, bool sip)
-{
-	if (hasLayout) {
-		return MysteryPart::makeSchematicSvg(labels, false);
-	}
-
-	if (sip) {
-		return MysteryPart::makeSchematicSvg(labels, true);
-	}
-
-	return Dip::makeSchematicSvg(labels);
-}
 
 QDomElement PartFactory::showSubpart(QDomElement & root, const QString & subpart)
 {
@@ -632,11 +682,11 @@ void PartFactory::fixSubpartBounds(QDomElement & top, ModelPartShared * mps)
 	QDomDocument doc = top.ownerDocument();
 	TextUtils::getSvgSizes(doc, sWidth, sHeight, vbWidth, vbHeight);
 
-	QMatrix m = renderer.matrixForElement(mps->subpartID());
+	QTransform m = renderer.transformForElement(mps->subpartID());
 	QRectF elementBounds = renderer.boundsOnElement(mps->subpartID());
 	QRectF bounds = m.mapRect(elementBounds);                                   // bounds is in terms of the whole svg
 
-	// unfortunately, QSvgRenderer doesn't deal with text bounds
+	// unfortunately, QSvgRenderer doesn't deal with text bounds, QTBUG-32405
 
 	int w = qCeil(sWidth * GraphicsUtils::SVGDPI);
 	int h = qCeil(sWidth * GraphicsUtils::SVGDPI);
@@ -648,17 +698,15 @@ void PartFactory::fixSubpartBounds(QDomElement & top, ModelPartShared * mps)
 		texts.append(nodeList.at(i).toElement());
 	}
 
-	int ix = 0;
-	foreach (QDomElement text, texts) {
+	Q_FOREACH (QDomElement text, texts) {
 		text.setTagName("g");
 	}
 
-	ix = 0;
-	foreach (QDomElement text, texts) {
+	Q_FOREACH (QDomElement text, texts) {
 		int minX, minY, maxX, maxY;
-		QMatrix matrix;
+		QTransform matrix;
 		QRectF viewBox2;
-		SchematicTextLayerKinPaletteItem::renderText(image, text, minX, minY, maxX, maxY, matrix, viewBox2);
+		SvgText::renderText(image, text, minX, minY, maxX, maxY, matrix, viewBox2);
 		QRectF r(minX * viewBox.width() / image.width(),
 		         minY * viewBox.height() / image.height(),
 		         (maxX - minX) * viewBox.width() / image.width(),
@@ -666,7 +714,7 @@ void PartFactory::fixSubpartBounds(QDomElement & top, ModelPartShared * mps)
 		bounds |= r;
 	}
 
-	foreach (QDomElement text, texts) {
+	Q_FOREACH (QDomElement text, texts) {
 		text.setTagName("text");
 	}
 
